@@ -65,3 +65,7 @@ clean:
 	@rm -f *.o
 	@rm -f lfs/*.o
 	@rm -f $(TARGET)
+
+
+lfs.img: $(TARGET)
+	mklfs -c lfs -b 512 -r 16 -p 16 -s 100000 -i 512000 lfs.img
