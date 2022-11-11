@@ -7,3 +7,16 @@ tags
 *.syms
 *.bc
 *.ll
+
+include/config
+.kconfig.d
+include/autoconf.h
+nautilus.secs
+scripts/basic/docproc
+scripts/basic/fixdep
+scripts/basic/split-include
+scripts/format_secs
+scripts/format_syms
+scripts/kconfig/conf
+scripts/kconfig/lxdialog/lxdialog
+scripts/kconfig/mconf
