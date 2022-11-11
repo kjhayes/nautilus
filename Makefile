@@ -1166,3 +1166,8 @@ FORCE:
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable se we can use it in if_changed and friends.
 .PHONY: $(PHONY)
+
+
+lfsroot.img:
+	make -C tools/mklfs
+	tools/mklfs/mklfs -c root -b 512 -r 16 -p 16 -s 1000000 -i lfsroot.img
