@@ -4,6 +4,7 @@ tags
 .config*
 *.bin
 *.iso
+*.img
 *.syms
 *.bc
 *.ll
