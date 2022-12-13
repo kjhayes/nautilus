@@ -89,8 +89,6 @@ struct lfs_state {
 
 static ssize_t lfs_nk_read_write(void *state, void *filestate, void *srcdest,
                                  off_t offset, size_t num_bytes, int write) {
-
-  INFO("in %s\n", __FUNCTION__);
   struct lfs_state *fs = state;
   char *path = filestate;
   ssize_t res = 0;
@@ -115,30 +113,31 @@ static ssize_t lfs_nk_read_write(void *state, void *filestate, void *srcdest,
 
 static ssize_t lfs_nk_read(void *state, void *file, void *srcdest, off_t offset,
                            size_t num_bytes) {
-  INFO("in %s\n", __FUNCTION__);
   return lfs_nk_read_write(state, file, srcdest, offset, num_bytes, 0);
 }
 
 static ssize_t lfs_nk_write(void *state, void *file, void *srcdest,
                             off_t offset, size_t num_bytes) {
-  INFO("in %s\n", __FUNCTION__);
   return lfs_nk_read_write(state, file, srcdest, offset, num_bytes, 1);
 }
 
 static void *lfs_nk_create_file(void *state, char *path) {
-  INFO("in %s\n", __FUNCTION__);
+  lfs_file_t f;
   struct lfs_state *fs = state;
-  return NULL;
+  if (lfs_file_open(&fs->lfs, &f, "boot_count", LFS_O_RDWR | LFS_O_CREAT)) {
+    return NULL;
+  }
+
+  lfs_file_close(&fs->lfs, &f);
+  return strdup(path);
 }
 
 static int lfs_nk_create_dir(void *state, char *path) {
-  INFO("in %s\n", __FUNCTION__);
   struct lfs_state *fs = state;
-  return -1;
+  return lfs_mkdir(&fs->lfs, path);
 }
 
 static int lfs_nk_exists(void *state, char *path) {
-  INFO("in %s\n", __FUNCTION__);
   struct lfs_state *fs = state;
   struct lfs_info info;
   int err = lfs_stat(&fs->lfs, path, &info);
@@ -146,13 +145,11 @@ static int lfs_nk_exists(void *state, char *path) {
 }
 
 static int lfs_nk_remove(void *state, char *path) {
-  INFO("in %s\n", __FUNCTION__);
   struct lfs_state *fs = state;
   return lfs_remove(&fs->lfs, path);
 }
 
 static void *lfs_nk_open(void *state, char *path) {
-  INFO("in %s\n", __FUNCTION__);
   if (lfs_nk_exists(state, path)) {
     return strdup(path);
   }
@@ -160,26 +157,32 @@ static void *lfs_nk_open(void *state, char *path) {
 }
 
 static int lfs_nk_stat_path(void *state, char *path, struct nk_fs_stat *st) {
-  INFO("in %s\n", __FUNCTION__);
   struct lfs_state *fs = state;
-  return -1;
+  struct lfs_info info;
+  if (lfs_stat(&fs->lfs, path, &info)) {
+    return -1;
+  }
+  // TODO: expand
+  st->st_size = info.size;
+  return 0;
 }
 static int lfs_nk_stat(void *state, void *file, struct nk_fs_stat *st) {
-  INFO("in %s\n", __FUNCTION__);
-  struct lfs_state *fs = state;
-  return -1;
+  return lfs_nk_stat_path(state, (char *)file, st);
 }
 
 static int lfs_nk_truncate(void *state, void *file, off_t len) {
-  INFO("in %s\n", __FUNCTION__);
+  lfs_file_t f;
   struct lfs_state *fs = state;
-  return -1;
+  char *path = file;
+
+  if (lfs_file_open(&fs->lfs, &f, path, LFS_O_RDONLY))
+    return -1;
+  lfs_file_truncate(&fs->lfs, &f, len);
+  lfs_file_close(&fs->lfs, &f);
+  return 0;
 }
 
-static void lfs_nk_close(void *state, void *file) {
-  INFO("in %s\n", __FUNCTION__);
-  free(file);
-}
+static void lfs_nk_close(void *state, void *file) { free(file); }
 
 // filesystem interface
 static struct nk_fs_int lfs_nk_inter = {
