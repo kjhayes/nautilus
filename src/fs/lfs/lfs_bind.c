@@ -35,7 +35,7 @@
 #define DEBUG(fmt, args...) DEBUG_PRINT("littlefs: " fmt, ##args)
 #define ERROR(fmt, args...) ERROR_PRINT("littlefs: " fmt, ##args)
 
-#ifndef NAUT_CONFIG_DEBUG_FAT32_FILESYSTEM_DRIVER
+#ifndef NAUT_CONFIG_DEBUG_lfs_FILESYSTEM_DRIVER
 #undef DEBUG
 #define DEBUG(fmt, args...)
 #endif
@@ -79,6 +79,124 @@ struct lfs_state {
 
   struct lfs_config cfg;
 };
+
+// ------------------- [ Interface to the nautilus kernel ] -------------------
+// HACK: the "file state" is the path in the filesystem. This is because it's
+// technically wrong to have multiple files open at once in LFS. To fix this, we
+// open and close the file when reading and writing. This is horribly slow, but
+// could be a good reason to optimize using demand paging in the paging lab :)
+//                                                      - Nick
+
+static ssize_t lfs_nk_read_write(void *state, void *filestate, void *srcdest,
+                                 off_t offset, size_t num_bytes, int write) {
+
+  INFO("in %s\n", __FUNCTION__);
+  struct lfs_state *fs = state;
+  char *path = filestate;
+  ssize_t res = 0;
+  int flags = write ? LFS_O_WRONLY : LFS_O_RDONLY;
+  lfs_file_t file;
+
+  if (lfs_file_open(&fs->lfs, &file, path, flags)) {
+    return -1;
+  }
+
+  lfs_file_seek(&fs->lfs, &file, offset, LFS_SEEK_SET);
+
+  if (write) {
+    res = lfs_file_write(&fs->lfs, &file, srcdest, num_bytes);
+  } else {
+    res = lfs_file_read(&fs->lfs, &file, srcdest, num_bytes);
+  }
+
+  lfs_file_close(&fs->lfs, &file);
+  return res;
+}
+
+static ssize_t lfs_nk_read(void *state, void *file, void *srcdest, off_t offset,
+                           size_t num_bytes) {
+  INFO("in %s\n", __FUNCTION__);
+  return lfs_nk_read_write(state, file, srcdest, offset, num_bytes, 0);
+}
+
+static ssize_t lfs_nk_write(void *state, void *file, void *srcdest,
+                            off_t offset, size_t num_bytes) {
+  INFO("in %s\n", __FUNCTION__);
+  return lfs_nk_read_write(state, file, srcdest, offset, num_bytes, 1);
+}
+
+static void *lfs_nk_create_file(void *state, char *path) {
+  INFO("in %s\n", __FUNCTION__);
+  struct lfs_state *fs = state;
+  return NULL;
+}
+
+static int lfs_nk_create_dir(void *state, char *path) {
+  INFO("in %s\n", __FUNCTION__);
+  struct lfs_state *fs = state;
+  return -1;
+}
+
+static int lfs_nk_exists(void *state, char *path) {
+  INFO("in %s\n", __FUNCTION__);
+  struct lfs_state *fs = state;
+  struct lfs_info info;
+  int err = lfs_stat(&fs->lfs, path, &info);
+  return (err == 0);
+}
+
+static int lfs_nk_remove(void *state, char *path) {
+  INFO("in %s\n", __FUNCTION__);
+  struct lfs_state *fs = state;
+  return lfs_remove(&fs->lfs, path);
+}
+
+static void *lfs_nk_open(void *state, char *path) {
+  INFO("in %s\n", __FUNCTION__);
+  if (lfs_nk_exists(state, path)) {
+    return strdup(path);
+  }
+  return NULL;
+}
+
+static int lfs_nk_stat_path(void *state, char *path, struct nk_fs_stat *st) {
+  INFO("in %s\n", __FUNCTION__);
+  struct lfs_state *fs = state;
+  return -1;
+}
+static int lfs_nk_stat(void *state, void *file, struct nk_fs_stat *st) {
+  INFO("in %s\n", __FUNCTION__);
+  struct lfs_state *fs = state;
+  return -1;
+}
+
+static int lfs_nk_truncate(void *state, void *file, off_t len) {
+  INFO("in %s\n", __FUNCTION__);
+  struct lfs_state *fs = state;
+  return -1;
+}
+
+static void lfs_nk_close(void *state, void *file) {
+  INFO("in %s\n", __FUNCTION__);
+  free(file);
+}
+
+// filesystem interface
+static struct nk_fs_int lfs_nk_inter = {
+    .stat_path = lfs_nk_stat_path,
+    .create_file = lfs_nk_create_file,
+    .create_dir = lfs_nk_create_dir,
+    .exists = lfs_nk_exists,
+    .remove = lfs_nk_remove,
+    .open_file = lfs_nk_open,
+    .stat = lfs_nk_stat,
+    .trunc_file = lfs_nk_truncate,
+    .close_file = lfs_nk_close,
+    .read_file = lfs_nk_read,
+    .write_file = lfs_nk_write,
+};
+
+// ------------------- [ ================================ ] -------------------
 
 // Read a region in a block. Negative error codes are propagated
 // to the user.
@@ -177,12 +295,6 @@ int nk_fs_lfs_attach(char *devname, char *fsname, int readonly) {
   s->cfg.block_cycles = -1;   // no wear leveling
   s->cfg.context = (void *)s; // pass the state to handlerss
 
-  // if (lfs_format(&s->lfs, &s->cfg)) {
-  //   ERROR("could not format %s\n", fsname);
-  //   free(s);
-  //   return -1;
-  // }
-
   if (lfs_mount(&s->lfs, &s->cfg) != 0) {
     ERROR("could not mount %s\n", fsname);
     free(s);
@@ -191,23 +303,26 @@ int nk_fs_lfs_attach(char *devname, char *fsname, int readonly) {
 
   INFO("Mounted %s\n", fsname);
 
-  lfs_file_t file;
-  INFO("trying to open\n");
-  int r = lfs_file_open(&s->lfs, &file, "test.txt", LFS_O_RDWR | LFS_O_CREAT);
-  INFO("r = %d\n", r);
-
-  char content[512];
-  int sz = lfs_file_read(&s->lfs, &file, content, 512);
-  INFO("read %d bytes:\n", sz);
-
-  hexdump(content, sz);
-
-  lfs_file_close(&s->lfs, &file);
-  lfs_unmount(&s->lfs);
-
-  while (1) {
+  // register the filesystem with the rest of the kernel
+  s->fs = nk_fs_register(fsname, flags, &lfs_nk_inter, s);
+  if (!s->fs) {
+    ERROR("Unable to register filesystem %s\n", fsname);
+    lfs_unmount(&s->lfs);
+    free(s);
+    return -1;
   }
-  return -1;
+  INFO("filesystem %s on device %s is attached (%s)\n", fsname, devname,
+       readonly ? "readonly" : "read/write");
+
+  return 0;
 }
 
-int nk_fs_lfs_detach(char *fsname) { return -1; }
+int nk_fs_lfs_detach(char *fsname) {
+  struct nk_fs *fs = nk_fs_find(fsname);
+  if (!fs) {
+    return -1;
+  } else {
+    INFO("TODO: deregister correctly!\n");
+    return nk_fs_unregister(fs);
+  }
+}

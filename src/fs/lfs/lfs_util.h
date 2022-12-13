@@ -31,7 +31,7 @@
 extern "C" {
 #endif
 
-#define LFS_YES_TRACE
+// #define LFS_YES_TRACE
 
 // Macros, may be replaced by system specific wrappers. Arguments to these
 // macros must not have side-effects as the macros can be removed for a smaller
