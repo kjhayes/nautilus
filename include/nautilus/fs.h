@@ -56,6 +56,7 @@ struct nk_fs_int {
     ssize_t  (*read_file)(void *state, void *file, void *dest, off_t offset, size_t n);
     ssize_t  (*write_file)(void *state, void *file, void *src, off_t offset, size_t n);
     void  (*close_file)(void *state, void *file);
+    char **(*list_directory)(void *state, char *path);
 };
 
 // This is the class for a filesystem.  It should be the first
@@ -117,6 +118,11 @@ ssize_t    nk_fs_tell(nk_fs_fd_t fd);
 ssize_t    nk_fs_read(nk_fs_fd_t fd, void *buf, size_t len);
 ssize_t    nk_fs_write(nk_fs_fd_t fd, void *buf, size_t len);
 int        nk_fs_close(nk_fs_fd_t fd);
+// Returns a null terminated list of strings. To be freed with
+// `nk_fs_free_list()` if not NULL.  Returning NULL indiciates either the file
+// was not a directory, or the filesystem does not support listing.
+char **   nk_fs_list(char *path); 
+void nk_fs_free_list(char **names);
 
 
 void test_fs(void);

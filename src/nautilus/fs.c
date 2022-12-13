@@ -524,6 +524,41 @@ ssize_t nk_fs_tell(nk_fs_fd_t fd)
 }
 
 
+
+char **nk_fs_list(char *path) {
+    STATE_LOCK_CONF;
+    struct nk_fs *fs;
+    char fs_name[strlen(path)+1];
+
+    DEBUG("open path %s, flags=%d, mode=%d\n",path,flags,mode);
+
+    path=decode_path(path,fs_name);
+
+    STATE_LOCK();
+    fs = __fs_find(fs_name);
+    STATE_UNLOCK();
+
+    if (!fs) { 
+        ERROR("Cannot find filesystem named %s\n",fs_name);
+        return NULL;
+    }
+
+    if (fs && fs->interface && fs->interface->list_directory) {
+	    return fs->interface->list_directory(fs->state, path);
+    } else {
+	    return 0;
+    }
+}
+
+void nk_fs_free_list(char **names) {
+    if (names == NULL) return;
+    for (int i = 0; names[i] != NULL; i++) {
+        free(names[i]);
+    }
+    free(names);
+}
+
+
 void nk_fs_dump_filesystems()
 {
     STATE_LOCK_CONF;
@@ -725,6 +760,23 @@ handle_ofs (char * buf, void * priv)
     return 0;
 }
 
+
+static int
+handle_ls (char * buf, void * priv)
+{
+    char **names = nk_fs_list("/");
+    if (names == NULL) {
+        nk_vc_printf("could not list\n");
+        return 0;
+    }
+
+    for (int i = 0; names[i]; i++) {
+        nk_vc_printf("%s\n", names[i]);
+    }
+    nk_fs_free_list(names);
+    return 0;
+}
+
 static int
 handle_cat (char * buf, void * priv)
 {
@@ -777,6 +829,14 @@ static struct shell_cmd_impl ofs_impl = {
     .handler  = handle_ofs,
 };
 nk_register_shell_cmd(ofs_impl);
+
+static struct shell_cmd_impl ls_impl = {
+    .cmd      = "ls",
+    .help_str = "ls",
+    .handler  = handle_ls,
+};
+nk_register_shell_cmd(ls_impl);
+
 
 static struct shell_cmd_impl cat_impl = {
     .cmd      = "cat",
