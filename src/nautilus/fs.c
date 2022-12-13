@@ -759,6 +759,8 @@ handle_cat (char * buf, void * priv)
         }
     } while (ct>0);
 
+    nk_fs_close(fd);
+
     return 0;
 }
 
