@@ -1157,7 +1157,10 @@ user: FORCE
 		src=$(src)/$@ \
 		all
 
-
+PHONY += ramdisk.img
+ramdisk.img:
+	make -C tools/mklfs
+	tools/mklfs/mklfs -c root -b 512 -r 512 -p 512 -s 1048576 -i $@
 
 PHONY += FORCE
 FORCE:
@@ -1165,9 +1168,4 @@ FORCE:
 
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable se we can use it in if_changed and friends.
-.PHONY: $(PHONY) root.img
-
-
-root.img:
-	make -C tools/mklfs
-	tools/mklfs/mklfs -c root -b 4096 -r 4096 -p 4096 -s 1000000 -i root.img
+.PHONY: $(PHONY)
