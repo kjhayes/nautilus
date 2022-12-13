@@ -184,6 +184,38 @@ static int lfs_nk_truncate(void *state, void *file, off_t len) {
 
 static void lfs_nk_close(void *state, void *file) { free(file); }
 
+static char **lfs_nk_list(void *state, char *path) {
+
+  struct lfs_state *fs = state;
+  lfs_dir_t dir;
+
+  if (lfs_dir_open(&fs->lfs, &dir, path))
+    return NULL;
+
+  char **names = NULL;
+  int ind = 0;
+
+  struct lfs_info info;
+  while (true) {
+    int res = lfs_dir_read(&fs->lfs, &dir, &info);
+    if (res < 0) {
+      break;
+    }
+    if (res == 0) {
+      break;
+    }
+
+    names = realloc(names, sizeof(char *) * (ind + 2));
+
+    names[ind] = strdup(info.name);
+    names[ind + 1] = NULL;
+    ind++;
+  }
+
+  lfs_dir_close(&fs->lfs, &dir);
+  return names;
+}
+
 // filesystem interface
 static struct nk_fs_int lfs_nk_inter = {
     .stat_path = lfs_nk_stat_path,
@@ -197,6 +229,7 @@ static struct nk_fs_int lfs_nk_inter = {
     .close_file = lfs_nk_close,
     .read_file = lfs_nk_read,
     .write_file = lfs_nk_write,
+    .list_directory = lfs_nk_list,
 };
 
 // ------------------- [ ================================ ] -------------------
