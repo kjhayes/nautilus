@@ -5425,12 +5425,16 @@ lfs_ssize_t lfs_getattr(lfs_t *lfs, const char *path, uint8_t type,
   if (err) {
     return err;
   }
-  LFS_TRACE("lfs_getattr(%p, \"%s\", %" PRIu8 ", %p, %u)", (void *)lfs, path,
-            type, buffer, size);
+  LFS_TRACE("lfs_getattr(%p, \"%s\", %"
+            "u"
+            ", %p, %u)",
+            (void *)lfs, path, type, buffer, size);
 
   lfs_ssize_t res = lfs_rawgetattr(lfs, path, type, buffer, size);
 
-  LFS_TRACE("lfs_getattr -> %" PRId32, res);
+  LFS_TRACE("lfs_getattr -> %"
+            "d",
+            res);
   LFS_UNLOCK(lfs->cfg);
   return res;
 }
@@ -5442,8 +5446,10 @@ int lfs_setattr(lfs_t *lfs, const char *path, uint8_t type, const void *buffer,
   if (err) {
     return err;
   }
-  LFS_TRACE("lfs_setattr(%p, \"%s\", %" PRIu8 ", %p, %u)", (void *)lfs, path,
-            type, buffer, size);
+  LFS_TRACE("lfs_setattr(%p, \"%s\", %"
+            "u"
+            ", %p, %u)",
+            (void *)lfs, path, type, buffer, size);
 
   err = lfs_rawsetattr(lfs, path, type, buffer, size);
 
@@ -5459,7 +5465,10 @@ int lfs_removeattr(lfs_t *lfs, const char *path, uint8_t type) {
   if (err) {
     return err;
   }
-  LFS_TRACE("lfs_removeattr(%p, \"%s\", %" PRIu8 ")", (void *)lfs, path, type);
+  LFS_TRACE("lfs_removeattr(%p, \"%s\", %"
+            "u"
+            ")",
+            (void *)lfs, path, type);
 
   err = lfs_rawremoveattr(lfs, path, type);
 
@@ -5550,7 +5559,9 @@ lfs_ssize_t lfs_file_read(lfs_t *lfs, lfs_file_t *file, void *buffer,
 
   lfs_ssize_t res = lfs_file_rawread(lfs, file, buffer, size);
 
-  LFS_TRACE("lfs_file_read -> %" PRId32, res);
+  LFS_TRACE("lfs_file_read -> %"
+            "d",
+            res);
   LFS_UNLOCK(lfs->cfg);
   return res;
 }
@@ -5568,7 +5579,9 @@ lfs_ssize_t lfs_file_write(lfs_t *lfs, lfs_file_t *file, const void *buffer,
 
   lfs_ssize_t res = lfs_file_rawwrite(lfs, file, buffer, size);
 
-  LFS_TRACE("lfs_file_write -> %" PRId32, res);
+  LFS_TRACE("lfs_file_write -> %"
+            "d",
+            res);
   LFS_UNLOCK(lfs->cfg);
   return res;
 }
@@ -5580,13 +5593,17 @@ lfs_soff_t lfs_file_seek(lfs_t *lfs, lfs_file_t *file, lfs_soff_t off,
   if (err) {
     return err;
   }
-  LFS_TRACE("lfs_file_seek(%p, %p, %" PRId32 ", %d)", (void *)lfs, (void *)file,
-            off, whence);
+  LFS_TRACE("lfs_file_seek(%p, %p, %"
+            "d"
+            ", %d)",
+            (void *)lfs, (void *)file, off, whence);
   LFS_ASSERT(lfs_mlist_isopen(lfs->mlist, (struct lfs_mlist *)file));
 
   lfs_soff_t res = lfs_file_rawseek(lfs, file, off, whence);
 
-  LFS_TRACE("lfs_file_seek -> %" PRId32, res);
+  LFS_TRACE("lfs_file_seek -> %"
+            "d",
+            res);
   LFS_UNLOCK(lfs->cfg);
   return res;
 }
@@ -5618,7 +5635,9 @@ lfs_soff_t lfs_file_tell(lfs_t *lfs, lfs_file_t *file) {
 
   lfs_soff_t res = lfs_file_rawtell(lfs, file);
 
-  LFS_TRACE("lfs_file_tell -> %" PRId32, res);
+  LFS_TRACE("lfs_file_tell -> %"
+            "d",
+            res);
   LFS_UNLOCK(lfs->cfg);
   return res;
 }
@@ -5647,7 +5666,9 @@ lfs_soff_t lfs_file_size(lfs_t *lfs, lfs_file_t *file) {
 
   lfs_soff_t res = lfs_file_rawsize(lfs, file);
 
-  LFS_TRACE("lfs_file_size -> %" PRId32, res);
+  LFS_TRACE("lfs_file_size -> %"
+            "d",
+            res);
   LFS_UNLOCK(lfs->cfg);
   return res;
 }
@@ -5734,7 +5755,9 @@ lfs_soff_t lfs_dir_tell(lfs_t *lfs, lfs_dir_t *dir) {
 
   lfs_soff_t res = lfs_dir_rawtell(lfs, dir);
 
-  LFS_TRACE("lfs_dir_tell -> %" PRId32, res);
+  LFS_TRACE("lfs_dir_tell -> %"
+            "d",
+            res);
   LFS_UNLOCK(lfs->cfg);
   return res;
 }
@@ -5762,7 +5785,9 @@ lfs_ssize_t lfs_fs_size(lfs_t *lfs) {
 
   lfs_ssize_t res = lfs_fs_rawsize(lfs);
 
-  LFS_TRACE("lfs_fs_size -> %" PRId32, res);
+  LFS_TRACE("lfs_fs_size -> %"
+            "d",
+            res);
   LFS_UNLOCK(lfs->cfg);
   return res;
 }
