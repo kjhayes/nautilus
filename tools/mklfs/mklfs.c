@@ -265,20 +265,24 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
+  memset(&cfg, 0, sizeof(cfg));
   // Mount the file system
   cfg.read = lfs_read;
   cfg.prog = lfs_prog;
   cfg.erase = lfs_erase;
   cfg.sync = lfs_sync;
 
+  // access size configurations
   cfg.block_size = block_size;
   cfg.read_size = read_size;
   cfg.prog_size = prog_size;
   cfg.block_count = fs_size / cfg.block_size;
-  cfg.lookahead = 32;
+  cfg.lookahead_size = 32;
+  cfg.cache_size = block_size;
+  cfg.block_cycles = -1;
   cfg.context = NULL;
 
-  printf("bc: %d, la: %d\n", cfg.block_count, cfg.lookahead);
+  printf("bc: %d, la: %d\n", cfg.block_count, cfg.lookahead_size);
 
   data = calloc(1, fs_size);
   if (!data) {
