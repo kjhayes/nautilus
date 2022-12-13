@@ -129,6 +129,10 @@
 #include <fs/fat32/fat32.h>
 #endif
 
+#ifdef NAUT_CONFIG_LITTLEFS_FILESYSTEM_DRIVER
+#include <fs/lfs/lfs.h>
+#endif
+
 #ifdef NAUT_CONFIG_NDPC_RT
 #include <rt/ndpc/ndpc.h>
 #endif
@@ -550,6 +554,13 @@ init (unsigned long mbd,
 #ifdef NAUT_CONFIG_FAT32_FILESYSTEM_DRIVER
 #ifdef NAUT_CONFIG_RAMDISK_EMBED
     nk_fs_fat32_attach("ramdisk0","rootfs", 1);
+#endif
+#endif
+
+
+#ifdef NAUT_CONFIG_LITTLEFS_FILESYSTEM_DRIVER
+#ifdef NAUT_CONFIG_RAMDISK_EMBED
+    nk_fs_lfs_attach("ramdisk0","rootfs", 1);
 #endif
 #endif
 
