@@ -1161,7 +1161,7 @@ user: FORCE
 USER_PROGRAMS=$(wildcard user/bin/*.c)
 USER_OBJECTS=$(patsubst %.c,%.o,$(USER_PROGRAMS))
 USER_BINARIES=$(patsubst user/bin/%.c,root/%,$(USER_PROGRAMS))
-UCFLAGS=-O1 -nostdlib -nostdinc
+UCFLAGS=-O1 -ffreestanding -nostdlib -nostdinc -Iuser/include
 
 user/lib/ulib.o: user/lib/ulib.c
 	@echo "  UCC  $@" 
@@ -1173,7 +1173,8 @@ user/bin/%.o: user/bin/%.c
 
 root/%: user/bin/%.o user/lib/ulib.o
 	@echo "  ULD  $@" 
-	@ld -m elf_x86_64 -nodefaultlibs --omagic -e start -Ttext 0x0 $^ -o $@
+	@ld -T user/user.ld -z max-page-size=0x1000 -m elf_x86_64 -nodefaultlibs $^ -o $@
+	@objdump -d $@ > root/$*.S
 	@objcopy -O binary $@ $@
 
 
@@ -1186,7 +1187,7 @@ userclean:
 
 
 PHONY += ramdisk.img
-ramdisk.img:
+ramdisk.img: userspace
 	make -C tools/mklfs
 	tools/mklfs/mklfs -c root -b 512 -r 512 -p 512 -s 1048576 -i $@
 
