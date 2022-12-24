@@ -1157,6 +1157,34 @@ user: FORCE
 		src=$(src)/$@ \
 		all
 
+
+USER_PROGRAMS=$(wildcard user/bin/*.c)
+USER_OBJECTS=$(patsubst %.c,%.o,$(USER_PROGRAMS))
+USER_BINARIES=$(patsubst user/bin/%.c,root/%,$(USER_PROGRAMS))
+UCFLAGS=-O1 -nostdlib -nostdinc
+
+user/lib/ulib.o: user/lib/ulib.c
+	@echo "  UCC  $@" 
+	@gcc $(UCFLAGS) -c $< -o $@
+
+user/bin/%.o: user/bin/%.c
+	@echo "  UCC  $@" 
+	@gcc $(UCFLAGS) -c $< -o $@
+
+root/%: user/bin/%.o user/lib/ulib.o
+	@echo "  ULD  $@" 
+	@ld -m elf_x86_64 -nodefaultlibs --omagic -e start -Ttext 0x0 $^ -o $@
+	@objcopy -O binary $@ $@
+
+
+.PRECIOUS: $(USER_OBJECTS)
+
+userspace: $(USER_BINARIES)
+
+userclean:
+	@rm -f $(USER_BINARIES) $(USER_OBJECTS)
+
+
 PHONY += ramdisk.img
 ramdisk.img:
 	make -C tools/mklfs

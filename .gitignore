@@ -9,6 +9,10 @@ tags
 *.bc
 *.ll
 
+# ignore the user binary output location
+/user/out
+/root/*
+
 include/config
 .kconfig.d
 include/autoconf.h
