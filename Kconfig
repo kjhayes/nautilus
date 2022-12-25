@@ -221,6 +221,7 @@ endmenu
 
 menu "Configuration"
 
+
 config MAX_THREADS
     int "Maximum number of threads in system"
     default 1024
@@ -296,6 +297,15 @@ config VIRTUAL_CONSOLE_SERIAL_MIRROR_ALL
         target virtual consoles;  direct displays
         (screen clears, display char, etc) are not
         currently mirrored.
+
+  menu "Userspace Configuration"
+  config ENABLE_USERSPACE
+    bool "Enable the nautilus userspace"
+    default n
+    help
+      Enables a ring 3 userspace where binaries are loaded from disk
+      and kernel interactions must go through the systemcall interface
+  endmenu
 
   menu "Scheduler Options"
 
