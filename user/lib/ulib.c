@@ -2,12 +2,7 @@
 
 extern void main(const char *cmd, const char *arg);
 
-// Tell the linker to put this symbol at the start of the flat binary. (the
-// only symbol in .init is start). This function exists to emulate a normal
-// '__libc_start' function in a glibc-based user application. In a more
-// complicated environment, it would run initializer functions and setup
-// things like the memory allocator. In our userspace, it just calls off to
-// main then calls exit when main returns.
+// This function is the entrypoint to the userspace binary
 __attribute__((section(".init"), noinline)) void start(const char *cmd,
                                                        const char *arg) {
   main(cmd, arg);
