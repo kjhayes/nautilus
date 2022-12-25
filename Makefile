@@ -1161,7 +1161,7 @@ user: FORCE
 USER_PROGRAMS=$(wildcard user/bin/*.c)
 USER_OBJECTS=$(patsubst %.c,%.o,$(USER_PROGRAMS))
 USER_BINARIES=$(patsubst user/bin/%.c,root/%,$(USER_PROGRAMS))
-UCFLAGS=-O1 -ffreestanding -nostdlib -nostdinc -Iuser/include
+UCFLAGS=-O2 -ffreestanding -nostdlib -nostdinc -Iuser/include
 
 user/lib/ulib.o: user/lib/ulib.c
 	@echo "  UCC  $@" 

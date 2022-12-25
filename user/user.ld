@@ -8,23 +8,21 @@ ENTRY(start)
 
 SECTIONS
 {
+	/* put the userspace programs in the "high half" */
+	. = 0xffff800000000000;
 
-	. = 0x10000;
-
-	.init           :
-	{
-		KEEP (*(SORT_NONE(.init)))
-	}
-	.plt            : { *(.plt) *(.iplt) }
-	.plt.bnd        : { *(.plt.bnd) }
-	.text           :
-	{
-		*(.text)
+	/* Put all "text" like things in the same area */
+	.text : {
+		/* Put the `start` function at the start so it is the first code executed */
+		*(.init) 
+		*(.text*)
 	}
 
-  .rodata ALIGN(4K) : {
+	/* Put all "data" like sections in the same area */
+	.data : {
     *(.rodata)
-  }
-	.data : { *(.bss) *(.data) }
+		*(.bss)
+		*(.data)
+	}
 }
 
