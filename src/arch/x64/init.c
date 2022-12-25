@@ -141,6 +141,11 @@
 #include <nautilus/vmm.h>
 #endif
 
+
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+#include <nautilus/user.h>
+#endif
+
 #ifdef NAUT_CONFIG_REAL_MODE_INTERFACE 
 #include <nautilus/realmode.h>
 #endif
@@ -577,6 +582,11 @@ init (unsigned long mbd,
     nk_test_init(naut);
 
     nk_cmdline_dispatch(naut);
+
+
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+    nk_user_init();
+#endif
 
 #ifdef NAUT_CONFIG_RUN_TESTS_AT_BOOT
     nk_run_tests(naut);

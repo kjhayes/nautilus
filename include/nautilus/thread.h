@@ -227,6 +227,10 @@ struct nk_thread {
     const void * tls[TLS_MAX_KEYS];
 
     uint8_t fpu_state[FPSTATE_SIZE] __align(FPSTATE_ALIGN);
+
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+    // userspace state
+#endif
 } ;
 
 // internal thread representations

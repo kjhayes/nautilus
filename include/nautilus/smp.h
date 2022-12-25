@@ -132,6 +132,10 @@ struct cpu {
 #ifdef NAUT_CONFIG_PROFILE
     struct nk_instr_data * instr_data;
 #endif
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+    // userspace state
+    void *tss;
+#endif
 };
 
 
