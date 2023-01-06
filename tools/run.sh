@@ -8,4 +8,4 @@ make ramdisk.img
 # build the kernel and the isoimage for it
 make isoimage -j $(nproc)
 
-qemu-system-x86_64 -cdrom nautilus.iso -m 2G -serial mon:stdio $@
+qemu-system-x86_64 -cdrom nautilus.iso -m 2G -serial mon:stdio -serial file:serial.txt $@
