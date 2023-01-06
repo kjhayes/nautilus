@@ -55,6 +55,10 @@ void nk_user_init(void) {
   tss[16] = 0x00680000; // IO Map Base = End of TSS
   tss[0x64] |= (0x64 * sizeof(uint32_t)) << 16;
 
+  // Load a fresh GDT to enable userspace isolation. Loading a new one now we
+  // are in C is easier than if we hardcoded all this in the boot.S file
+  // considering the TSS needs to be configured correctly so we can have a
+  // kernel stack
   uint64_t addr = (uint64_t)tss;
   gdt[0] = 0x0000000000000000;
   gdt[SEG_KCODE] = 0x002098000000FFFF; // Code, DPL=0, R/X

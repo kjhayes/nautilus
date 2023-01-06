@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# Exit on any errors
 set -e
 
 # make the root filesystem (lfs)
@@ -8,4 +9,6 @@ make ramdisk.img
 # build the kernel and the isoimage for it
 make isoimage -j $(nproc)
 
+
+# qemu-system-x86_64 -smp 2 -m 2048 -vga std -serial stdio -cdrom nautilus.iso $@
 qemu-system-x86_64 -cdrom nautilus.iso -m 2G -serial mon:stdio -serial file:serial.txt $@
