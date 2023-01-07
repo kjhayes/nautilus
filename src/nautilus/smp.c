@@ -40,6 +40,11 @@
 #include <dev/ioapic.h>
 #include <dev/apic.h>
 
+
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+#include <nautilus/user.h>
+#endif
+
 #ifdef NAUT_CONFIG_ASPACES
 #include <nautilus/aspace.h>
 #endif
@@ -335,6 +340,11 @@ smp_ap_setup (struct cpu * core)
     if (nk_aspace_init_ap()) {
         ERROR_PRINT("Could not set up aspaces for core %u\n",core->id);
     }
+#endif
+
+
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+    nk_user_init();
 #endif
     
     apic_init(core);

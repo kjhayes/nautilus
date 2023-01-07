@@ -455,6 +455,12 @@ setup_idt (void)
         idt_assign_entry(i, (ulong_t)null_irq_handler, 0);
     }
 
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+		extern int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state);
+    idt_assign_entry(0x80, (ulong_t)user_syscall_handler, 0);
+    write_gate_desc(idt64, 0x80, GATE_TYPE_INT, (void*)(excp_start + 0x80*16), 3 /* user mode */, 0, KERNEL_CS);
+#endif
+
     if (idt_assign_entry(PF_EXCP, (ulong_t)nk_pf_handler, 0) < 0) {
         ERROR_PRINT("Couldn't assign page fault handler\n");
         return -1;

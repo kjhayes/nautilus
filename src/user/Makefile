@@ -1,1 +1,1 @@
-obj-y += user.o
+obj-y += user.o userstart.o

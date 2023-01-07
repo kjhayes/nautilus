@@ -376,6 +376,8 @@ init (unsigned long mbd,
 
     // setup per-core area for BSP
     msr_write(MSR_GS_BASE, (uint64_t)naut->sys.cpus[0]);
+    msr_write(MSR_GS_BASE + 1, (uint64_t)naut->sys.cpus[0]);
+    msr_write(MSR_FS_BASE, (uint64_t)naut->sys.cpus[0]);
 
     /* now we switch to the real kernel memory allocator, pages
      * allocated in the boot mem allocator are kept reserved */

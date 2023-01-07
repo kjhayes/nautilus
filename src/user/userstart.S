@@ -20,22 +20,39 @@
  * This is free software.  You are permitted to use,
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
-#ifndef __NK_USER_H__
-#define __NK_USER_H__
 
-#include "./uapi.h"
+#include <asm/lowlevel.h>
+#include <nautilus/smp.h>
+#include <nautilus/gdt.h>
 #include <nautilus/thread.h>
 
-struct user_process {
-	// The main thread of the process
-	nk_thread_t *thread;
+.section .text
+.code64
 
-	// Address space of the process
-	nk_aspace_t *aspace;
 
-	// TODO: the rest of the process state :^)
-};
+# Enter a userspace program, where the trap frame to "restore" from is in %rdi
+ENTRY(user_start)
 
-void nk_user_init(void);
+	mov %rdi, %rsp
 
-#endif
+	// restore register state
+	popq %r15
+	popq %r14
+	popq %r13
+	popq %r12
+	popq %r11
+	popq %r10
+	popq %r9
+	popq %r8
+	popq %rbp
+	popq %rdi
+	popq %rsi
+	popq %rdx
+	popq %rcx
+	popq %rbx
+	popq %rax
+
+	// pop the vector and the error code
+  addq $16, %rsp
+	// return to userspace!
+	iretq

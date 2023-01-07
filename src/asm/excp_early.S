@@ -75,6 +75,24 @@ GLOBAL(early_irq_common)
 
     SAVE_GPRS()
 
+	
+		// Restore the kernel's segment registers
+		// for when we come back up from userspace
+		// TODO: figure out why we need to do this.
+	  //       - nick
+    movl $0x10, %eax
+		movw %ax, %ds
+		movw %ax, %es
+		movw %ax, %fs
+		movw %ax, %gs
+		swapgs
+
+		// Make sure both GS.base and KernelGS.base are the same
+		movq $0xC0000101, %rcx
+		rdmsr
+		movq $0xC0000102, %rcx
+		wrmsr
+
 #ifdef NAUT_CONFIG_WATCHDOG
     // this call can nuke registers, but we don't
     // care because it is first, and we don't depend on
