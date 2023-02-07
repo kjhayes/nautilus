@@ -11,4 +11,4 @@ make isoimage -j $(nproc)
 
 
 # qemu-system-x86_64 -smp 2 -m 2048 -vga std -serial stdio -cdrom nautilus.iso $@
-qemu-system-x86_64 -cdrom nautilus.iso -m 2G -serial mon:stdio -serial file:serial.txt $@
+qemu-system-x86_64 -cdrom nautilus.iso -m 2G -serial mon:stdio $@
