@@ -79,14 +79,61 @@ static void process_run_user(void *input, void **output) {
   nk_thread_exit(NULL);
 }
 
+
+
+/*
+ * Setup a process' address space. The main thing that happens here is we
+ * create a paging aspace, attach it to the process and the main thread, then
+ * add a region for the kernel to be mapped into, then we create a region
+ * for the stack and the user binary.
+ *
+ * Returns: 0 on success, -1 on failure.
+ *     The aspace and all intermediate structs will be cleaned up on failure
+ */
+static int setup_process_aspace(nk_process_t *proc, nk_aspace_characteristics_t *aspace_chars) {
+
+  nk_aspace_region_t region;
+  nk_thread_t *thread = NULL;
+  char aspace_name[32];
+
+
+  // allocate an aspace for the process
+  sprintf(aspace_name, "pid%d\n", proc->pid);
+  proc->aspace = nk_aspace_create("paging", aspace_name, &aspace_chars);
+  if (proc->aspace == NULL) {
+    ERROR("Failed to allocate aspace for process!\n");
+    goto clean_up;
+  }
+  thread = proc->main_thread;
+  thread->aspace = proc->aspace;
+
+  // create a 1-1 region mapping all of physical memory so that
+  // the kernel can work when the process is active
+  region.va_start = 0;
+  region.pa_start = 0;
+  region.len_bytes = LEN_4GB;  // first 4 GB are mapped
+  // set protections for kernel
+  // use EAGER to tell paging implementation that it needs to build all these PTs right now
+  region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_KERN | NK_ASPACE_EAGER;
+
+  // Add the region to the aspace, which should map the memory immediately.
+  if (nk_aspace_add_region(proc->aspace, &region)) {
+    ERROR("failed to add initial eager region to address space\n");
+    goto clean_up;
+  }
+  return 0;
+
+clean_up:
+  // Delete the aspace if we ended up creating it.
+  if (proc->aspace != NULL) nk_aspace_destroy(proc->aspace);
+  return -1;
+}
+
 nk_process_t *nk_process_create(const char *program, const char *argument) {
   PTABLE_LOCK_CONF;
 
-  char aspace_name[32]; // place that the aspace name goes into
   nk_process_t *proc = NULL;
-  nk_aspace_region_t region;
   nk_thread_t *thread;
-
 
   // First, we query the aspace implementation to make
   // sure it has a paging implmentation for us.
@@ -126,40 +173,14 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
   list_add_tail(&proc->ptable_list_node, &ptable_list);
   PTABLE_UNLOCK()
 
-  // allocate an aspace for the process
-  sprintf(aspace_name, "pid%d\n", proc->pid);
-  proc->aspace = nk_aspace_create("paging", aspace_name, &aspace_chars);
-  if (proc->aspace == NULL) {
-    ERROR("Failed to allocate aspace for process!\n");
-    // TODO: cleanup!
+  if (setup_process_aspace(proc, &aspace_chars)) {
+    ERROR("Failed to initialize process' address space\n");
     goto clean_up;
   }
+
   thread = proc->main_thread;
   thread->vc = get_cur_thread()->vc; // Make sure the thread prints to the console
-  thread->aspace = proc->aspace;     // Set the aspace
 
-  /**
-   * create a 1-1 region mapping all of physical memory
-   * so that the kernel can work when that thread is active
-   **/
-  region.va_start = 0;
-  region.pa_start = 0;
-  region.len_bytes = LEN_4GB;  // first 4 GB are mapped
-                          // (hard coded in run. TODO: use the kernel mmap to be robust)
-  /**
-   * set protections for kernel
-   * use EAGER to tell paging implementation that it needs to build all these PTs right now
-   **/ 
-  region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_KERN | NK_ASPACE_EAGER;
-
-  /**
-   * now add the region
-   * this should build the page tables immediately
-   **/
-  if (nk_aspace_add_region(proc->aspace, &region)) {
-    nk_vc_printf("failed to add initial eager region to address space\n");
-    goto clean_up;
-  }
 
   // kickoff main thread
   nk_thread_run(proc->main_thread);
@@ -170,8 +191,6 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
 
 clean_up:
   if (proc != NULL) {
-    // Delete the aspace
-    if (proc->aspace != NULL) nk_aspace_destroy(proc->aspace);
     // Delete the main thread
     if (proc->main_thread != NULL) nk_thread_destroy(proc->main_thread);
     // Finally, delete the process
