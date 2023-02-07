@@ -99,7 +99,7 @@ static int setup_process_aspace(nk_process_t *proc, nk_aspace_characteristics_t 
 
   // allocate an aspace for the process
   sprintf(aspace_name, "pid%d\n", proc->pid);
-  proc->aspace = nk_aspace_create("paging", aspace_name, &aspace_chars);
+  proc->aspace = nk_aspace_create("paging", aspace_name, aspace_chars);
   if (proc->aspace == NULL) {
     ERROR("Failed to allocate aspace for process!\n");
     goto clean_up;
