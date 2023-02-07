@@ -27,6 +27,9 @@
 #include <nautilus/thread.h>
 
 
+
+// An internal representation for a userspace trap frame.
+// This is used when handling system calls, and lives on the kernel interrupt stack.
 struct user_frame {
   uint64_t r15;
   uint64_t r14;
