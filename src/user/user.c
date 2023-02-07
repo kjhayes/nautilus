@@ -94,6 +94,9 @@ int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
 	per_cpu_get(system);
 
 	r->rax = read_cr3();
+
+  nk_vc_printf("got a syscall!\n");
+  nk_thread_exit(NULL);
   // r->rax = 42;
   return 0;
 }

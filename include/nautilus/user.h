@@ -70,7 +70,7 @@ struct user_frame {
 #define SEG_TSS 6   // this process's task state
 
 // A nautilus user process
-typedef struct {
+typedef struct nk_process {
 
 	// processes in nautilus get a unique pid, which
 	// is entirely unrelated to the threads that are run under it

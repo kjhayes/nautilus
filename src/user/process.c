@@ -63,8 +63,40 @@ static void tss_set_rsp(uint32_t *tss, uint32_t n, uint64_t rsp) {
 
 static nk_aspace_interface_t nk_process_aspace_interface = {};
 
+nk_process_t *get_process_pid(long pid) {
+  PTABLE_LOCK_CONF;
+  PTABLE_LOCK();
+
+  // walk the list to get the pid
+  struct list_head *cur;
+  list_for_each(cur, &ptable_list) {
+    nk_process_t *proc = list_entry(cur, nk_process_t, ptable_list_node);
+    if (proc->pid == pid) {
+      PTABLE_UNLOCK();
+      return proc;
+    }
+  }
+
+  PTABLE_UNLOCK();
+  return NULL;
+}
+
+nk_process_t *get_process(nk_thread_t *thread) {
+  return thread->process;
+}
+
 static void process_run_user(void *input, void **output) {
+  nk_vc_printf("in run_user!\n");
   nk_thread_t *t = get_cur_thread();
+  nk_vc_printf("thread: %p\n", t);
+  nk_process_t *p = get_process(t);
+  nk_vc_printf("proc: %p\n", p);
+  nk_thread_name(t, p->program);
+
+  nk_aspace_move_thread(p->aspace);
+
+  nk_vc_printf("It worked!\n");
+  //
 
   struct user_frame frame;
   frame.rip = (uint64_t)user_code;     // userspace code
@@ -74,6 +106,8 @@ static void process_run_user(void *input, void **output) {
   frame.ds = (SEG_UDATA << 3) | 3;     // user data segment in ring 3
 
   tss_set_rsp(get_cpu()->tss, 0, (uint64_t)t->stack + t->stack_size);
+
+  // Call the userspace code
   user_start((void *)&frame, SEG_UDATA);
 
   nk_thread_exit(NULL);
@@ -98,14 +132,14 @@ static int setup_process_aspace(nk_process_t *proc, nk_aspace_characteristics_t 
 
 
   // allocate an aspace for the process
-  sprintf(aspace_name, "pid%d\n", proc->pid);
+  sprintf(aspace_name, "pid%d", proc->pid);
   proc->aspace = nk_aspace_create("paging", aspace_name, aspace_chars);
   if (proc->aspace == NULL) {
     ERROR("Failed to allocate aspace for process!\n");
     goto clean_up;
   }
   thread = proc->main_thread;
-  thread->aspace = proc->aspace;
+  // thread->aspace = proc->aspace;
 
   // create a 1-1 region mapping all of physical memory so that
   // the kernel can work when the process is active
@@ -114,7 +148,7 @@ static int setup_process_aspace(nk_process_t *proc, nk_aspace_characteristics_t 
   region.len_bytes = LEN_4GB;  // first 4 GB are mapped
   // set protections for kernel
   // use EAGER to tell paging implementation that it needs to build all these PTs right now
-  region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_KERN | NK_ASPACE_EAGER;
+  region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_EAGER;
 
   // Add the region to the aspace, which should map the memory immediately.
   if (nk_aspace_add_region(proc->aspace, &region)) {
@@ -180,14 +214,13 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
 
   thread = proc->main_thread;
   thread->vc = get_cur_thread()->vc; // Make sure the thread prints to the console
+  thread->process = proc;
 
 
   // kickoff main thread
   nk_thread_run(proc->main_thread);
 
-  nk_vc_printf("Here: pid=%d\n", proc->pid);
   return proc;
-
 
 clean_up:
   if (proc != NULL) {

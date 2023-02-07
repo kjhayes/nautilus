@@ -1,0 +1,660 @@
+diff --git a/src/aspace/paging/paging.c b/src/aspace/paging/paging.c
+index 60b2a24..2df4ffb 100644
+--- a/src/aspace/paging/paging.c
++++ b/src/aspace/paging/paging.c
+@@ -44,6 +44,7 @@
+ #include <nautilus/aspace.h>
+ 
+ #include "paging_helpers.h"
++#include "region_list.h"
+ 
+ 
+ //
+@@ -71,6 +72,25 @@
+ // graceful printouts of names
+ #define ASPACE_NAME(a) ((a)?(a)->aspace->name : "default")
+ #define THREAD_NAME(t) ((!(t)) ? "(none)" : (t)->is_idle ? "(idle)" : (t)->name[0] ? (t)->name : "(noname)")
++#define REGION_FORMAT "(VA=0x%p to PA=0x%p, len=%lx, prot=%lx)"
++#define REGION(r) (r)->va_start, (r)->pa_start, (r)->len_bytes, (r)->protect.flags
++
++/**
++ *  should be defined in aspace.h, but moved here for the simplicity of solution
++ * */
++#define NK_ASPACE_GET_READ(flags) ((flags & NK_ASPACE_READ) >> 0)
++#define NK_ASPACE_GET_WRITE(flags) ((flags & NK_ASPACE_WRITE) >> 1)
++#define NK_ASPACE_GET_EXEC(flags) ((flags & NK_ASPACE_EXEC) >> 2)
++#define NK_ASPACE_GET_PIN(flags) ((flags & NK_ASPACE_PIN) >> 3)
++#define NK_ASPACE_GET_KERN(flags) ((flags & NK_ASPACE_KERN) >> 4)
++#define NK_ASPACE_GET_SWAP(flags) ((flags & NK_ASPACE_SWAP) >> 5)
++#define NK_ASPACE_GET_EAGER(flags) ((flags & NK_ASPACE_EAGER) >> 6)
++
++/**
++ *  subject to design
++ * */
++#define THRESH PAGE_SIZE_2MB
++
+ 
+ // You probably want some sort of data structure that will let you
+ // keep track of the set of regions you are asked to add/remove/change
+@@ -95,6 +115,8 @@ typedef struct nk_aspace_paging {
+     
+     // Your characteristics
+     nk_aspace_characteristics_t chars;
++    
++    mm_llist_t * llist_tracker;
+ 
+     // The cr3 register contents that reflect
+     // the root of your page table hierarchy
+@@ -158,6 +180,125 @@ static int remove_thread(void *state)
+     return 0;
+ }
+ 
++ph_pf_access_t access_from_region (nk_aspace_region_t *region) {
++    ph_pf_access_t access;
++    access.val = 0;
++    
++    access.write = NK_ASPACE_GET_WRITE(region->protect.flags);
++    access.user = !NK_ASPACE_GET_KERN(region->protect.flags);
++    access.ifetch = NK_ASPACE_GET_EXEC(region->protect.flags);
++
++    return access;
++}
++
++int region_align_check(nk_aspace_paging_t *p, nk_aspace_region_t *region) {
++    // sanity check for region validness
++    if ((addr_t) region->va_start % p->chars.alignment != 0) {
++        ERROR("region VA_start=0x%p expect to have alignment of %lx", region->va_start, p->chars.alignment);
++        return -1;
++    }
++
++    if ((addr_t) region->pa_start % p->chars.alignment != 0) {
++        ERROR("region PA_start=0x%p expect to have alignment of %lx", region->pa_start, p->chars.alignment);
++        return -1;
++    }
++
++    if ((addr_t) region->len_bytes % p->chars.granularity != 0) {
++        ERROR("region len_bytes=0x%lx expect to have granularity of %lx", region->len_bytes, p->chars.granularity);
++        return -1;
++    }
++    return 0;
++}
++
++int clear_cache (nk_aspace_paging_t *p, nk_aspace_region_t *region, uint64_t threshold) {
++    
++    // if we are editing the current address space of this cpu, then we
++    // might need to flush the TLB here.   We can do that with a cr3 write
++    // like: write_cr3(p->cr3.val);
++
++    // if this aspace is active on a different cpu, we might need to do
++    // a TLB shootdown here (out of scope of class)
++    // a TLB shootdown is an interrupt to a remote CPU whose handler
++    // flushes the TLB
++
++    if (p->aspace == get_cpu()->cur_aspace) {
++            // write_cr3(p->cr3.val);
++            // DEBUG("flush TLB DONE!\n");
++        if (region->len_bytes > threshold) {
++            write_cr3(p->cr3.val);
++            DEBUG("flush TLB DONE!\n");
++        } else {
++            uint64_t offset = 0;
++            while (offset < region->len_bytes) {
++                invlpg((addr_t)region->va_start + (addr_t) offset);
++                offset = offset + p->chars.granularity;
++            }
++            DEBUG("virtual address cache from %016lx to %016lx are invalidated\n", 
++                region->va_start, 
++                region->va_start + region->len_bytes
++            );
++        }
++    } else {
++        // TLB shootdown out of the scope
++    }
++    return 0;
++}
++
++int eager_drill_wrapper(nk_aspace_paging_t *p, nk_aspace_region_t *region) {
++    /*
++        Only to be called if region passed the following check:
++            1. alignment and granularity check 
++            2. region overlap or other region validnesss check (involved using p->llist_tracker)
++            3. region allocation must be eager
++    */
++
++    ph_pf_access_t access_type = access_from_region(region);
++
++    addr_t vaddr = (addr_t) region->va_start;
++    addr_t paddr = (addr_t)region->pa_start;
++    uint64_t remained = region->len_bytes;
++    addr_t va_end = (addr_t) region->va_start + region->len_bytes;
++
++    uint64_t page_granularity = 0;
++    int ret = 0;
++
++    while (vaddr < va_end) {
++        
++        if (
++            vaddr % PAGE_SIZE_4KB == 0 && 
++            paddr % PAGE_SIZE_4KB == 0 && 
++            remained >= PAGE_SIZE_4KB 
++        ) {
++            // vaddr % PAGE_SIZE_4KB == 0
++            // must be the case as we require 4KB alignment
++            page_granularity = PAGE_SIZE_4KB;
++
++            ret = paging_helper_drill (p->cr3, vaddr, paddr, access_type);
++
++            if (ret < 0) {
++                ERROR("Failed to drill at virtual address=%p"
++                        " physical adress %p"
++                        " and ret code of %d"
++                        " page_granularity = %lx\n",
++                        vaddr, paddr, ret, page_granularity
++                );
++                return ret;
++            }
++            
++            vaddr += page_granularity;
++            paddr += page_granularity;
++            remained -= page_granularity;
++        } else {
++
++            ERROR("Region" REGION_FORMAT "doesnot meet drill requirement at vaddr=0x%p and paddr=0x%p\n", 
++                    REGION(region), vaddr, paddr);
++            return -1;
++        }        
++    }
++
++    return ret;
++}
++
+ 
+ // The function the aspace abstraction will call when it
+ // is adding a region to your address space
+@@ -176,6 +317,26 @@ static int add_region(void *state, nk_aspace_region_t *region)
+     
+     // first you should sanity check the region to be sure it doesn't overlap
+     // an existing region, and then place it into your region data structure
++    int ret = 0;
++
++    ret = region_align_check(p, region);
++    if (ret < 0) {
++        ASPACE_UNLOCK(p);
++        return ret;
++    }
++
++    // sanity check to be sure it doesn't overlap an existing region...
++    nk_aspace_region_t * overlap_ptr = mm_check_overlap(p->llist_tracker, region);
++    if (overlap_ptr) {
++        DEBUG("region Overlapping:\n"
++                "\t(va=%016lx pa=%016lx len=%lx, prot=%lx) \n"
++                "\t(va=%016lx pa=%016lx len=%lx, prot=%lx) \n", 
++            region->va_start, region->pa_start, region->len_bytes, region->protect.flags,
++            overlap_ptr->va_start, overlap_ptr->pa_start, overlap_ptr->len_bytes, overlap_ptr->protect.flags
++        );
++        ASPACE_UNLOCK(p);
++        return -1;
++    }
+ 
+     // NOTE: you MUST create a new nk_aspace_region_t to store in your data structure
+     // and you MAY NOT store the region pointer in your data structure. There is no
+@@ -188,13 +349,26 @@ static int add_region(void *state, nk_aspace_region_t *region)
+ 	// page table entries right now, before we return
+ 
+ 	// DRILL THE PAGE TABLES HERE
++        ret = eager_drill_wrapper(p, region);
++        if (ret < 0) {
++            ASPACE_UNLOCK(p);
++            return ret;
++        }
+ 
+     }
+ 
++    /**
++     *  add and print 
++     * */
++    mm_insert(p->llist_tracker, region);
++    // DEBUG("after mm_insert\n");
++    mm_show(p->llist_tracker);
++
++
+     // if we are editing the current address space of this cpu, then we
+     // might need to flush the TLB here.   We can do that with a cr3 write
+     // like: write_cr3(p->cr3.val);
+-
++    clear_cache(p,region, THRESH);
+     // if this aspace is active on a different cpu, we might need to do
+     // a TLB shootdown here (out of scope of class)
+     // a TLB shootdown is an interrupt to a remote CPU whose handler
+@@ -223,12 +397,50 @@ static int remove_region(void *state, nk_aspace_region_t *region)
+     // it had better exist and be identical.
+ 
+     // next, remove the region from your data structure
++    if (NK_ASPACE_GET_PIN(region->protect.flags)) {
++        ERROR("Cannot remove pinned region"REGION_FORMAT"\n", REGION(region));
++        ASPACE_UNLOCK(p);
++        return -1;
++    }
+ 
+-    // next, remove all corresponding page table entries that exist
++    uint8_t check_flag = VA_CHECK | PA_CHECK | LEN_CHECK | PROTECT_CHECK;
++    int remove_failed = mm_remove(p->llist_tracker, region, check_flag);
++
++    if (remove_failed) {
++        DEBUG("region to remove \
++            (va=%016lx pa=%016lx len=%lx, prot=%lx) not FOUND\n", 
++            region->va_start, 
++            region->pa_start, 
++            region->len_bytes,
++            region->protect.flags
++        );
++        ASPACE_UNLOCK(p);
++        return -1;
++    }
+ 
++    // next, remove all corresponding page table entries that exist
++    ph_pf_access_t access_type = access_from_region(region);
++    uint64_t offset = 0;
++    
++    while (offset < region->len_bytes){
++        uint64_t *entry;
++        addr_t virtaddr = (addr_t) region->va_start + (addr_t) offset;
++        int ret = paging_helper_walk(p->cr3, virtaddr, access_type, &entry);
++       
++        if (ret == 0) {
++            ((ph_pte_t *) entry)->present = 0;
++            offset = offset + PAGE_SIZE_4KB;
++        } 
++        else {
++            panic("unexpected return from page walking = %d\n", ret);
++        }
++    }
++    
++    
+     // next, if we are editing the current address space of this cpu,
+     // we need to either invalidate individual pages using invlpg()
+     // or do a full TLB flush with a write to cr3.
++    clear_cache(p, region, THRESH);
+ 
+     ASPACE_UNLOCK(p);
+ 
+@@ -244,23 +456,121 @@ static int protect_region(void *state, nk_aspace_region_t *region, nk_aspace_pro
+ 
+     DEBUG("protecting region (va=%016lx pa=%016lx len=%lx) from address space %s\n", region->va_start, region->pa_start, region->len_bytes,ASPACE_NAME(p));
+ 
++    DEBUG("protecting region" 
++            "(va=%016lx pa=%016lx len=%lx, prot=%lx)" 
++            "from address space %s"
++            "to new protection = %lx\n", 
++            region->va_start, region->pa_start, region->len_bytes, region->protect.flags,
++            ASPACE_NAME(p),
++            prot->flags
++    );
++
++    DEBUG("Old protection details:" 
++        "(read=%d write=%d exec=%d pin=%d kern=%d swap=%d eager=%d)\n",
++        NK_ASPACE_GET_READ(region->protect.flags),
++        NK_ASPACE_GET_WRITE(region->protect.flags),
++        NK_ASPACE_GET_EXEC(region->protect.flags),
++        NK_ASPACE_GET_PIN(region->protect.flags), 
++        NK_ASPACE_GET_KERN(region->protect.flags), 
++        NK_ASPACE_GET_SWAP(region->protect.flags), 
++        NK_ASPACE_GET_EAGER(region->protect.flags)
++    );
++
++    DEBUG("new protection details:" 
++        "(read=%d write=%d exec=%d pin=%d kern=%d swap=%d eager=%d)\n",
++        NK_ASPACE_GET_READ(prot->flags),
++        NK_ASPACE_GET_WRITE(prot->flags),
++        NK_ASPACE_GET_EXEC(prot->flags),
++        NK_ASPACE_GET_PIN(prot->flags), 
++        NK_ASPACE_GET_KERN(prot->flags), 
++        NK_ASPACE_GET_SWAP(prot->flags), 
++        NK_ASPACE_GET_EAGER(prot->flags)
++    );
++
+     ASPACE_LOCK_CONF;
+ 
+     ASPACE_LOCK(p);
+ 
+-    // WRITE ME!
++    // WRITE ME!    
++    
++    int ret = region_align_check(p, region);
++    if (ret < 0) {
++        ASPACE_UNLOCK(p);
++        return ret;
++    }
+     
++    nk_aspace_region_t new_prot_wrapper = *region;
++    new_prot_wrapper.protect = *prot;
+     // first, find the region in your data structure
+     // it had better exist and be identical except for protections
+-
+     // next, update the region protections from your data structure
+ 
++    /**
++     *  update_region function does check and update in one shot
++     * */
++    uint8_t check_flag = VA_CHECK | LEN_CHECK | PA_CHECK;
++    nk_aspace_region_t* reg_ptr = mm_update_region(p->llist_tracker, region, &new_prot_wrapper, check_flag);
++    
++    if (reg_ptr == NULL) {
++        DEBUG("region to update protect \
++             (va=%016lx pa=%016lx len=%lx, prot=%lx) not FOUND", 
++            region->va_start, 
++            region->pa_start, 
++            region->len_bytes,
++            region->protect.flags
++        );
++        ASPACE_UNLOCK(p);
++        return -1;
++    }
++
++    
++    // next, update all corresponding page table entries that exist
++    ph_pf_access_t access_type = access_from_region(region);
++    ph_pf_access_t new_access = access_from_region(reg_ptr);
++
+     // next, update all corresponding page table entries that exist
++    /**
++     *  if eager just redrill everything
++     *      drill function will update the protections
++     * */
++    if (NK_ASPACE_GET_EAGER(reg_ptr->protect.flags)) {
++        ret = eager_drill_wrapper(p, reg_ptr);
++        if (ret < 0) {
++            ASPACE_UNLOCK(p);
++            return ret;
++        }
++    } else if (access_type.val != new_access.val) {
++        
++        /**
++         *  if not eager but need to update
++         *      invalid all entries.
++         *      Exception handler will update the protection 
++         * */
++        uint64_t offset = 0;
++
++        while (offset < reg_ptr->len_bytes){
++            uint64_t *entry;
++            addr_t virtaddr = (addr_t) region->va_start + (addr_t) offset;
++            int ret = paging_helper_walk(p->cr3, virtaddr, access_type, &entry);
++            
++            if (ret == 0) {
++                ((ph_pte_t *) entry)->present = 0;
++                perm_set(entry, new_access);
++                
++            } 
++            
++            offset = offset + PAGE_SIZE_4KB;
++            
++        }
++    }
++
+ 
+     // next, if we are editing the current address space of this cpu,
+     // we need to either invalidate individual pages using invlpg()
+     // or do a full TLB flush with a write to cr3.
++    clear_cache(p, reg_ptr, THRESH);
+ 
++    // DEBUG("protection done!\n");
+     ASPACE_UNLOCK(p);
+ 
+     return 0;
+@@ -278,20 +588,104 @@ static int move_region(void *state, nk_aspace_region_t *cur_region, nk_aspace_re
+ 
+     // WRITE ME!
+     
++    int ret = region_align_check(p, cur_region);
++    if (ret < 0) {
++        ASPACE_UNLOCK(p);
++        return ret;
++    }
++    
++    ret = region_align_check(p, new_region);
++    if (ret < 0) {
++        ASPACE_UNLOCK(p);
++        return ret;
++    }
++
++
++    /**
++     *  I here merge the checking steps and update step together.
++     *      the mm_update_region does check and then update
++     * */
+     // first, find the region in your data structure
+     // it had better exist and be identical except for the physical addresses
++    uint8_t check_flag = VA_CHECK | LEN_CHECK | PROTECT_CHECK;
++    int reg_eq = region_equal(cur_region, new_region, check_flag);
++    if (!reg_eq) {
++        DEBUG("regions differ in attributes other than physical address!\n");
++        ASPACE_UNLOCK(p);
++        return -1;
++    }
++
++    if (NK_ASPACE_GET_PIN(cur_region->protect.flags)) {
++        ERROR("Cannot move pinned region"REGION_FORMAT"\n", REGION(cur_region));
++        ASPACE_UNLOCK(p);
++        return -1;
++    }
+ 
+     // next, update the region in your data structure
++    nk_aspace_region_t* reg_ptr = mm_update_region(
++                                    p->llist_tracker, 
++                                    cur_region,
++                                    new_region,
++                                    check_flag
++                                );
++
++    if (!reg_ptr) {
++        DEBUG(
++            "region to update"
++            "(va=%016lx pa=%016lx len=%lx, prot=%lx) not FOUND", 
++            cur_region->va_start, 
++            cur_region->pa_start, 
++            cur_region->len_bytes,
++            cur_region->protect.flags
++        );
++        ASPACE_UNLOCK(p);
++        return -1;
++    }
++
+ 
+     // you can assume that the caller has done the work of copying the memory
+     // contents to the new physical memory
+ 
+     // next, update all corresponding page table entries that exist
++    ph_pf_access_t access_type = access_from_region(cur_region);
++    uint64_t offset = 0;
++
++    // invalidate pages for cur_region
++    while (offset < cur_region->len_bytes){
++        uint64_t *entry;
++        addr_t virtaddr = (addr_t) cur_region->va_start + (addr_t) offset;
++        int ret = paging_helper_walk(p->cr3, virtaddr, access_type, &entry);
++       
++        if (ret == 0) {
++            ((ph_pte_t *) entry)->present = 0;
++            offset = offset + PAGE_SIZE_4KB;
++        } 
++        else {
++            panic("unexpected return from page walking = %d\n", ret);
++        }
++    }
++    
++
++
++    if (NK_ASPACE_GET_EAGER(new_region->protect.flags)) {
++	// an eager region means that we need to build all the corresponding
++	// page table entries right now, before we return
++	// DRILL THE PAGE TABLES HERE
++        ret = eager_drill_wrapper(p, new_region);
++        if (ret < 0) {
++            ASPACE_UNLOCK(p);
++            return ret;
++        }
++    } else {
++        // nothing to do for uneager region
++    }
++    
+ 
+     // next, if we are editing the current address space of this cpu,
+     // we need to either invalidate individual pages using invlpg()
+     // or do a full TLB flush with a write to cr3.
+-
++    clear_cache(p, cur_region, THRESH);
++    clear_cache(p, new_region, THRESH);
+ 
+     // OPTIONAL ADVANCED VERSION: allow for splitting the region - if cur_region
+     // is a subset of some region, then split that region, and only move
+@@ -351,7 +745,7 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
+     nk_aspace_paging_t *p = (nk_aspace_paging_t *)state;
+     struct nk_thread *thread = get_cur_thread();
+     
+-    DEBUG("exception 0x%x for address space %s in context of thread %d (%s)\n",vec,ASPACE_NAME(p),thread->tid,THREAD_NAME(thread));
++    // DEBUG("exception 0x%x for address space %s in context of thread %d (%s)\n",vec,ASPACE_NAME(p),thread->tid,THREAD_NAME(thread));
+     
+     if (vec==GP_EXCP) {
+ 	ERROR("general protection fault encountered.... uh...\n");
+@@ -373,6 +767,20 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
+     ph_pf_error_t  error;
+     error.val = exp->error_code;
+     
++    // DEBUG("Page fault at virt_addr = %llx, error = %llx\n", virtaddr, error.val);
++    
++    // DEBUG("Page fault at error.present = %x, "
++    //         "error.write = %x " 
++    //         "error.user = %x " 
++    //         "error.rsvd_access = %x " 
++    //         "error.ifetch = %x \n", 
++    //         error.present,
++    //         error.write,
++    //         error.user,
++    //         error.rsvd_access,
++    //         error.ifetch    
++    // );
++
+     
+     ASPACE_LOCK_CONF;
+     
+@@ -383,19 +791,88 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
+     //
+     
+     // Now find the region corresponding to this address
+-
+     // if there is no such region, this is an unfixable fault
+     //   (if this is a user thread, we now would signal it or kill it, but there are no user threads in Nautilus)
+     //   if it's a kernel thread, the kernel should panic
+     //   if it's within an interrupt handler, the kernel should panic
++    nk_aspace_region_t * region = mm_find_reg_at_addr(p->llist_tracker, (addr_t) virtaddr);
++    if (region == NULL) {
++        panic("Page Fault at %p, but no matching region found\n", virtaddr);
++        ASPACE_UNLOCK(p);
++        return -1;
++    }
+ 
+     // Is the problem that the page table entry is not present?
+     // if so, drill the entry and then return from the function
+     // so the faulting instruction can try agai
+     //    This is the lazy construction of the page table entries
+ 
+-    // Assuming the page table entry is present, check the region's
+-    // protections and compare to the error code
++    int ret;
++    ph_pf_access_t access_type = access_from_region(region);
++
++    if(!error.present) {
++        addr_t vaddr, paddr, vaddr_try, paddr_try;
++        uint64_t remained, remained_try, page_granularity;
++        
++        addr_t va_start = (addr_t) region->va_start;
++        addr_t pa_start = (addr_t) region->pa_start;
++
++        
++
++        addr_t vaddr_4KB_align = virtaddr - ADDR_TO_OFFSET_4KB(virtaddr);
++
++        vaddr = vaddr_4KB_align;
++        paddr = vaddr - va_start + pa_start;
++        remained = region->len_bytes - (vaddr - va_start);
++        page_granularity = PAGE_SIZE_4KB;
++
++        ret = paging_helper_drill(p->cr3, vaddr, paddr, access_type);
++
++        if (ret < 0) {
++            ERROR("Failed to drill at virtual address=%p"
++                    " physical adress %p"
++                    " and ret code of %d"
++                    " page_granularity = %lx\n",
++                    vaddr, paddr, ret, page_granularity
++            );
++            ASPACE_UNLOCK(p);
++            return ret;
++        }
++        
++    } else {
++        
++        // Assuming the page table entry is present, check the region's
++        // protections and compare to the error code
++
++        // if the region has insufficient permissions for the request,
++        // then this is an unfixable fault
++        //   if this is a user thread, we now would signal it or kill it
++        //   if it's a kernel thread, the kernel should panic
++        //   if it's within an interrupt handler, the kernel should panic
++
++        int ok = (access_type.write >= error.write) && 
++                    (access_type.user>= error.user) && 
++                    (access_type.ifetch >= error.ifetch);
++
++        DEBUG(
++            "region.protect.write=%d, error.write=%d\n" 
++            "region.protect.user=%d, error.user=%d\n" 
++            "region.protect.ifetch=%d, error.ifetch=%d\n",
++            access_type.write, error.write,
++            access_type.user, error.user,
++            access_type.ifetch, error.ifetch
++        );
++
++        if(ok){
++            ASPACE_UNLOCK(p);
++            panic("weird Page fault with permission ok and page present\n");
++            return 0;
++        } else{
++            ASPACE_UNLOCK(p);
++            panic("Permission not allowed\n");
++            return -1;
++        }
++    }
+ 
+     // if the region has insufficient permissions for the request,
+     // then this is an unfixable fault
+@@ -403,6 +880,7 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
+     //   if it's a kernel thread, the kernel should panic
+     //   if it's within an interrupt handler, the kernel should panic
+     
++    // DEBUG("Done: Paging Exception handler!\n");
+     ASPACE_UNLOCK(p);
+     
+     return 0;
+@@ -487,7 +965,8 @@ static struct nk_aspace * create(char *name, nk_aspace_characteristics_t *c)
+     spinlock_init(&p->lock);
+ 
+     // initialize your region set data structure here!
+-
++    p->llist_tracker = mm_llist_create();
++    p->chars = *c;
+ 
+     // create an initial top-level page table (PML4)
+     if(paging_helper_create(&(p->cr3)) == -1){
+@@ -496,7 +975,8 @@ static struct nk_aspace * create(char *name, nk_aspace_characteristics_t *c)
+ 
+     // note also the cr4 bits you should maintain
+     p->cr4 = nk_paging_default_cr4() & CR4_MASK;
+-
++    
++    
+ 
+     // if we supported address spaces other than long mode
+     // we would also manage the EFER register here

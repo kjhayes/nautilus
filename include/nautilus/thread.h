@@ -230,6 +230,7 @@ struct nk_thread {
 
 #ifdef NAUT_CONFIG_ENABLE_USERSPACE
     // userspace state
+    struct nk_process *process; // opaque pointer to the process this thread belongs to.
 #endif
 } ;
 
