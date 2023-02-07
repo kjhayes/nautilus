@@ -129,7 +129,7 @@ typedef union ph_pml4e {
     struct {
 	uint_t present        : 1;  
 	uint_t writable       : 1;  
-	uint_t user           : 1;  // 1 => allow user-mode access
+	uint_t user           : 1;  // 1 => allow user-mode access (unused in our implementation)
 	uint_t write_through  : 1;  // legacy cache control - set to zero
 	uint_t cache_disable  : 1;  // legacy cache control - set to zero
 	uint_t accessed       : 1;  // HW writes to 1 when page accessed
@@ -204,20 +204,29 @@ typedef union ph_pte {  // mostly the same as a pde, comments show diffs
 
 
 // page fault error code deconstruction
-typedef struct ph_pf_error {
-    uint_t present           : 1; // if 0, fault due to page not present
-    uint_t write             : 1; // if 1, faulting access was a write
-    uint_t user              : 1; // if 1, faulting access was in user mode
-    uint_t rsvd_access       : 1; // if 1, fault from reading a 1 from a reserved field (?)
-    uint_t ifetch            : 1; // if 1, faulting access was an instr fetch (only with NX)
-    uint_t rsvd              : 27;
+typedef union ph_pf_error {
+    uint32_t val;
+    struct {
+	uint_t present           : 1; // if 0, fault due to page not present
+	uint_t write             : 1; // if 1, faulting access was a write
+	uint_t user              : 1; // if 1, faulting access was in user mode
+	uint_t rsvd_access       : 1; // if 1, fault from reading a 1 from a reserved field (?)
+	uint_t ifetch            : 1; // if 1, faulting access was an instr fetch (only with NX)
+	uint_t rsvd              : 27;
+    };
 } __attribute__((packed)) ph_pf_error_t;
 
-// for access use, present is ignored, write=>writeable, user=>user allowed, ifetch=>ifetch ok
+// for access use, present, rsvd_access, and rsvd is ignored
+//	write => is writeable?
+//	user => is user allowed?
+//	ifetch => is executable?
 // ie, it reflects the maximum permissions
 typedef ph_pf_error_t ph_pf_access_t;
 
 
+#define perm_ok(p,a) paging_helper_permissions_ok((uint64_t*)p,a)
+#define perm_set(p,a) paging_helper_set_permissions((uint64_t*)p,a)
+#define perm_set_highest(p) paging_helper_set_highest_permissions((uint64_t*)p)
 
 // create a new page table hierarchy, returning a cr3e
 // this simply creates an empty PML4T

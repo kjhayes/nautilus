@@ -1173,7 +1173,7 @@ user/bin/%.o: user/bin/%.c
 
 root/%: user/bin/%.o user/lib/ulib.o
 	@echo "  ULD  $@" 
-	@ld -T user/user.ld -z max-page-size=0x1000 -m elf_x86_64 -nodefaultlibs $^ -o $@
+	@ld -T user/user.ld -z max-page-size=0x1000 -m elf_x86_64 $^ -o $@
 	@objdump -d $@ > root/$*.S
 	@objcopy -O binary $@ $@
 

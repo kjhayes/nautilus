@@ -24,45 +24,6 @@
 #include <nautilus/shell.h>
 #include <nautilus/user.h>
 
-struct user_frame {
-  uint64_t r15;
-  uint64_t r14;
-  uint64_t r13;
-  uint64_t r12;
-  uint64_t r11;
-  uint64_t r10;
-  uint64_t r9;
-  uint64_t r8;
-  uint64_t rbp;
-  uint64_t rdi;
-  uint64_t rsi;
-  uint64_t rdx;
-  uint64_t rcx;
-  uint64_t rbx;
-  uint64_t rax;
-
-  uint64_t trapno;
-  uint64_t err;
-
-  uint64_t rip;
-  uint64_t cs;
-  uint64_t rflags;
-  uint64_t rsp;
-  uint64_t ds;
-} __packed;
-
-/**
- * This file is the main implementation of the nautilus kernel simple userspace
- * system.
- */
-
-#define SEG_KCODE 1 // kernel code
-#define SEG_KDATA 2 // kernel data+stack
-#define SEG_KCPU 3  // kernel per-cpu data
-#define SEG_UCODE 4 // user code
-#define SEG_UDATA 5 // user data+stack
-#define SEG_TSS 6   // this process's task state
-
 static inline void user_lgdt(void *data, int size) {
   struct gdt_desc64 gdt;
   gdt.limit = size - 1;
@@ -119,24 +80,6 @@ void nk_user_init(void) {
   printk("Userspace enabled on core %d\n", cpu->id);
 }
 
-extern void __attribute__((noreturn)) user_start(void *tf_rsp, int data_segment);
-
-#define syscall0(nr)                                                           \
-  ({                                                                           \
-    unsigned long ret;                                                         \
-    asm volatile("int $0x80" : "=a"(ret) : "0"(nr) : "memory");                \
-    ret;                                                                       \
-  });
-
-
-static volatile int val;
-void user_code(void) {
-	val = 0;
-  syscall0(1);
-  while (1) {
-		//
-  }
-}
 
 
 nk_thread_t *user_get_thread() { return get_cur_thread(); }
@@ -153,49 +96,23 @@ int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
 }
 
 
-static void thread_run_user(void *input, void **output) {
-  nk_thread_t *t = get_cur_thread();
 
-  struct user_frame frame;
-  frame.rip = (uint64_t)user_code;     // userspace code
-  frame.cs = (SEG_UCODE << 3) | 3;     // user code segment in ring 3
-  frame.rflags = 0x00000200;           // enable interrupts
-  frame.rsp = (uint64_t)t->stack + 32; // userspace stack
-  frame.ds = (SEG_UDATA << 3) | 3;     // user data segment in ring 3
-
-  tss_set_rsp(get_cpu()->tss, 0, (uint64_t)t->stack + t->stack_size);
-  user_start((void *)&frame, SEG_UDATA);
-
-  nk_thread_exit(NULL);
-}
 
 static int handle_urun(char *buf, void *priv) {
-	
-	per_cpu_get(system);
+  // TODO: parse the command
 
-  // spawn a new thread that will be used as a userspace thread
-  nk_thread_id_t tid = 0;
-  if (nk_thread_create(thread_run_user, buf, NULL, 0, 4096, &tid, CPU_ANY) <
-      0) {
-    return -1;
-  }
+  // create the process
+  nk_process_t *proc = nk_process_create("/init", "argument");
 
-  // set the thread's name for debugging
-  nk_thread_name(tid, buf);
+  // wait for the process (it's main thread) to exit, and free it's memory
+  nk_process_wait(proc);
 
-  nk_thread_t *t = tid;
-  t->vc = get_cur_thread()->vc;
-
-  // Start the thread
-  nk_thread_run(tid);
-  // Wait for it to finish
-  nk_join(tid, NULL);
   return 0;
 }
 
 static struct shell_cmd_impl urun_impl = {
     .cmd = "urun",
-    .help_str = "urun path <arg>",
+    .help_str = "urun <path> <arg>",
     .handler = handle_urun,
 };
 nk_register_shell_cmd(urun_impl);

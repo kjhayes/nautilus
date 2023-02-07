@@ -1,1 +1,1 @@
-obj-y += user.o userstart.o
+obj-y += user.o userstart.o process.o

@@ -25,6 +25,7 @@
 #define __NK_ASPACE
 
 #include <nautilus/idt.h>
+#include <nautilus/list.h>
 
 typedef struct nk_aspace_characteristics {
     uint64_t   granularity;     // smallest unit of control (bytes)
@@ -53,10 +54,10 @@ typedef struct nk_aspace_impl {
 
 typedef struct nk_aspace_protections {
     uint64_t        flags;
-#define NK_ASPACE_READ   1
-#define NK_ASPACE_WRITE  2
-#define NK_ASPACE_EXEC   4
-#define NK_ASPACE_PIN    8
+#define NK_ASPACE_READ   1    // readable
+#define NK_ASPACE_WRITE  2    // writable
+#define NK_ASPACE_EXEC   4    // executable
+#define NK_ASPACE_PIN    8    // pinned pages cannot be moved or removed
 #define NK_ASPACE_KERN   16   // meaning "kernel only", which is not yet supported
 #define NK_ASPACE_SWAP   32   // meaning "is swaped", which is not yet supported
 #define NK_ASPACE_EAGER  64   // meaning the mapping must be immediately constructed
@@ -152,7 +153,7 @@ int          nk_aspace_add_region(nk_aspace_t *aspace, nk_aspace_region_t *regio
 int          nk_aspace_remove_region(nk_aspace_t *aspace, nk_aspace_region_t *region);
 
 // change protections for a region
-int          nk_aspace_protect(nk_aspace_t *aspace, nk_aspace_region_t *region, nk_aspace_protection_t *prot);
+int          nk_aspace_protect_region(nk_aspace_t *aspace, nk_aspace_region_t *region, nk_aspace_protection_t *prot);
 
 int          nk_aspace_move_region(nk_aspace_t *aspace, nk_aspace_region_t *cur_region, nk_aspace_region_t *new_region);
 
