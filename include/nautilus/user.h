@@ -99,6 +99,12 @@ typedef struct {
 } nk_process_t;
 
 
+// Where user programs are loaded. In nautilus, we expect the kernel
+// be 1:1 mapped virtually and physically. As a result, we must map
+// the userspace program to the high half, and the kernel to the low
+// half. This is the inverse of a regular kernel, but it doesn't
+// really matter which order we use :)
+#define USER_ADDR_UPPER ((void *) 0xffff800000000000UL)
 
 
 // this creates a new process, and starts running it immediately.

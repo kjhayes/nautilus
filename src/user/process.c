@@ -26,7 +26,7 @@
 
 
 #define ERROR(fmt, args...) ERROR_PRINT("userspace: " fmt, ##args)
-
+#define LEN_4GB (0x100000000UL)
 
 static spinlock_t ptable_lock;
 // A simple (slow) linked list that represents the "process table"
@@ -82,6 +82,11 @@ static void process_run_user(void *input, void **output) {
 nk_process_t *nk_process_create(const char *program, const char *argument) {
   PTABLE_LOCK_CONF;
 
+  char aspace_name[32]; // place that the aspace name goes into
+  nk_process_t *proc = NULL;
+  nk_aspace_region_t region;
+  nk_thread_t *thread;
+
 
   // First, we query the aspace implementation to make
   // sure it has a paging implmentation for us.
@@ -94,21 +99,19 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
 
 
   // allocate the memory for the process
-  nk_process_t *proc = malloc(sizeof(*proc));
+  proc = malloc(sizeof(*proc));
   if (!proc) {
     ERROR("cannot allocate process\n");
-    return NULL;
+    goto clean_up;
   }
   // Make sure the process structure is zeroed
   memset(proc, 0, sizeof(*proc));
-
 
   // spawn the first thread
   if (nk_thread_create(process_run_user, (void *)argument, NULL, 0, 4096,
                        &proc->main_thread, CPU_ANY) < 0) {
     ERROR("cannot allocate main thread for process\n");
-    free(proc); // Make sure to free the process structure
-    return NULL;
+    goto clean_up;
   }
 
   // now that we have allocated the process and it's first thread, we should be good to go!
@@ -124,24 +127,63 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
   PTABLE_UNLOCK()
 
   // allocate an aspace for the process
-  char aspace_name[32];
   sprintf(aspace_name, "pid%d\n", proc->pid);
-  // allocate the aspace
   proc->aspace = nk_aspace_create("paging", aspace_name, &aspace_chars);
   if (proc->aspace == NULL) {
     ERROR("Failed to allocate aspace for process!\n");
     // TODO: cleanup!
-    return NULL;
+    goto clean_up;
   }
-  nk_thread_t *t = proc->main_thread;
-  t->vc = get_cur_thread()->vc; // Make sure the thread prints to the console
-  t->aspace = proc->aspace;     // Set the aspace
+  thread = proc->main_thread;
+  thread->vc = get_cur_thread()->vc; // Make sure the thread prints to the console
+  thread->aspace = proc->aspace;     // Set the aspace
+
+  /**
+   * create a 1-1 region mapping all of physical memory
+   * so that the kernel can work when that thread is active
+   **/
+  region.va_start = 0;
+  region.pa_start = 0;
+  region.len_bytes = LEN_4GB;  // first 4 GB are mapped
+                          // (hard coded in run. TODO: use the kernel mmap to be robust)
+  /**
+   * set protections for kernel
+   * use EAGER to tell paging implementation that it needs to build all these PTs right now
+   **/ 
+  region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_KERN | NK_ASPACE_EAGER;
+
+  /**
+   * now add the region
+   * this should build the page tables immediately
+   **/
+  if (nk_aspace_add_region(proc->aspace, &region)) {
+    nk_vc_printf("failed to add initial eager region to address space\n");
+    goto clean_up;
+  }
 
   // kickoff main thread
   nk_thread_run(proc->main_thread);
 
   nk_vc_printf("Here: pid=%d\n", proc->pid);
   return proc;
+
+
+clean_up:
+  if (proc != NULL) {
+    // Delete the aspace
+    if (proc->aspace != NULL) nk_aspace_destroy(proc->aspace);
+    // Delete the main thread
+    if (proc->main_thread != NULL) nk_thread_destroy(proc->main_thread);
+    // Finally, delete the process
+    PTABLE_LOCK(); // First, remove it from the table list
+    list_del(&proc->ptable_list_node);
+    PTABLE_UNLOCK();
+    // ...
+
+    // Finally, delete the process
+    free(proc);
+  }
+  return NULL;
 }
 
 // mark the process as exited, and exit the main thread
