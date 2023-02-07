@@ -24,6 +24,9 @@
 #include <nautilus/shell.h>
 #include <nautilus/user.h>
 
+#define ERROR(fmt, args...) ERROR_PRINT("userspace: " fmt, ##args)
+
+
 static inline void user_lgdt(void *data, int size) {
   struct gdt_desc64 gdt;
   gdt.limit = size - 1;
@@ -96,14 +99,17 @@ int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
 }
 
 
-
-
 static int handle_urun(char *buf, void *priv) {
   // TODO: parse the command
 
   // create the process
   nk_process_t *proc = nk_process_create("/init", "argument");
+  if (proc == NULL) {
+    ERROR("Could not spawn process.\n");
+    return 0;
+  }
 
+  
   // wait for the process (it's main thread) to exit, and free it's memory
   nk_process_wait(proc);
 
