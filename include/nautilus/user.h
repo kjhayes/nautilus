@@ -106,6 +106,7 @@ typedef struct nk_process {
 // really matter which order we use :)
 #define USER_ASPACE_START ((void *) 0xffff800000000000UL)
 
+extern nk_process_t *get_cur_process(void);
 
 // this creates a new process, and starts running it immediately.
 extern nk_process_t *nk_process_create(const char *program, const char *argument);
@@ -116,7 +117,7 @@ extern int nk_process_wait(nk_process_t *process);
 // given a pid, get the process structure
 extern nk_process_t *nk_process_get(int pid);
 extern nk_process_t *nk_get_current_process(void);
-
+unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a, uint64_t b, uint64_t c);
 extern void nk_user_init(void);
 
 #endif

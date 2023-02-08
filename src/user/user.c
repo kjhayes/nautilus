@@ -26,7 +26,6 @@
 
 #define ERROR(fmt, args...) ERROR_PRINT("userspace: " fmt, ##args)
 
-
 static inline void user_lgdt(void *data, int size) {
   struct gdt_desc64 gdt;
   gdt.limit = size - 1;
@@ -78,61 +77,45 @@ void nk_user_init(void) {
   user_lgdt((void *)gdt, 8 * sizeof(uint64_t));
   user_ltr(SEG_TSS << 3);
 
-
-	// msr_write(0xC0000102, msr_read(0xC0000101));
+  // msr_write(0xC0000102, msr_read(0xC0000101));
   printk("Userspace enabled on core %d\n", cpu->id);
 }
 
-
 nk_thread_t *user_get_thread() { return get_cur_thread(); }
 
+// Low level interrupt handler for system call requests
 int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
-  // nk_vc_printf("in the syscall handler\n");
   struct user_frame *r = (struct user_frame *)((addr_t)excp + -128);
-
-	per_cpu_get(system);
-
-
-  if (r->rax == SYSCALL_WRITE) {
-    char *x = (char *)r->rdi;
-    for (int i = 0; i < r->rsi; i++) {
-      nk_vc_printf("%c", x[i]);
-    }
-    return 0;
+  per_cpu_get(system);
+  nk_process_t *proc = get_cur_process();
+  if (proc == NULL) {
+    return -1; // TODO: what?
   }
 
-  if (r->rax == SYSCALL_EXIT) {
-    nk_thread_exit(NULL);
-    return 0;
-  }
-
-  nk_vc_printf("Got an unknown system call:\n");
-  #define preg(name) nk_vc_printf(#name "=%llx\n", r->name);
-  preg(rax);
-  preg(rdi);
-  preg(rsi);
-  preg(rdx);
-  preg(rcx);
-  preg(rbx);
-
-  preg(rip);
-  preg(rsp);
-  // r->rax = 42;
-  return -1;
+  r->rax = process_dispatch_syscall(proc, r->rax, r->rdi, r->rsi, r->rdx);
+  return 0;
 }
-
 
 static int handle_urun(char *buf, void *priv) {
   // TODO: parse the command
+  char command[256];
+  char argument[256];
+  int scanned = sscanf(buf, "urun %s %s", command, argument);
+  // no argument passed
+  if (scanned < 1) {
+    strcpy(command, "/init");
+  }
+  if (scanned < 2) {
+    strcpy(argument, "");
+  }
 
   // create the process
-  nk_process_t *proc = nk_process_create("/init", "argument");
+  nk_process_t *proc = nk_process_create(command, argument);
   if (proc == NULL) {
     ERROR("Could not spawn process.\n");
     return 0;
   }
 
-  
   // wait for the process (it's main thread) to exit, and free it's memory
   nk_process_wait(proc);
 

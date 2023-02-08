@@ -17,8 +17,9 @@ typedef unsigned long uint64_t;
 typedef int int32_t;
 typedef long int64_t;
 
-// Write some data to the console
-extern int console_write(const char *message);
+typedef unsigned char bool;
+#define true ((bool)1)
+#define false ((bool)0)
 
 // Spawning a userspace program in Nautilus requires the user pass in the path
 // to the binary (absolute path) and the argument. Note there is not an array of
@@ -31,8 +32,11 @@ extern void exit(void);
 
 extern long strlen(const char *s);
 extern void printf(char *fmt, ...);
+extern void puts(const char *s);
 extern void putc(char c);
-
+extern int getc(void); // get a character from the console.
+extern void write(void *buf, long len);
+extern long readline(char *dst, long len);
 // These macros declare interfaces to make systemcalls to the kernel. There are
 // 4 of them to allow you to invoke a systemcall `nr` up to three arguments,
 // `a,b,c`.

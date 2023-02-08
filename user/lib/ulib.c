@@ -9,10 +9,50 @@ __attribute__((section(".init"), noinline)) void start(const char *cmd,
   exit();
 }
 
+// The syscalls
 void exit(void) { syscall0(SYSCALL_EXIT); }
+void write(void *buf, long len) { syscall2(SYSCALL_WRITE, buf, len); }
+int getc() { return syscall1(SYSCALL_GETC, 1); }
 
-int console_write(const char *message) {
-  return syscall2(SYSCALL_WRITE, message, strlen(message));
+// read a line into dst, with a maximum size of `len`
+long readline(char *dst, long len) {
+  long i;
+  bool echo;
+  bool save;
+
+  for (i = 0; i < len - 1; i++) {
+    int c = getc();
+    echo = true;
+    save = false;
+    if (c == '\n') {
+      break;
+    } else if (c == 0x08) {
+      if (i != 0) {
+        echo = true;
+        save = false;
+        dst[--i] = '\0'; // delete the previous char
+      } else {
+        echo = false;
+        save = false;
+      }
+      i--; // make sure the i++ in the for loop doesn't do anything
+    } else {
+      echo = true;
+      save = true;
+    }
+
+    if (save)
+      dst[i] = c;
+    if (echo)
+      putc(c);
+  }
+
+  // null terminate the output
+  dst[i] = '\0';
+  // make go to the next line (we don't echo \n input)
+  putc('\n');
+
+  return i;
 }
 
 // ----------------------------------------------------
@@ -100,3 +140,4 @@ void printf(char *fmt, ...) {
 
 // Simply write a single byte to the console
 void putc(char c) { syscall2(SYSCALL_WRITE, &c, 1); }
+void puts(const char *s) { write((void *)s, strlen(s)); }

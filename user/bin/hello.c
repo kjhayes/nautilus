@@ -1,6 +1,6 @@
 #include <ulib.h>
 
 int main() {
-  console_write("Hello, world");
+  puts("Hello, world");
   return 0;
 }

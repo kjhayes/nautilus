@@ -771,7 +771,9 @@ handle_ls (char * buf, void * priv)
     }
 
     for (int i = 0; names[i]; i++) {
-        nk_vc_printf("%s\n", names[i]);
+        struct nk_fs_stat stat;
+        nk_fs_stat(names[i], &stat);
+        nk_vc_printf("%-20s%-10d\n", names[i], stat.st_size);
     }
     nk_fs_free_list(names);
     return 0;
