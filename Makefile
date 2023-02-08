@@ -1189,7 +1189,9 @@ userclean:
 PHONY += ramdisk.img
 ramdisk.img: userspace
 	make -C tools/mklfs
-	tools/mklfs/mklfs -c root -b 512 -r 512 -p 512 -s 1048576 -i $@
+	# tools/mklfs/mklfs -c root -b 512 -r 512 -p 512 -s 1048576 -i $@
+	tools/mklfs/mklfs -c root -b 512 -r 512 -p 512 -s 655360 -i $@
+	
 
 PHONY += FORCE
 FORCE:
