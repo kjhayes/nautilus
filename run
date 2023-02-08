@@ -6,7 +6,7 @@ set -e
 # make the root filesystem (lfs)
 make ramdisk.img
 
-# hack: delete src/asm/ramdisk.o
+# hack: delete `src/asm/ramdisk.o` so the root filesystem gets updated (we use a RAM filesystem to avoid complications)
 rm -f src/asm/ramdisk.o
 
 # build the kernel and the isoimage for it
