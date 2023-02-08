@@ -54,7 +54,7 @@ struct user_frame {
   uint64_t cs;
   uint64_t rflags;
   uint64_t rsp;
-  uint64_t ds;
+  uint64_t ss;
 } __packed;
 
 /**
@@ -104,7 +104,7 @@ typedef struct nk_process {
 // the userspace program to the high half, and the kernel to the low
 // half. This is the inverse of a regular kernel, but it doesn't
 // really matter which order we use :)
-#define USER_ADDR_UPPER ((void *) 0xffff800000000000UL)
+#define USER_ASPACE_START ((void *) 0xffff800000000000UL)
 
 
 // this creates a new process, and starts running it immediately.

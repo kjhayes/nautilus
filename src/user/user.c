@@ -84,7 +84,6 @@ void nk_user_init(void) {
 }
 
 
-
 nk_thread_t *user_get_thread() { return get_cur_thread(); }
 
 int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
@@ -93,12 +92,33 @@ int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
 
 	per_cpu_get(system);
 
-	r->rax = read_cr3();
 
-  nk_vc_printf("got a syscall!\n");
-  nk_thread_exit(NULL);
+  if (r->rax == SYSCALL_WRITE) {
+    char *x = (char *)r->rdi;
+    for (int i = 0; i < r->rsi; i++) {
+      nk_vc_printf("%c", x[i]);
+    }
+    return 0;
+  }
+
+  if (r->rax == SYSCALL_EXIT) {
+    nk_thread_exit(NULL);
+    return 0;
+  }
+
+  nk_vc_printf("Got an unknown system call:\n");
+  #define preg(name) nk_vc_printf(#name "=%llx\n", r->name);
+  preg(rax);
+  preg(rdi);
+  preg(rsi);
+  preg(rdx);
+  preg(rcx);
+  preg(rbx);
+
+  preg(rip);
+  preg(rsp);
   // r->rax = 42;
-  return 0;
+  return -1;
 }
 
 

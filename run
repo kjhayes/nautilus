@@ -6,6 +6,9 @@ set -e
 # make the root filesystem (lfs)
 make ramdisk.img
 
+# hack: delete src/asm/ramdisk.o
+rm -f src/asm/ramdisk.o
+
 # build the kernel and the isoimage for it
 make isoimage -j $(nproc)
 

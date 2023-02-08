@@ -23,6 +23,8 @@
 #include <nautilus/nautilus.h>
 #include <nautilus/shell.h>
 #include <nautilus/user.h>
+#include <nautilus/fs.h>
+#include <nautilus/macros.h>
 
 
 #define ERROR(fmt, args...) ERROR_PRINT("userspace: " fmt, ##args)
@@ -38,30 +40,14 @@ static int proc_next_pid = 1; // start with pid 1
 #define PTABLE_UNLOCK()                                                        \
   spin_unlock_irq_restore(&ptable_lock, _ptable_lock_flags);
 
-#define syscall0(nr)                                                           \
-  ({                                                                           \
-    unsigned long ret;                                                         \
-    asm volatile("int $0x80" : "=a"(ret) : "0"(nr) : "memory");                \
-    ret;                                                                       \
-  });
 
-extern void __attribute__((noreturn))
-user_start(void *tf_rsp, int data_segment);
-static volatile int val;
-void user_code(void) {
-  val = 0;
-  syscall0(1);
-  while (1) {
-    //
-  }
-}
+extern void __attribute__((noreturn)) user_start(void *tf_rsp, int data_segment);
+
 
 static void tss_set_rsp(uint32_t *tss, uint32_t n, uint64_t rsp) {
   tss[n * 2 + 1] = rsp;
   tss[n * 2 + 2] = rsp >> 32;
 }
-
-static nk_aspace_interface_t nk_process_aspace_interface = {};
 
 nk_process_t *get_process_pid(long pid) {
   PTABLE_LOCK_CONF;
@@ -85,25 +71,35 @@ nk_process_t *get_process(nk_thread_t *thread) {
   return thread->process;
 }
 
-static void process_run_user(void *input, void **output) {
-  nk_vc_printf("in run_user!\n");
+nk_process_t *get_cur_process(void) {
+  return get_process(get_cur_thread());
+}
+
+static void process_bootstrap_and_start(void *input, void **output) {
   nk_thread_t *t = get_cur_thread();
-  nk_vc_printf("thread: %p\n", t);
   nk_process_t *p = get_process(t);
-  nk_vc_printf("proc: %p\n", p);
   nk_thread_name(t, p->program);
+  
+    // allocate a stakc and put it into the address space :)
+  nk_aspace_region_t stack_region;
+  stack_region.va_start = USER_ASPACE_START + 0xf000;
+  stack_region.pa_start = malloc(0x1000); // HACK: MEMORY LEAK!
+  stack_region.len_bytes = 0x1000; // map the 
+  stack_region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_EAGER;
+  nk_aspace_add_region(p->aspace, &stack_region); // cross fingers this works!
+
 
   nk_aspace_move_thread(p->aspace);
 
-  nk_vc_printf("It worked!\n");
-  //
+
 
   struct user_frame frame;
-  frame.rip = (uint64_t)user_code;     // userspace code
-  frame.cs = (SEG_UCODE << 3) | 3;     // user code segment in ring 3
-  frame.rflags = 0x00000200;           // enable interrupts
-  frame.rsp = (uint64_t)t->stack + 32; // userspace stack
-  frame.ds = (SEG_UDATA << 3) | 3;     // user data segment in ring 3
+  memset(&frame, 0, sizeof(frame));
+  frame.rip = (uint64_t)USER_ASPACE_START;  // userspace code
+  frame.cs = (SEG_UCODE << 3) | 3;          // user code segment in ring 3
+  frame.rflags = 0x00000200;                // enable interrupts
+  frame.rsp = (uint64_t)stack_region.va_start + stack_region.len_bytes - 8;    // userspace stack
+  frame.ss = (SEG_UDATA << 3) | 3;          // user data segment in ring 3
 
   tss_set_rsp(get_cpu()->tss, 0, (uint64_t)t->stack + t->stack_size);
 
@@ -148,7 +144,7 @@ static int setup_process_aspace(nk_process_t *proc, nk_aspace_characteristics_t 
   region.len_bytes = LEN_4GB;  // first 4 GB are mapped
   // set protections for kernel
   // use EAGER to tell paging implementation that it needs to build all these PTs right now
-  region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_EAGER;
+  region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_KERN | NK_ASPACE_EAGER;
 
   // Add the region to the aspace, which should map the memory immediately.
   if (nk_aspace_add_region(proc->aspace, &region)) {
@@ -164,18 +160,27 @@ clean_up:
 }
 
 nk_process_t *nk_process_create(const char *program, const char *argument) {
+
   PTABLE_LOCK_CONF;
 
   nk_process_t *proc = NULL;
   nk_thread_t *thread;
+  struct nk_fs_stat stat;
 
-  // First, we query the aspace implementation to make
+
+  // Check that the program exists
+  if (nk_fs_stat((char*)program, &stat) < 0) {
+    ERROR("No such program exists (%s)\n", program);
+    goto clean_up;
+  }
+
+
+  // Then, we query the aspace implementation to make
   // sure it has a paging implmentation for us.
   nk_aspace_characteristics_t aspace_chars;
   if (nk_aspace_query("paging", &aspace_chars) != 0) {
-    ERROR("No paging implementation available\n");
-    // TODO error
-    return NULL;
+    ERROR("No paging aspace implementation available\n");
+    goto clean_up;
   }
 
 
@@ -189,7 +194,7 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
   memset(proc, 0, sizeof(*proc));
 
   // spawn the first thread
-  if (nk_thread_create(process_run_user, (void *)argument, NULL, 0, 4096,
+  if (nk_thread_create(process_bootstrap_and_start, (void *)argument, NULL, 0, 4096,
                        &proc->main_thread, CPU_ANY) < 0) {
     ERROR("cannot allocate main thread for process\n");
     goto clean_up;
@@ -212,10 +217,27 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
     goto clean_up;
   }
 
+  // BEGIN HACK
+
+  // map the binary in (HACK. TODO: get this working correctly.)
+  void *binary = malloc(round_up(stat.st_size, 0x1000)); // MEMORY LEAK!!!
+  nk_fs_fd_t fd = nk_fs_open((char*)program, O_RDONLY, 0);
+  nk_fs_read(fd, binary, stat.st_size);
+  nk_fs_close(fd);
+
+  // map `binary` into the start of the address space.
+  nk_aspace_region_t region;
+  region.va_start = USER_ASPACE_START;
+  region.pa_start = binary;
+  region.len_bytes = round_up(stat.st_size, 0x1000); // map the 
+  region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_EAGER;
+  nk_aspace_add_region(proc->aspace, &region);
+
+  // END HACK
+
   thread = proc->main_thread;
   thread->vc = get_cur_thread()->vc; // Make sure the thread prints to the console
   thread->process = proc;
-
 
   // kickoff main thread
   nk_thread_run(proc->main_thread);
@@ -243,7 +265,7 @@ clean_up:
 void nk_process_exit(nk_process_t *process) {}
 
 int nk_process_wait(nk_process_t *process) {
-
   nk_join(process->main_thread, NULL);
+  // TODO: cleanup! (free proc, aspace, make sure all threads are dead)
 	return 0;
 }

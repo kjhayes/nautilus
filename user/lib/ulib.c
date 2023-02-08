@@ -55,7 +55,7 @@ static void printint(int xx, int base, int sgn) {
     putc(buf[i]);
 }
 
-// Print to the given fd. Only understands %d, %x, %p, %s.
+// A simple printf. Only understands %d, %x, %p, %s.
 void printf(char *fmt, ...) {
   va_list ap;
   char *s;
