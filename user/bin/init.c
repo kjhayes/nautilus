@@ -13,6 +13,11 @@ int main(char *argument) {
       printf("0x%x ", buf[i]);
     }
     printf("\n");
+
+    pid_t pid = spawn(buf, "argument");
+    printf("pid=%d\n", pid);
+    wait(pid);
+    printf("waited\n");
     if (len == 0)
       break;
   }

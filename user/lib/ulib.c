@@ -141,3 +141,9 @@ void printf(char *fmt, ...) {
 // Simply write a single byte to the console
 void putc(char c) { syscall2(SYSCALL_WRITE, &c, 1); }
 void puts(const char *s) { write((void *)s, strlen(s)); }
+
+pid_t spawn(const char *program, const char *argument) {
+  return (pid_t)syscall2(SYSCALL_SPAWN, program, argument);
+}
+
+int wait(pid_t pid) { return (int)syscall1(SYSCALL_WAIT, pid); }

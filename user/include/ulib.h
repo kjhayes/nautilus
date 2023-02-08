@@ -16,16 +16,10 @@ typedef unsigned long uint64_t;
 
 typedef int int32_t;
 typedef long int64_t;
-
+typedef long pid_t;
 typedef unsigned char bool;
 #define true ((bool)1)
 #define false ((bool)0)
-
-// Spawning a userspace program in Nautilus requires the user pass in the path
-// to the binary (absolute path) and the argument. Note there is not an array of
-// argv. Every program takes one and only string as argument to simplify the
-// interface
-extern int spawn(const char *program, const char *argument);
 
 // Exit the program
 extern void exit(void);
@@ -37,6 +31,14 @@ extern void putc(char c);
 extern int getc(void); // get a character from the console.
 extern void write(void *buf, long len);
 extern long readline(char *dst, long len);
+
+// Spawning a userspace program in Nautilus requires the user pass in the path
+// to the binary (absolute path) and the argument. Note there is not an array of
+// argv. Every program takes one and only string as argument to simplify the
+// interface
+extern pid_t spawn(const char *program, const char *argument);
+extern int wait(pid_t pid /* TODO: return value? */);
+
 // These macros declare interfaces to make systemcalls to the kernel. There are
 // 4 of them to allow you to invoke a systemcall `nr` up to three arguments,
 // `a,b,c`.

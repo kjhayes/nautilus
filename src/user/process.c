@@ -32,7 +32,7 @@
 // ================ PROCESS TABLE STRUCTURES ================
 static spinlock_t ptable_lock;
 // A simple (slow) linked list that represents the "process table"
-static struct list_head ptable_list;
+static struct list_head ptable_list = LIST_HEAD_INIT(ptable_list);
 static int proc_next_pid = 1; // start with pid 1
 #define PTABLE_LOCK_CONF uint8_t _ptable_lock_flags
 #define PTABLE_LOCK() _ptable_lock_flags = spin_lock_irq_save(&ptable_lock)
@@ -58,6 +58,7 @@ nk_process_t *get_process_pid(long pid) {
   // walk the list to get the pid
   struct list_head *cur;
   list_for_each(cur, &ptable_list) {
+    printk("cur=%p\n", cur);
     nk_process_t *proc = list_entry(cur, nk_process_t, ptable_list_node);
     if (proc->pid == pid) {
       PTABLE_UNLOCK();
@@ -100,6 +101,24 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
   if (nr == SYSCALL_GETC) {
     // probably a bad idea to forward directly... but whatever
     return nk_vc_getchar(a);
+  }
+
+  if (nr == SYSCALL_SPAWN) {
+    nk_vc_printf("spawn from %d\n", proc->pid);
+
+    const char *program = (const char *)a;  // TODO: copy_from_user
+    const char *argument = (const char *)b; // TODO: copy_from_user
+    nk_process_t *proc = nk_process_create(program, argument);
+    return proc->pid;
+  }
+
+  if (nr == SYSCALL_WAIT) {
+    nk_process_t *target_proc = get_process_pid(a);
+    nk_vc_printf("wait from %d. target=%d,%p\n", proc->pid, a, target_proc);
+
+    if (target_proc == NULL)
+      return -1;
+    return nk_process_wait(target_proc);
   }
 
   nk_vc_printf("Unknown system call. Nr=%d, args=%d,%d,%d\n", nr, a, b, c);
@@ -166,7 +185,7 @@ static int setup_process_aspace(nk_process_t *proc,
   char aspace_name[32];
 
   // allocate an aspace for the process
-  sprintf(aspace_name, "pid%d", proc->pid);
+  sprintf(aspace_name, "proc%d", proc->pid);
   proc->aspace = nk_aspace_create("paging", aspace_name, aspace_chars);
   if (proc->aspace == NULL) {
     ERROR("Failed to allocate aspace for process!\n");
@@ -309,13 +328,13 @@ int nk_process_wait(nk_process_t *process) {
   nk_join(process->main_thread, NULL);
   // TODO: cleanup! (free proc, aspace, make sure all threads are dead)
 
-  nk_aspace_destroy(process->aspace);
+  // nk_aspace_destroy(process->aspace);
 
   // Remove the process from the process list
-  PTABLE_LOCK();
-  list_del(&process->ptable_list_node);
-  PTABLE_UNLOCK();
+  // PTABLE_LOCK();
+  // list_del_init(&process->ptable_list_node);
+  // PTABLE_UNLOCK();
 
-  free(process);
+  // free(process);
   return 0;
 }
