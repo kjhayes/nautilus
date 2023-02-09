@@ -24,12 +24,17 @@
 #ifndef __NK_ASPACE
 #define __NK_ASPACE
 
+#include <nautilus/fs.h>
 #include <nautilus/idt.h>
 #include <nautilus/list.h>
 
 typedef struct nk_aspace_characteristics {
     uint64_t   granularity;     // smallest unit of control (bytes)
     uint64_t   alignment;       // smallest alignment (bytes)
+
+    uint64_t   capabilities;    // bitmap of capabilities (NK_ASPACE_CAP_*)
+#define NK_ASPACE_CAP_ANON   (1LU << 0) // This aspace can manage anonymous mappings (allocates it's own backing memory)
+#define NK_ASPACE_CAP_FILE   (1LU << 1) // This aspace can manage file-backed mappings
 } nk_aspace_characteristics_t;
 
 
@@ -54,13 +59,15 @@ typedef struct nk_aspace_impl {
 
 typedef struct nk_aspace_protections {
     uint64_t        flags;
-#define NK_ASPACE_READ   1    // readable
-#define NK_ASPACE_WRITE  2    // writable
-#define NK_ASPACE_EXEC   4    // executable
-#define NK_ASPACE_PIN    8    // pinned pages cannot be moved or removed
-#define NK_ASPACE_KERN   16   // meaning "kernel only", which is not yet supported
-#define NK_ASPACE_SWAP   32   // meaning "is swaped", which is not yet supported
-#define NK_ASPACE_EAGER  64   // meaning the mapping must be immediately constructed
+#define NK_ASPACE_READ   (1LU << 0)  // readable
+#define NK_ASPACE_WRITE  (1LU << 1)  // writable
+#define NK_ASPACE_EXEC   (1LU << 2)  // executable
+#define NK_ASPACE_PIN    (1LU << 3)  // pinned pages cannot be moved or removed
+#define NK_ASPACE_KERN   (1LU << 4)  // meaning "kernel only", which is not yet supported
+#define NK_ASPACE_SWAP   (1LU << 5)  // meaning "is swaped", which is not yet supported
+#define NK_ASPACE_EAGER  (1LU << 6)  // meaning the mapping must be immediately constructed
+#define NK_ASPACE_ANON   (1LU << 7)  // meaning the aspace must map and manage backing memory. pa_start is meaningless.
+#define NK_ASPACE_FILE   (1LU << 8)  // this region is file backed. The aspace must manage reading and flushing data to and from disk. pa_start is meaningless.
 } nk_aspace_protection_t;
 
 
@@ -72,6 +79,12 @@ typedef struct nk_aspace_region {
     void       *va_start;
     void       *pa_start;
     uint64_t    len_bytes;
+    // If `protect` contains NK_ASPACE_FILE then this is the "backing memory" of
+    // this region. It is expected that the file is not owned by the aspace
+    // implementation. As a result, it's expected that any call to nk_fs_close()
+    // occurs after any usage in the aspace.
+    nk_fs_fd_t  file;
+                               
     nk_aspace_protection_t  protect;
 } nk_aspace_region_t;
 

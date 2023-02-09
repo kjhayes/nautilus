@@ -130,6 +130,7 @@ typedef struct nk_aspace_paging {
 } nk_aspace_paging_t;
 
 
+static int remove_region(void *state, nk_aspace_region_t *region);
 
 // The function the aspace abstraction will call when it
 // wants to destroy your address space
@@ -148,7 +149,25 @@ static  int destroy(void *state)
     //
     // WRITEME!!    actually do the work
     // 
+    nk_aspace_region_t regions_to_unmap[p->llist_tracker->size];
+    off_t ind = 0;
+    mm_llist_node_t * curr_node = p->llist_tracker->region_head;
+    while (curr_node != NULL) {
+        regions_to_unmap[ind++] = curr_node->region;
+        // printk("VA = %016lx to PA = %016lx, len = %16lx\n", 
+        //     curr_node->region.va_start,
+        //     curr_node->region.pa_start,
+        //     curr_node->region.len_bytes
+        // );
+        curr_node = curr_node->next_llist_node;
+    }
+
+
     ASPACE_UNLOCK(p);
+
+    for (int i = 0; i < p->llist_tracker->size; i++) {
+        remove_region(state, &regions_to_unmap[i]);
+    }
 
     return 0;
 }
@@ -251,49 +270,38 @@ int eager_drill_wrapper(nk_aspace_paging_t *p, nk_aspace_region_t *region) {
             2. region overlap or other region validnesss check (involved using p->llist_tracker)
             3. region allocation must be eager
     */
-
     ph_pf_access_t access_type = access_from_region(region);
-
-    addr_t vaddr = (addr_t) region->va_start;
-    addr_t paddr = (addr_t)region->pa_start;
-    uint64_t remained = region->len_bytes;
-    addr_t va_end = (addr_t) region->va_start + region->len_bytes;
-
-    uint64_t page_granularity = 0;
+    uint64_t page_granularity = PAGE_SIZE_4KB;
     int ret = 0;
 
-    while (vaddr < va_end) {
-        
-        if (
-            vaddr % PAGE_SIZE_4KB == 0 && 
-            paddr % PAGE_SIZE_4KB == 0 && 
-            remained >= PAGE_SIZE_4KB 
-        ) {
-            // vaddr % PAGE_SIZE_4KB == 0
-            // must be the case as we require 4KB alignment
-            page_granularity = PAGE_SIZE_4KB;
+    int file_mapping = (region->protect.flags & NK_ASPACE_FILE) != 0;
+    int anon_mapping = (region->protect.flags & NK_ASPACE_ANON) != 0;
 
-            ret = paging_helper_drill (p->cr3, vaddr, paddr, access_type);
+    // Iterate over the page inds and map each page as required.
+    for (uint64_t page = 0; page < region->len_bytes / PAGE_SIZE_4KB; page += 1) {
+        addr_t vaddr = (addr_t)region->va_start + (page * PAGE_SIZE_4KB);
+        addr_t paddr = (addr_t)region->pa_start + (page * PAGE_SIZE_4KB);
 
-            if (ret < 0) {
-                ERROR("Failed to drill at virtual address=%p"
-                        " physical adress %p"
-                        " and ret code of %d"
-                        " page_granularity = %lx\n",
-                        vaddr, paddr, ret, page_granularity
-                );
-                return ret;
-            }
-            
-            vaddr += page_granularity;
-            paddr += page_granularity;
-            remained -= page_granularity;
-        } else {
+        if (anon_mapping || file_mapping) {
+            // if we are mapping anonymous memory, or a file, we need to allocate the backing memory here.
+            paddr = (addr_t)malloc(PAGE_SIZE_4KB);
+            printk("allocated %p\n", paddr);
+            // if it's a file mapping, read the file into the page
+            if (file_mapping) nk_fs_read(region->file, (void*)paddr, PAGE_SIZE_4KB);
+        }
 
-            ERROR("Region" REGION_FORMAT "doesnot meet drill requirement at vaddr=0x%p and paddr=0x%p\n", 
-                    REGION(region), vaddr, paddr);
-            return -1;
-        }        
+
+        ret = paging_helper_drill(p->cr3, vaddr, paddr, access_type);
+
+        if (ret < 0) {
+            ERROR("Failed to drill at virtual address=%p"
+                    " physical adress %p"
+                    " and ret code of %d"
+                    " page_granularity = %lx\n",
+                    vaddr, paddr, ret, page_granularity
+            );
+            return ret;
+        }
     }
 
     return ret;
@@ -397,11 +405,11 @@ static int remove_region(void *state, nk_aspace_region_t *region)
     // it had better exist and be identical.
 
     // next, remove the region from your data structure
-    if (NK_ASPACE_GET_PIN(region->protect.flags)) {
-        ERROR("Cannot remove pinned region"REGION_FORMAT"\n", REGION(region));
-        ASPACE_UNLOCK(p);
-        return -1;
-    }
+    // if (NK_ASPACE_GET_PIN(region->protect.flags)) {
+    //     ERROR("Cannot remove pinned region"REGION_FORMAT"\n", REGION(region));
+    //     ASPACE_UNLOCK(p);
+    //     return -1;
+    // }
 
     uint8_t check_flag = VA_CHECK | PA_CHECK | LEN_CHECK | PROTECT_CHECK;
     int remove_failed = mm_remove(p->llist_tracker, region, check_flag);
@@ -430,6 +438,11 @@ static int remove_region(void *state, nk_aspace_region_t *region)
         if (ret == 0) {
             ((ph_pte_t *) entry)->present = 0;
             offset = offset + PAGE_SIZE_4KB;
+
+            // we need to free memory if the region was anonymous or file-backed.
+            addr_t paddr = ((ph_pte_t *) entry)->page_base << 12;
+            printk("free %p\n", paddr);
+            free((void*)paddr);
         } 
         else {
             panic("unexpected return from page walking = %d\n", ret);
@@ -940,6 +953,8 @@ static int   get_characteristics(nk_aspace_characteristics_t *c)
 {
     // you must support 4KB page granularity and alignment
     c->granularity = c->alignment = PAGE_SIZE_4KB;
+    // you must support anonymous mappings, as well as file mappings
+    c->capabilities = NK_ASPACE_CAP_ANON | NK_ASPACE_CAP_FILE;
     
     return 0;
 }

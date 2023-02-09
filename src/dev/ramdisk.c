@@ -124,7 +124,7 @@ static int discover_ramdisks()
     // this should do real discovery, but currently the only way to
     // include a ramdisk is with the embedded image
 #if NAUT_CONFIG_RAMDISK_EMBED
-    extern int __RAMDISK_START, __RAMDISK_END;
+    extern uint8_t __RAMDISK_START, __RAMDISK_END;
 
     struct ramdisk_state *s = malloc(sizeof(*s));
     

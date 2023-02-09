@@ -58,7 +58,6 @@ nk_process_t *get_process_pid(long pid) {
   // walk the list to get the pid
   struct list_head *cur;
   list_for_each(cur, &ptable_list) {
-    printk("cur=%p\n", cur);
     nk_process_t *proc = list_entry(cur, nk_process_t, ptable_list_node);
     if (proc->pid == pid) {
       PTABLE_UNLOCK();
@@ -104,7 +103,7 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
   }
 
   if (nr == SYSCALL_SPAWN) {
-    nk_vc_printf("spawn from %d\n", proc->pid);
+    // nk_vc_printf("spawn from %d\n", proc->pid);
 
     const char *program = (const char *)a;  // TODO: copy_from_user
     const char *argument = (const char *)b; // TODO: copy_from_user
@@ -114,14 +113,14 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
 
   if (nr == SYSCALL_WAIT) {
     nk_process_t *target_proc = get_process_pid(a);
-    nk_vc_printf("wait from %d. target=%d,%p\n", proc->pid, a, target_proc);
+    // nk_vc_printf("wait from %d. target=%d,%p\n", proc->pid, a, target_proc);
 
     if (target_proc == NULL)
       return -1;
     return nk_process_wait(target_proc);
   }
 
-  nk_vc_printf("Unknown system call. Nr=%d, args=%d,%d,%d\n", nr, a, b, c);
+  printk("Unknown system call. Nr=%d, args=%d,%d,%d\n", nr, a, b, c);
 
   return 0;
 }
@@ -143,10 +142,9 @@ static void process_bootstrap_and_start(void *input, void **output) {
   // allocate a stack and put it into the address space :)
   nk_aspace_region_t stack_region;
   stack_region.va_start = USER_ASPACE_START + 0xf000;
-  stack_region.pa_start = malloc(0x1000); // HACK: MEMORY LEAK!
+  stack_region.pa_start = 0;
   stack_region.len_bytes = 0x1000;        // map the
-  stack_region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE |
-                               NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_EAGER;
+  stack_region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_ANON | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_EAGER;
   nk_aspace_add_region(p->aspace, &stack_region); // cross fingers this works!
   nk_aspace_move_thread(p->aspace);
 
@@ -267,6 +265,7 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
   PTABLE_LOCK();
   // allocate a pid
   proc->pid = proc_next_pid++;
+  // Add the process to the table.
   list_add_tail(&proc->ptable_list_node, &ptable_list);
   PTABLE_UNLOCK()
 
@@ -277,17 +276,17 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
 
   // ===== BEGIN HACK =====
   // map the binary in (HACK. TODO: get this working correctly.)
-  void *binary = malloc(round_up(stat.st_size, 0x1000)); // MEMORY LEAK!!!
   nk_fs_fd_t fd = nk_fs_open((char *)program, O_RDONLY, 0);
-  nk_fs_read(fd, binary, stat.st_size);
-  nk_fs_close(fd);
   nk_aspace_region_t region;
   region.va_start = USER_ASPACE_START;
-  region.pa_start = binary;
+  region.pa_start = 0;
   region.len_bytes = round_up(stat.st_size, 0x1000); // map the
+  region.file = fd;
   region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC |
-                         NK_ASPACE_PIN | NK_ASPACE_EAGER;
+                         NK_ASPACE_PIN | NK_ASPACE_EAGER | NK_ASPACE_FILE;
   nk_aspace_add_region(proc->aspace, &region);
+  nk_fs_close(fd);
+
   // ===== END HACK =====
 
   // Configure some fields on the processes' main thread.
@@ -328,13 +327,13 @@ int nk_process_wait(nk_process_t *process) {
   nk_join(process->main_thread, NULL);
   // TODO: cleanup! (free proc, aspace, make sure all threads are dead)
 
-  // nk_aspace_destroy(process->aspace);
+  nk_aspace_destroy(process->aspace);
 
   // Remove the process from the process list
-  // PTABLE_LOCK();
-  // list_del_init(&process->ptable_list_node);
-  // PTABLE_UNLOCK();
+  PTABLE_LOCK();
+  list_del_init(&process->ptable_list_node);
+  PTABLE_UNLOCK();
 
-  // free(process);
+  free(process);
   return 0;
 }
