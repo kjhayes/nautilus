@@ -375,6 +375,7 @@ int nk_process_wait(nk_process_t *process) {
   PTABLE_LOCK_CONF;
 
   nk_join(process->main_thread, NULL);
+  nk_sched_reap(1);
   // TODO: cleanup! (free proc, aspace, make sure all threads are dead)
 
   nk_aspace_destroy(process->aspace);
