@@ -75,6 +75,9 @@ typedef struct nk_process {
 	// processes in nautilus get a unique pid, which
 	// is entirely unrelated to the threads that are run under it
 	int pid;
+  
+  // A lock for the fields of this structure
+  spinlock_t process_lock;
 
 	// Address space of the process
 	// The API for this is implemented in src/user/process.c
@@ -94,6 +97,9 @@ typedef struct nk_process {
 
 	// for system-wide process list
 	struct list_head ptable_list_node;
+
+  // the next location to palloc to.
+  off_t next_palloc;
 
 	// TODO: the rest of the process state :^)
 } nk_process_t;

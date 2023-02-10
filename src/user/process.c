@@ -38,6 +38,13 @@ static int proc_next_pid = 1; // start with pid 1
 #define PTABLE_LOCK() _ptable_lock_flags = spin_lock_irq_save(&ptable_lock)
 #define PTABLE_UNLOCK()                                                        \
   spin_unlock_irq_restore(&ptable_lock, _ptable_lock_flags);
+
+
+
+#define PROCESS_LOCK_CONF uint8_t _process_lock_flags
+#define PROCESS_LOCK(proc) _process_lock_flags = spin_lock_irq_save(&proc->process_lock)
+#define PROCESS_UNLOCK(proc)                                                        \
+  spin_unlock_irq_restore(&proc->process_lock, _process_lock_flags);
 // ==========================================================
 
 // The assembly function which calls `iret` to enter userspace from the kernel.
@@ -48,6 +55,14 @@ user_start(void *tf_rsp, int data_segment);
 static void tss_set_rsp(uint32_t *tss, uint32_t n, uint64_t rsp) {
   tss[n * 2 + 1] = rsp;
   tss[n * 2 + 2] = rsp >> 32;
+}
+
+
+void nk_process_switch(nk_thread_t *t) {
+  if (t->process == NULL) return; // NOP
+
+  printk("STACK: %p\n", (uint64_t)t->stack + t->stack_size - (2*sizeof(uint64_t)));
+  tss_set_rsp(get_cpu()->tss, 0, (uint64_t)t->stack + t->stack_size - (2*sizeof(uint64_t)));
 }
 
 // Lookup a process structure by it's pid.
@@ -74,6 +89,32 @@ nk_process_t *get_process(nk_thread_t *thread) { return thread->process; }
 
 // Get the current process for the currently executing thread.s
 nk_process_t *get_cur_process(void) { return get_process(get_cur_thread()); }
+
+
+static addr_t process_valloc(nk_process_t *proc, off_t incr_pages) {
+  PROCESS_LOCK_CONF;
+
+  PROCESS_LOCK(proc);
+  off_t bytes = incr_pages * PAGE_SIZE_4KB;
+  off_t vaddr = proc->next_palloc;
+  proc->next_palloc += bytes + PAGE_SIZE_4KB; // bump the next pointer, skipping one page (for "protection")
+
+  PROCESS_UNLOCK(proc);
+
+
+  // Allocate the region
+  nk_aspace_region_t stack_region;
+  stack_region.va_start = (void*)vaddr;
+  stack_region.pa_start = 0; // anonymous.
+  stack_region.len_bytes = bytes;
+  // Readable, writable, anonymous, and eager.
+  // Note: NOT executable
+  stack_region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_ANON | NK_ASPACE_EAGER;
+  nk_aspace_add_region(proc->aspace, &stack_region); // cross fingers this works!
+
+
+  return vaddr;
+}
 
 // Dispatch on a system call `nr` on process `proc
 unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
@@ -120,6 +161,16 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
     return nk_process_wait(target_proc);
   }
 
+
+  if (nr == SYSCALL_VALLOC) {
+    return process_valloc(proc, a);
+  }
+
+  if (nr == SYSCALL_VFREE) {
+    // TODO
+    return -1;
+  }
+
   printk("Unknown system call. Nr=%d, args=%d,%d,%d\n", nr, a, b, c);
 
   return 0;
@@ -139,25 +190,22 @@ static void process_bootstrap_and_start(void *input, void **output) {
   nk_process_t *p = get_process(t);
   nk_thread_name(t, p->program);
 
-  // allocate a stack and put it into the address space :)
-  nk_aspace_region_t stack_region;
-  stack_region.va_start = USER_ASPACE_START + 0xf000;
-  stack_region.pa_start = 0;
-  stack_region.len_bytes = 0x1000;        // map the
-  stack_region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_ANON | NK_ASPACE_EXEC | NK_ASPACE_PIN | NK_ASPACE_EAGER;
-  nk_aspace_add_region(p->aspace, &stack_region); // cross fingers this works!
+
+  // Attach the address space to this thread.
   nk_aspace_move_thread(p->aspace);
 
+
+  // allocate one page for the stack
+  addr_t stack_top = process_valloc(p, 1);
+
+  // Initialize the registers for this thread (mainly RIP and RSP)
   struct user_frame frame;
   memset(&frame, 0, sizeof(frame));
-  frame.rip = (uint64_t)USER_ASPACE_START; // userspace code
-  frame.cs = (SEG_UCODE << 3) | 3;         // user code segment in ring 3
-  frame.rflags = 0x00000200;               // enable interrupts
-  frame.rsp = (uint64_t)stack_region.va_start + stack_region.len_bytes -
-              8;                   // userspace stack
-  frame.ss = (SEG_UDATA << 3) | 3; // user data segment in ring 3
-
-  tss_set_rsp(get_cpu()->tss, 0, (uint64_t)t->stack + t->stack_size);
+  frame.rip = (uint64_t)USER_ASPACE_START;     // userspace code
+  frame.rsp = (uint64_t)stack_top + 4096 - 8;  // userspace stack
+  frame.cs = (SEG_UCODE << 3) | 3;             // user code segment in ring 3
+  frame.ss = (SEG_UDATA << 3) | 3;             // user data segment in ring 3
+  frame.rflags = 0x00000200;                   // enable interrupts
 
   // Call the userspace code
   user_start((void *)&frame, SEG_UDATA);
@@ -274,7 +322,6 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
     goto clean_up;
   }
 
-  // ===== BEGIN HACK =====
   // map the binary in (HACK. TODO: get this working correctly.)
   nk_fs_fd_t fd = nk_fs_open((char *)program, O_RDONLY, 0);
   nk_aspace_region_t region;
@@ -287,7 +334,10 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
   nk_aspace_add_region(proc->aspace, &region);
   nk_fs_close(fd);
 
-  // ===== END HACK =====
+
+  // When a process requests new pages, allocate them here
+  // then bump it up (with a gap for "protection")
+  proc->next_palloc = (off_t)USER_ASPACE_START + region.len_bytes + 4096;
 
   // Configure some fields on the processes' main thread.
   thread = proc->main_thread;

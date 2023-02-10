@@ -1,12 +1,31 @@
 #include <ulib.h>
 
+
+struct node {
+  int value;
+  struct node *next;
+};
+
+
+
 int main(char *argument) {
-  printf("Hello, world\n");
-  return 0;
-  while (1) {
-    pid_t pid = spawn("hello", "argument");
-    wait(pid);
+
+  struct node *root = NULL;
+
+  for (int i = 0; i < 10; i++) {
+    struct node *n = calloc(1, sizeof(struct node));
+    n->value = i;
+    n->next = root;
+    root = n;
+    printf("made node %x\n", n);
   }
+  // volatile long *data = valloc(12);
+  // printf("Hello, world. %x\n", *data);
+  // return 0;
+  // while (1) {
+  //   pid_t pid = spawn("hello", "argument");
+  //   wait(pid);
+  // }
   printf("Hello from userspace!. Type some stuff (type nothing to continue)\n");
 
   while (1) {

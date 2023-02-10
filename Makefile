@@ -1163,15 +1163,20 @@ USER_OBJECTS=$(patsubst %.c,%.o,$(USER_PROGRAMS))
 USER_BINARIES=$(patsubst user/bin/%.c,root/%,$(USER_PROGRAMS))
 UCFLAGS=-O2 -ffreestanding -nostdlib -nostdinc -Iuser/include
 
-user/lib/ulib.o: user/lib/ulib.c
-	@echo "  UCC  $@" 
-	@gcc $(UCFLAGS) -c $< -o $@
+
+user/lib/%.o: user/lib/%.c
+	@echo "  UCC  $@"
+	@gcc $(UCFLAGS) -c $^ -o $@
+
+user/lib/ulib.a: user/lib/ulib.o user/lib/liballoc.o
+	@echo "  UAR  $@"
+	@ar rcs $@ $^
 
 user/bin/%.o: user/bin/%.c
 	@echo "  UCC  $@" 
 	@gcc $(UCFLAGS) -c $< -o $@
 
-root/%: user/bin/%.o user/lib/ulib.o
+root/%: user/bin/%.o user/lib/ulib.a
 	@echo "  ULD  $@" 
 	@ld -T user/user.ld -z max-page-size=0x1000 -m elf_x86_64 $^ -o $@
 	@objdump -d $@ > root/$*.S

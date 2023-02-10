@@ -1,4 +1,5 @@
 #include <ulib.h>
+#include "./liballoc.h"
 
 extern void main(const char *cmd, const char *arg);
 
@@ -65,16 +66,26 @@ long strlen(const char *s) {
   return len;
 }
 
+
+void *memset(void *x, unsigned char value, unsigned long length) {
+  unsigned char *xs = x;
+  for (unsigned long i = 0; i < length; i++) {
+    xs[i] = value;
+  }
+  return x;
+}
+
+
 typedef __builtin_va_list va_list;
 #define va_start(ap, param) __builtin_va_start(ap, param)
 #define va_end(ap) __builtin_va_end(ap)
 #define va_arg(ap, type) __builtin_va_arg(ap, type)
 
-static void printint(int xx, int base, int sgn) {
-  static char digits[] = "0123456789ABCDEF";
+static void printint(long xx, int base, int sgn) {
+  static char digits[] = "0123456789abcdef";
   char buf[16];
   int i, neg;
-  uint32_t x;
+  uint64_t x;
 
   neg = 0;
   if (sgn && xx < 0) {
@@ -99,7 +110,7 @@ static void printint(int xx, int base, int sgn) {
 void printf(char *fmt, ...) {
   va_list ap;
   char *s;
-  int c, i, state;
+  uint64_t c, i, state;
   va_start(ap, fmt);
 
   state = 0;
@@ -113,9 +124,9 @@ void printf(char *fmt, ...) {
       }
     } else if (state == '%') {
       if (c == 'd') {
-        printint(va_arg(ap, int), 10, 1);
+        printint(va_arg(ap, uint64_t), 10, 1);
       } else if (c == 'x' || c == 'p') {
-        printint(va_arg(ap, int), 16, 0);
+        printint(va_arg(ap, uint64_t), 16, 0);
       } else if (c == 's') {
         s = va_arg(ap, char *);
         if (s == 0)
@@ -125,7 +136,7 @@ void printf(char *fmt, ...) {
           s++;
         }
       } else if (c == 'c') {
-        putc(va_arg(ap, uint32_t));
+        putc(va_arg(ap, uint64_t));
       } else if (c == '%') {
         putc(c);
       } else {
@@ -147,3 +158,47 @@ pid_t spawn(const char *program, const char *argument) {
 }
 
 int wait(pid_t pid) { return (int)syscall1(SYSCALL_WAIT, pid); }
+
+
+void *valloc(unsigned npages) {
+  return (void*)syscall1(SYSCALL_VALLOC, npages);
+}
+
+
+
+
+
+// Utility functions for the allocator.
+int liballoc_lock() {
+  // TODO
+  return 0;
+}
+
+int liballoc_unlock() {
+  // TODO
+  return 0;
+}
+
+/** This is the hook into the local system which allocates pages. It
+ * accepts an integer parameter which is the number of pages
+ * required.  The page size was set up in the liballoc_init function.
+ *
+ * \return NULL if the pages were not allocated.
+ * \return A pointer to the allocated memory.
+ */
+void *liballoc_alloc(size_t npages) {
+  return valloc(npages);
+}
+
+/** This frees previously allocated memory. The void* parameter passed
+ * to the function is the exact same value returned from a previous
+ * liballoc_alloc call.
+ *
+ * The integer value is the number of pages to free.
+ *
+ * \return 0 if the memory was successfully freed.
+ */
+int liballoc_free(void *ptr, size_t pages) {
+  // TODO:
+  return 0;
+}

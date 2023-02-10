@@ -285,7 +285,7 @@ int eager_drill_wrapper(nk_aspace_paging_t *p, nk_aspace_region_t *region) {
         if (anon_mapping || file_mapping) {
             // if we are mapping anonymous memory, or a file, we need to allocate the backing memory here.
             paddr = (addr_t)malloc(PAGE_SIZE_4KB);
-            printk("allocated %p\n", paddr);
+            // printk("allocated %p\n", paddr);
             // if it's a file mapping, read the file into the page
             if (file_mapping) nk_fs_read(region->file, (void*)paddr, PAGE_SIZE_4KB);
         }
@@ -441,7 +441,7 @@ static int remove_region(void *state, nk_aspace_region_t *region)
 
             // we need to free memory if the region was anonymous or file-backed.
             addr_t paddr = ((ph_pte_t *) entry)->page_base << 12;
-            printk("free %p\n", paddr);
+            // printk("free %p\n", paddr);
             free((void*)paddr);
         } 
         else {
@@ -720,7 +720,8 @@ static int switch_from(void *state)
     struct nk_thread *thread = get_cur_thread();
     
     DEBUG("switching out address space %s from thread %d (%s)\n",ASPACE_NAME(p), thread->tid, THREAD_NAME(thread));
-    
+    write_cr3(nk_paging_default_cr3());
+
     return 0;
 }
 
@@ -766,6 +767,7 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
 	ERROR("general protection fault encountered.... uh...\n");
 	ERROR("i have seen things that you people would not believe.\n");
 	panic("general protection fault delivered to paging subsystem\n");
+    nk_thread_exit(NULL);
 	return -1; // will never happen
     }
 

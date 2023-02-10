@@ -3231,6 +3231,11 @@ static void handle_special_switch(rt_status what, int have_lock, uint8_t flags, 
     }
     
 
+    #ifdef NAUT_CONFIG_ENABLE_USERSPACE
+    extern void nk_process_switch(nk_thread_t *n);
+    nk_process_switch(n);
+    #endif
+
     // at this point, we have interrupts off
     // whatever we switch to will turn them back on
     // our context will indicate interrupts off

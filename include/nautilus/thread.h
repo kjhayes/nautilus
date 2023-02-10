@@ -218,6 +218,11 @@ struct nk_thread {
 
     struct nk_virtual_console *vc;
 
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+    // userspace state
+    struct nk_process *process; // opaque pointer to the process this thread belongs to.
+#endif
+
 #ifdef NAUT_CONFIG_GARBAGE_COLLECTION
     void  *gc_state;
 #endif
@@ -227,11 +232,6 @@ struct nk_thread {
     const void * tls[TLS_MAX_KEYS];
 
     uint8_t fpu_state[FPSTATE_SIZE] __align(FPSTATE_ALIGN);
-
-#ifdef NAUT_CONFIG_ENABLE_USERSPACE
-    // userspace state
-    struct nk_process *process; // opaque pointer to the process this thread belongs to.
-#endif
 } ;
 
 // internal thread representations
