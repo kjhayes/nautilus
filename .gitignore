@@ -25,3 +25,4 @@ scripts/format_syms
 scripts/kconfig/conf
 scripts/kconfig/lxdialog/lxdialog
 scripts/kconfig/mconf
+user/lib/ulib.a
