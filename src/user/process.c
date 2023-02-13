@@ -270,7 +270,7 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
 
   printk("Unknown system call. Nr=%d, args=%d,%d,%d\n", nr, a, b, c);
 
-  return 0;
+  return -1;
 }
 
 /**
