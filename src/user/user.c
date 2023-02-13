@@ -139,7 +139,7 @@ static int handle_urun(char *buf, void *priv) {
   }
 
   // create the process
-  nk_process_t *proc = nk_process_create(command, argument);
+  nk_process_t *proc = nk_process_spawn(command, argument);
   if (proc == NULL) {
     ERROR("Could not spawn process.\n");
     return 0;

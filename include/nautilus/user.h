@@ -115,9 +115,7 @@ typedef struct nk_process {
 extern nk_process_t *get_cur_process(void);
 
 // this creates a new process, and starts running it immediately.
-extern nk_process_t *nk_process_create(const char *program, const char *argument);
-// exit a process, and mark it ready to free
-extern void nk_process_exit(nk_process_t *process);
+extern nk_process_t *nk_process_spawn(const char *program, const char *argument);
 // wait for a process's main thread to exit, and return the exit code
 extern int nk_process_wait(nk_process_t *process);
 // given a pid, get the process structure

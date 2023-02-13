@@ -56,8 +56,10 @@ static void tss_set_rsp(uint32_t *tss, uint32_t n, uint64_t rsp) {
   tss[n * 2 + 2] = rsp >> 32;
 }
 
+// This function is called whenever a thread is about to be context
+// switched into. The main function is to initialize some CPU state
+// so that the context switch into userspace can succeed.
 void nk_process_switch(nk_thread_t *t) {
-  // printk("nk_process_switch to %d (%s)\n", t->tid, t->name);
   if (t->process == NULL) {
     tss_set_rsp(get_cpu()->tss, 0, 0);
     return; // NOP
@@ -66,8 +68,14 @@ void nk_process_switch(nk_thread_t *t) {
               (uint64_t)t->stack + t->stack_size - (1 * sizeof(uint64_t)));
 }
 
-// Lookup a process structure by it's pid.
-nk_process_t *get_process_pid(long pid) {
+// Given a thread, return the process it belongs to
+nk_process_t *get_process(nk_thread_t *thread) { return thread->process; }
+// Get the current process for the currently executing thread.s
+nk_process_t *get_cur_process(void) { return get_process(get_cur_thread()); }
+// Lookup a process structure by it's pid. This implementation is really slow,
+// as it walks the process table as a linear linked list. A better
+// implementation would be a hashmap or a red-black tree.
+static nk_process_t *get_process_pid(long pid) {
   PTABLE_LOCK_CONF;
   PTABLE_LOCK();
 
@@ -84,12 +92,6 @@ nk_process_t *get_process_pid(long pid) {
   PTABLE_UNLOCK();
   return NULL;
 }
-
-// Given a thread, return the process it belongs to
-nk_process_t *get_process(nk_thread_t *thread) { return thread->process; }
-
-// Get the current process for the currently executing thread.s
-nk_process_t *get_cur_process(void) { return get_process(get_cur_thread()); }
 
 static addr_t process_valloc(nk_process_t *proc, off_t incr_pages) {
   PROCESS_LOCK_CONF;
@@ -146,25 +148,38 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
   }
 
   if (nr == SYSCALL_SPAWN) {
-    // nk_vc_printf("spawn from %d\n", proc->pid);
-
     const char *program = (const char *)a;  // TODO: copy_from_user
     const char *argument = (const char *)b; // TODO: copy_from_user
-    nk_process_t *proc = nk_process_create(program, argument);
-    if (proc == NULL) return -1;
+    nk_process_t *proc = nk_process_spawn(program, argument);
+    if (proc == NULL)
+      return -1;
     return proc->pid;
   }
 
   if (nr == SYSCALL_WAIT) {
     nk_process_t *target_proc = get_process_pid(a);
-    // nk_vc_printf("wait from %d. target=%d,%p\n", proc->pid, a, target_proc);
-
     if (target_proc == NULL)
       return -1;
+
+    // Note, there are some hideous race conditions that could happen between
+    // the call to `get_process_id` and here relating to multiple processes
+    // calling SYSCALL_WAIT at the same time. It isn't really a problem in this
+    // toy process abstraction, due to it being single-threaded and there not
+    // being a real way to communicate between processes. In a real system, you
+    // would need to guarentee that someone isn't currently waiting on this
+    // thread, as they could free the threads state between when you find the
+    // process and when you call wait. This is a *really* hard thing to solve
+    // correctly (and robustly), so we won't quite do it here.
+    // If you are interested to see how Nautilus fixes it (with normal threads)
+    // check out the implementation of `handle_special_switch` and the exit
+    // function (which avoid the use of the stack entirely.)
     return nk_process_wait(target_proc);
   }
 
   if (nr == SYSCALL_VALLOC) {
+    // Allocate `a` pages in the processes' address space, and return a pointer
+    // to the start of the new region. This region should be anonoymously
+    // allocated to zero pages.
     return process_valloc(proc, a);
   }
 
@@ -174,6 +189,7 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
   }
 
   if (nr == SYSCALL_YIELD) {
+    // Simply forward the request to the scheduler.
     nk_sched_yield(NULL);
     return 0;
   }
@@ -181,17 +197,6 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
   printk("Unknown system call. Nr=%d, args=%d,%d,%d\n", nr, a, b, c);
 
   return 0;
-}
-
-static void user_code(void) {
-  for (int i = 0; i < 10; i++) {
-    unsigned long nr = SYSCALL_YIELD;
-    unsigned long ret;
-    asm volatile("int $0x80" : "=a"(ret) : "0"(nr) : "memory");
-  }
-  unsigned long nr = SYSCALL_EXIT;
-  unsigned long ret;
-  asm volatile("int $0x80" : "=a"(ret) : "0"(nr) : "memory");
 }
 
 /**
@@ -219,7 +224,6 @@ static void process_bootstrap_and_start(void *input, void **output) {
   struct user_frame frame;
   memset(&frame, 0, sizeof(frame));
   frame.rip = (uint64_t)USER_ASPACE_START;    // userspace code
-  // frame.rip = (uint64_t)user_code;            // userspace code
   frame.rsp = (uint64_t)stack_top + 4096 - 8; // userspace stack
   frame.cs = (SEG_UCODE << 3) | 3;            // user code segment in ring 3
   frame.ss = (SEG_UDATA << 3) | 3;            // user data segment in ring 3
@@ -243,20 +247,20 @@ static void process_bootstrap_and_start(void *input, void **output) {
  */
 static int setup_process_aspace(nk_process_t *proc,
                                 nk_aspace_characteristics_t *aspace_chars) {
-
+  // The region we map later on.
   nk_aspace_region_t region;
-  nk_thread_t *thread = NULL;
+  // A buffer to storethe formatted aspace name
   char aspace_name[32];
 
-  // allocate an aspace for the process
+  // allocate an aspace for the process. We do this by asking the aspace subsystem
+  // (which abstracts all the concepts of an aspace) to create a "paging" aspace.
+  // Implementing that aspace is will be what you will do in the lab.
   sprintf(aspace_name, "proc%d", proc->pid);
   proc->aspace = nk_aspace_create("paging", aspace_name, aspace_chars);
   if (proc->aspace == NULL) {
     ERROR("Failed to allocate aspace for process!\n");
     goto clean_up;
   }
-  thread = proc->main_thread;
-  // thread->aspace = proc->aspace;
 
   // create a 1-1 region mapping all of physical memory so that
   // the kernel can work when the process is active
@@ -283,7 +287,7 @@ clean_up:
   return -1;
 }
 
-nk_process_t *nk_process_create(const char *program, const char *argument) {
+nk_process_t *nk_process_spawn(const char *program, const char *argument) {
 
   PTABLE_LOCK_CONF;
 
@@ -339,6 +343,9 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
     ERROR("Failed to initialize process' address space\n");
     goto clean_up;
   }
+
+
+  // Next, open the binary file and map it into memory with NK_ASPACE_FILE
   nk_fs_fd_t fd = nk_fs_open((char *)program, O_RDONLY, 0);
   nk_aspace_region_t region;
   region.va_start = USER_ASPACE_START;
@@ -361,6 +368,11 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
   // And make sure the thread knows what process it is a part of.
   thread->process = proc;
 
+  // Make sure everything we just did sticks by performing a memory fence. This
+  // guarentees that wherever the thread is run in the `nk_thread_run` invocation
+  // below, all the state of the process and it's main thread are consistent on
+  // the whole system. You really don't need to worry about this in QEMU, but on
+  // a real system this is a nightmare of a problem to debug :^)
   asm volatile("mfence" ::: "memory");
 
   // kickoff main thread
@@ -368,6 +380,9 @@ nk_process_t *nk_process_create(const char *program, const char *argument) {
 
   return proc;
 
+
+  // A lovely label which we `goto` when we need to cleanup the process we were
+  // creating if it fails at any point.
 clean_up:
   if (proc != NULL) {
     // Delete the main thread
@@ -383,10 +398,6 @@ clean_up:
   }
   return NULL;
 }
-
-// mark the process as exited, and exit the main thread
-// (this MUST be called from the main thread)
-void nk_process_exit(nk_process_t *process) {}
 
 int nk_process_wait(nk_process_t *process) {
   PTABLE_LOCK_CONF;
