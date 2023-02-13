@@ -120,6 +120,19 @@ static addr_t process_valloc(nk_process_t *proc, off_t incr_pages) {
   return vaddr;
 }
 
+static nk_fs_fd_t process_get_fd(nk_process_t *proc, int fd) {
+  if (fd < 0 || fd > PROCESS_FD_TABLE_SIZE) {
+    // invalid file decriptor
+    return FS_BAD_FD;
+  }
+  // already closed
+  if (proc->open_files[fd] == FS_BAD_FD) {
+    return FS_BAD_FD;
+  }
+
+  return proc->open_files[fd];
+}
+
 // Dispatch on a system call `nr` on process `proc
 unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
                                        uint64_t b, uint64_t c) {
@@ -131,7 +144,7 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
   }
 
   // Write some characters to the console
-  if (nr == SYSCALL_WRITE) {
+  if (nr == SYSCALL_CONWRITE) {
     // TODO: reading directly from user memory is dangerous.
     //       see /user/bin/hack.c to know why...
     //       How could we fix this?
@@ -194,6 +207,67 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
     return 0;
   }
 
+  if (nr == SYSCALL_OPEN) {
+    // UNSAFE! Bad to read directly from userspace like this.
+    char *path = (char *)a;
+
+    int fd_nr = -1;
+    for (int i = 0; i < PROCESS_FD_TABLE_SIZE; i++) {
+      if (proc->open_files[i] == FS_BAD_FD) {
+        fd_nr = i;
+        break;
+      }
+    }
+    // no open files. Just return -1 ("failed to open")
+    if (fd_nr == -1)
+      return -1;
+
+    nk_fs_fd_t fd = nk_fs_open(path, b /* b is the flags*/, 0666);
+    if (fd == FS_BAD_FD) {
+      return -1;
+    }
+
+    proc->open_files[fd_nr] = fd;
+    return fd_nr;
+  }
+
+  if (nr == SYSCALL_CLOSE) {
+    nk_fs_fd_t fd = process_get_fd(proc, a);
+    if (fd == FS_BAD_FD)
+      return -1;
+    nk_fs_close(fd);
+    proc->open_files[a] = FS_BAD_FD;
+    return 0;
+  }
+
+  if (nr == SYSCALL_READ) {
+    int fd_nr = (int)a;
+    void *dst = (void *)b;
+    long size = (long)c;
+    nk_fs_fd_t fd = process_get_fd(proc, fd_nr);
+    if (fd == FS_BAD_FD)
+      return -1;
+    // Note: this is *very* dangerous. We are letting random parts of the
+    // kernel, namely the filesystem, write to an arbitrary pointer the user has
+    // provided.
+    long n = nk_fs_read(fd, dst, size);
+    return n;
+  }
+
+  if (nr == SYSCALL_WRITE) {
+    int fd_nr = (int)a;
+    void *dst = (void *)b;
+    long size = (long)c;
+    nk_fs_fd_t fd = process_get_fd(proc, fd_nr);
+    if (fd == FS_BAD_FD)
+      return -1;
+    // Note: this is *very* dangerous. We are letting random parts of the
+    // kernel, namely the filesystem, write to an arbitrary pointer the user has
+    // provided.
+    long n = nk_fs_write(fd, dst, size);
+    return n;
+  }
+
   printk("Unknown system call. Nr=%d, args=%d,%d,%d\n", nr, a, b, c);
 
   return 0;
@@ -252,9 +326,10 @@ static int setup_process_aspace(nk_process_t *proc,
   // A buffer to storethe formatted aspace name
   char aspace_name[32];
 
-  // allocate an aspace for the process. We do this by asking the aspace subsystem
-  // (which abstracts all the concepts of an aspace) to create a "paging" aspace.
-  // Implementing that aspace is will be what you will do in the lab.
+  // allocate an aspace for the process. We do this by asking the aspace
+  // subsystem (which abstracts all the concepts of an aspace) to create a
+  // "paging" aspace. Implementing that aspace is will be what you will do in
+  // the lab.
   sprintf(aspace_name, "proc%d", proc->pid);
   proc->aspace = nk_aspace_create("paging", aspace_name, aspace_chars);
   if (proc->aspace == NULL) {
@@ -266,7 +341,8 @@ static int setup_process_aspace(nk_process_t *proc,
   // the kernel can work when the process is active
   region.va_start = 0;
   region.pa_start = 0;
-  region.len_bytes = LEN_4GB; // first 4 GB are mapped
+  // Map 4 GB
+  region.len_bytes = 0x100000000UL;
   // set protections for kernel
   // use EAGER to tell paging implementation that it needs to build all these
   // PTs right now
@@ -287,13 +363,35 @@ clean_up:
   return -1;
 }
 
-nk_process_t *nk_process_spawn(const char *program, const char *argument) {
-
+static void process_free(nk_process_t *process) {
   PTABLE_LOCK_CONF;
 
+  // Free the aspace
+  nk_aspace_destroy(process->aspace);
+
+  // Remove the process from the process list
+  PTABLE_LOCK();
+  list_del_init(&process->ptable_list_node);
+  PTABLE_UNLOCK();
+
+  // Close all the open files
+  for (int i = 0; i < PROCESS_FD_TABLE_SIZE; i++) {
+    if (process->open_files[i] != FS_BAD_FD) {
+      nk_fs_close(process->open_files[i]);
+      process->open_files[i] = FS_BAD_FD;
+    }
+  }
+
+  // Free the process state
+  free(process);
+}
+
+nk_process_t *nk_process_spawn(const char *program, const char *argument) {
+  PTABLE_LOCK_CONF;
   nk_process_t *proc = NULL;
   nk_thread_t *thread;
   struct nk_fs_stat stat;
+  nk_fs_fd_t fd;
 
   // Check that the program exists
   if (nk_fs_stat((char *)program, &stat) < 0) {
@@ -309,7 +407,7 @@ nk_process_t *nk_process_spawn(const char *program, const char *argument) {
     goto clean_up;
   }
 
-  // allocate the memory for the process
+  // Allocate the memory for the process structure
   proc = malloc(sizeof(*proc));
   if (!proc) {
     ERROR("cannot allocate process\n");
@@ -343,10 +441,13 @@ nk_process_t *nk_process_spawn(const char *program, const char *argument) {
     ERROR("Failed to initialize process' address space\n");
     goto clean_up;
   }
-
+  // initialize all the files
+  for (int i = 0; i < PROCESS_FD_TABLE_SIZE; i++) {
+    proc->open_files[i] = FS_BAD_FD;
+  }
 
   // Next, open the binary file and map it into memory with NK_ASPACE_FILE
-  nk_fs_fd_t fd = nk_fs_open((char *)program, O_RDONLY, 0);
+  fd = nk_fs_open((char *)program, O_RDONLY, 0);
   nk_aspace_region_t region;
   region.va_start = USER_ASPACE_START;
   region.pa_start = 0;
@@ -355,7 +456,9 @@ nk_process_t *nk_process_spawn(const char *program, const char *argument) {
   region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC |
                          NK_ASPACE_PIN | NK_ASPACE_EAGER | NK_ASPACE_FILE;
   nk_aspace_add_region(proc->aspace, &region);
-  nk_fs_close(fd);
+  // cache this in the last file descriptor so it gets closed *after* the aspace
+  // is destroyed when the process exits.
+  proc->open_files[PROCESS_FD_TABLE_SIZE - 1] = fd;
 
   // When a process requests new pages, allocate them here
   // then bump it up (with a gap for "protection")
@@ -369,17 +472,16 @@ nk_process_t *nk_process_spawn(const char *program, const char *argument) {
   thread->process = proc;
 
   // Make sure everything we just did sticks by performing a memory fence. This
-  // guarentees that wherever the thread is run in the `nk_thread_run` invocation
-  // below, all the state of the process and it's main thread are consistent on
-  // the whole system. You really don't need to worry about this in QEMU, but on
-  // a real system this is a nightmare of a problem to debug :^)
+  // guarentees that wherever the thread is run in the `nk_thread_run`
+  // invocation below, all the state of the process and it's main thread are
+  // consistent on the whole system. You really don't need to worry about this
+  // in QEMU, but on a real system this is a nightmare of a problem to debug :^)
   asm volatile("mfence" ::: "memory");
 
   // kickoff main thread
   nk_thread_run(proc->main_thread);
 
   return proc;
-
 
   // A lovely label which we `goto` when we need to cleanup the process we were
   // creating if it fails at any point.
@@ -388,31 +490,18 @@ clean_up:
     // Delete the main thread
     if (proc->main_thread != NULL)
       nk_thread_destroy(proc->main_thread);
-
-    // Remove the process from the process list
-    PTABLE_LOCK();
-    list_del(&proc->ptable_list_node);
-    PTABLE_UNLOCK();
-    // Finally, delete the process
-    free(proc);
+    process_free(proc);
   }
   return NULL;
 }
 
+// An implementation of process waiting. Most of the heavy lifting of this
+// function piggy-backs on nk_join, which does the hard work of dealing with the
+// scheduler.
 int nk_process_wait(nk_process_t *process) {
-  PTABLE_LOCK_CONF;
 
+  // Join the thread, which transitively frees it's state
   nk_join(process->main_thread, NULL);
-  nk_sched_reap(1);
-  // TODO: cleanup! (free proc, aspace, make sure all threads are dead)
-
-  nk_aspace_destroy(process->aspace);
-
-  // Remove the process from the process list
-  PTABLE_LOCK();
-  list_del_init(&process->ptable_list_node);
-  PTABLE_UNLOCK();
-
-  free(process);
+  process_free(process);
   return 0;
 }

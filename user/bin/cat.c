@@ -20,22 +20,20 @@
  * This is free software.  You are permitted to use,
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
-#pragma once
 
-#ifndef __NAUTILUS_KERNEL_UAPI__
-#define __NAUTILUS_KERNEL_UAPI__
 
-#define SYSCALL_EXIT 0
-#define SYSCALL_CONWRITE 1
-#define SYSCALL_GETC 2
-#define SYSCALL_SPAWN 3
-#define SYSCALL_WAIT 4
-#define SYSCALL_VALLOC 5 // Allocate some pages
-#define SYSCALL_VFREE 6  // free some pages
-#define SYSCALL_YIELD 7  // yield the thread
-#define SYSCALL_OPEN 8   // open a file
-#define SYSCALL_CLOSE 9  // close a file
-#define SYSCALL_READ 10
-#define SYSCALL_WRITE 11
+#include <ulib.h>
 
-#endif
+int main() {
+  int fd = open("/test.txt", O_RDONLY);
+  printf("fd=%d\n", fd);
+  if (fd != -1) {
+    char buf[512];
+    long size = read(fd, buf, 512);
+    if (size > 0) {
+      conwrite(buf, size);
+    }
+  }
+  close(fd);
+  return 0;
+}

@@ -55,15 +55,12 @@ void hexdump(void *vbuf, long len) {
 }
 
 int main() {
-
   void *kernel_address = (void *)0x1000;
+
   printf("I'm about to print memory from the kernel.\n");
   // Nautilus doesn't protect against the user doing sneaky stuff like this!
-  write(kernel_address, 0x1000);
+  conwrite(kernel_address, 0x1000);
   printf("\nWhy did that work?\n");
-
-
-
 
   printf("Now, I'm going to allocate some memory and\nprint it out. It better be all zeroes!\n");
   // allocate a page

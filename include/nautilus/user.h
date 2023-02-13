@@ -69,6 +69,7 @@ struct user_frame {
 #define SEG_UDATA 5 // user data+stack
 #define SEG_TSS 6   // this process's task state
 
+#define PROCESS_FD_TABLE_SIZE 64
 // A nautilus user process
 typedef struct nk_process {
 
@@ -101,7 +102,10 @@ typedef struct nk_process {
   // the next location to palloc to.
   off_t next_palloc;
 
-	// TODO: the rest of the process state :^)
+  // Simply a bunch of open files. All initialized to FS_BAD_FD
+  nk_fs_fd_t open_files[PROCESS_FD_TABLE_SIZE];
+
+	// TODO: More state :)
 } nk_process_t;
 
 

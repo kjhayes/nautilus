@@ -30,6 +30,7 @@ int main(char *argument) {
     printf("[init] starting shell (/sh)\n");
     pid_t pid = spawn("/sh", "");
     wait(pid);
+    break;
   }
   return 0;
 }

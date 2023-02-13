@@ -58,12 +58,24 @@ extern void printf(char *fmt, ...);
 extern void puts(const char *s);
 extern void putc(char c);
 extern int getc(void); // get a character from the console.
-extern void write(void *buf, long len);
+extern void conwrite(void *buf, long len); // write to the console
 extern long readline(char *dst, long len);
 extern void *memset(void *x, unsigned char value, unsigned long length);
 
 // allocate `page_count` pages of virtual memory to the process.
 extern void *valloc(unsigned page_count);
+
+#define O_RDONLY 1
+#define O_WRONLY 2
+#define O_RDWR   3 // OR of RD and WR ONLY
+#define O_APPEND 4
+#define O_CREAT  8
+#define O_TRUNC  16 // guess
+// File abstractions
+extern int open(const char *filename, int flags);
+extern void close(int fd);
+extern long read(int fd, void *buf, long size);
+extern long write(int fd, void *buf, long size);
 
 // Spawning a userspace program in Nautilus requires the user pass in the path
 // to the binary (absolute path) and the argument. Note there is not an array of
