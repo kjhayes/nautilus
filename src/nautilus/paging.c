@@ -398,7 +398,8 @@ nk_gpf_handler (excp_entry_t * excp,
             id);
 #ifdef NAUT_CONFIG_ASPACES
     if (!nk_aspace_exception(excp,vector,state)) {
-	return 0;
+    return null_excp_handler(excp,vector,state);
+	// return 0;
     }
 #endif
 

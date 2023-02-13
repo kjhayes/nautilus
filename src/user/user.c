@@ -37,11 +37,6 @@ static inline void user_ltr(uint16_t sel) {
   asm volatile("ltr %0" : : "r"(sel));
 }
 
-static void tss_set_rsp(uint32_t *tss, uint32_t n, uint64_t rsp) {
-  tss[n * 2 + 1] = rsp;
-  tss[n * 2 + 2] = rsp >> 32;
-}
-
 // Called per CPU, this function initializes the CPU state in a way that enables
 // it to enter ring 3 code. THe main thing that it does is configures a new GDT
 // with segments for user code and data, as well as a segment for the TSS
@@ -92,11 +87,45 @@ int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
     return -1; // TODO: what?
   }
 
+  // uint64_t sp;
+  // asm( "mov %%rsp, %0" : "=rm" ( sp ));
+  // printk("in  %d sp before %p. rax=%d\n", get_cur_thread()->tid, sp, r->rax);
   r->rax = process_dispatch_syscall(proc, r->rax, r->rdi, r->rsi, r->rdx);
+  // asm( "mov %%rsp, %0" : "=rm" ( sp ));
+  // printk("out %d sp before %p\n", get_cur_thread()->tid, sp);
+  
   return 0;
 }
 
+
+void mr_burns_task(void *arg, void **out) {
+  while (1) {
+    // nk_sched_yield(NULL);
+  }
+}
 static int handle_urun(char *buf, void *priv) {
+
+  // nk_thread_id_t mr_burns;
+  // nk_thread_create(mr_burns_task, NULL, NULL, 0, 4096, &mr_burns, CPU_ANY);
+  // nk_thread_name(mr_burns, "mr_burns");
+  // nk_thread_run(mr_burns);
+
+  // for (int i = 0; i < 10; i++) {
+  //   nk_process_t *proc = nk_process_create("hello", "");
+  //   if (proc == NULL) {
+  //     ERROR("Could not spawn process.\n");
+  //     return 0;
+  //   }
+  //   // wait for the process (it's main thread) to exit, and free it's memory
+  //   nk_process_wait(proc);
+  // }
+
+  // return 0;
+
+
+
+
+  // return 0;
   // TODO: parse the command
   char command[256];
   char argument[256];

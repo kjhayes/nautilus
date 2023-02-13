@@ -718,7 +718,7 @@ static void nk_thread_brain_wipe(nk_thread_t *t)
     // do only absolutely minimal cleanup so we don't need to zero the whole thing
     thethread->tid=0;
     thethread->name[0]=0;
-    memset(thethread, 0, sizeof(*thethread));
+    // memset(thethread, 0, sizeof(*thethread));
 
     // vc management and other handles are up to caller, similar to
     // thread destroy

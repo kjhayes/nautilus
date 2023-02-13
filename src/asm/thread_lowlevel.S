@@ -141,6 +141,16 @@ continue_context_switch:
 
 #endif
 
+    movq %rax, %gs:0x0  /* make it the new current thread */
+    movq (%rax), %rsp   /* load its stack pointer */
+
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+    push %rax
+    movq %rax, %rdi
+    call nk_process_switch
+    pop %rax
+#endif
+
 #ifdef NAUT_CONFIG_ASPACES
     push %rax
     movq 24(%rax), %rdi
@@ -148,8 +158,7 @@ continue_context_switch:
     pop %rax
 #endif
 	
-    movq %rax, %gs:0x0  /* make it the new current thread */
-    movq (%rax), %rsp   /* load its stack pointer */
+
 
 #ifdef NAUT_CONFIG_FPU_SAVE
     /* Restore the FPRs */

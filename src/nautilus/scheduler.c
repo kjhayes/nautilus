@@ -3214,6 +3214,8 @@ static void handle_special_switch(rt_status what, int have_lock, uint8_t flags, 
 	have_lock = 0;
     }
 
+
+
     // Now preemption is enabled, but interrupts are 
     // still off, so we will continue to run to completion
     preempt_reset();
@@ -3231,10 +3233,7 @@ static void handle_special_switch(rt_status what, int have_lock, uint8_t flags, 
     }
     
 
-    #ifdef NAUT_CONFIG_ENABLE_USERSPACE
-    extern void nk_process_switch(nk_thread_t *n);
-    nk_process_switch(n);
-    #endif
+
 
     // at this point, we have interrupts off
     // whatever we switch to will turn them back on

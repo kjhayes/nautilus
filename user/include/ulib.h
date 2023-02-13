@@ -29,6 +29,7 @@ typedef unsigned char bool;
 // Exit the program
 extern void exit(void);
 
+extern int strcmp(const char *l, const char *r);
 extern long strlen(const char *s);
 extern void printf(char *fmt, ...);
 extern void puts(const char *s);

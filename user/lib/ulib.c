@@ -1,5 +1,5 @@
-#include <ulib.h>
 #include "./liballoc.h"
+#include <ulib.h>
 
 extern void main(const char *cmd, const char *arg);
 
@@ -8,6 +8,9 @@ __attribute__((section(".init"), noinline)) void start(const char *cmd,
                                                        const char *arg) {
   main(cmd, arg);
   exit();
+  while (1) {
+    // no return
+  }
 }
 
 // The syscalls
@@ -57,6 +60,11 @@ long readline(char *dst, long len) {
 }
 
 // ----------------------------------------------------
+int strcmp(const char *l, const char *r) {
+  for (; *l == *r && *l; l++, r++)
+    ;
+  return *(unsigned char *)l - *(unsigned char *)r;
+}
 
 long strlen(const char *s) {
   long len = 0;
@@ -66,7 +74,6 @@ long strlen(const char *s) {
   return len;
 }
 
-
 void *memset(void *x, unsigned char value, unsigned long length) {
   unsigned char *xs = x;
   for (unsigned long i = 0; i < length; i++) {
@@ -74,7 +81,6 @@ void *memset(void *x, unsigned char value, unsigned long length) {
   }
   return x;
 }
-
 
 typedef __builtin_va_list va_list;
 #define va_start(ap, param) __builtin_va_start(ap, param)
@@ -159,14 +165,9 @@ pid_t spawn(const char *program, const char *argument) {
 
 int wait(pid_t pid) { return (int)syscall1(SYSCALL_WAIT, pid); }
 
-
 void *valloc(unsigned npages) {
-  return (void*)syscall1(SYSCALL_VALLOC, npages);
+  return (void *)syscall1(SYSCALL_VALLOC, npages);
 }
-
-
-
-
 
 // Utility functions for the allocator.
 int liballoc_lock() {
@@ -186,9 +187,7 @@ int liballoc_unlock() {
  * \return NULL if the pages were not allocated.
  * \return A pointer to the allocated memory.
  */
-void *liballoc_alloc(size_t npages) {
-  return valloc(npages);
-}
+void *liballoc_alloc(size_t npages) { return valloc(npages); }
 
 /** This frees previously allocated memory. The void* parameter passed
  * to the function is the exact same value returned from a previous
