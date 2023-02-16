@@ -715,16 +715,16 @@ shell (void * in, void ** out)
     nk_aspace_characteristics_t c;
 
     if (nk_aspace_query("paging",&c)) {
-	nk_vc_printf("failed to find paging implementation\n");
-	goto vc_setup;
+        nk_vc_printf("failed to find paging implementation\n");
+        goto vc_setup;
     }
     
     // create a new address space for this shell thread
     nk_aspace_t *mas = nk_aspace_create("paging",op->name,&c);
 
     if (!mas) {
-	nk_vc_printf("failed to create new address space\n");
-	goto vc_setup;
+        nk_vc_printf("failed to create new address space\n");
+        goto vc_setup;
     }
     
     nk_aspace_region_t r;
@@ -740,8 +740,8 @@ shell (void * in, void ** out)
     // now add the region
     // this should build the page tables immediately
     if (nk_aspace_add_region(mas,&r)) {
-	nk_vc_printf("failed to add initial eager region to address space\n");
-	goto vc_setup;
+        nk_vc_printf("failed to add initial eager region to address space\n");
+        goto vc_setup;
     }
 
     // now we will remap the kernel starting at the following address
@@ -753,8 +753,8 @@ shell (void * in, void ** out)
 
     // This one is lazily implemented
     if (nk_aspace_add_region(mas,&r)) {
-	nk_vc_printf("failed to add secondary lazy region to address space\n");
-	goto vc_setup;
+        nk_vc_printf("failed to add secondary lazy region to address space\n");
+        goto vc_setup;
     }
 
     //nk_aspace_dump_aspaces(1);
@@ -763,17 +763,25 @@ shell (void * in, void ** out)
     
     // put ourselves into new address space
     if (nk_aspace_move_thread(mas)) {
-	nk_vc_printf("failed to move shell thread to new address space\n");
-	goto vc_setup;
+        nk_vc_printf("failed to move shell thread to new address space\n");
+        goto vc_setup;
     }
 
     nk_vc_printf("Survived moving thread into its own address space\n");
 
     // start reading the kernel from address 0xffff80000.....+ 1 GB
     // should be identical to starting from address 1 MB
-    // also, this will fault in pages as we go 
+    // also, this will fault in pages as we go.
+    // Poke around at a few places in the virtual address space to see if they
+    // match. This will fault in pages as we go. We look at two places to make
+    // sure the paging implementation works.
+    // 0xffff80000.....+ 1 MB:
     if (memcmp((void*)0x100000, (void*)(0xffff800000000000UL+0x100000), 0x100000 * 16)) {
-	nk_vc_printf("Weird, low-mapped and high-mapped memory differ...\n");
+	    nk_vc_printf("Weird, low-mapped and high-mapped memory differ 1MB...\n");
+    }
+    // 0xffff80000.....+ 1 GB:
+    if (memcmp((void*)0x40000000, (void*)(0xffff800000000000UL+0x40000000), 0x100000 * 16)) {
+	    nk_vc_printf("Weird, low-mapped and high-mapped memory differ after 1GB...\n");
     }
 
     nk_vc_printf("Survived memory comparison of two mapped copies\n");
