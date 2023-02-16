@@ -857,6 +857,7 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
                     vaddr, paddr, ret, page_granularity
             );
             ASPACE_UNLOCK(p);
+            nk_thread_exit(NULL);
             return ret;
         }
         
@@ -890,7 +891,8 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
             return 0;
         } else{
             ASPACE_UNLOCK(p);
-            panic("Permission not allowed\n");
+            nk_vc_printf("Permission not allowed\n");
+            nk_thread_exit(NULL);
             return -1;
         }
     }

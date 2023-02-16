@@ -188,7 +188,7 @@ static int add_region(void *state, nk_aspace_region_t *region)
 	// page table entries right now, before we return
 
 	// DRILL THE PAGE TABLES HERE
-    // Remember to handle anonymous and file-backed mappings!
+    // Remember to handle anonymous and file-backed mappings when getting processes working!
 
     }
 
@@ -227,7 +227,7 @@ static int remove_region(void *state, nk_aspace_region_t *region)
 
     // next, remove all corresponding page table entries that exist.
     // Make sure to handle anonymous and file-backed mappings. You'll
-    // need to free the physical memory you allocated.
+    // need to free the physical memory you allocated when drilling.
 
     // next, if we are editing the current address space of this cpu,
     // we need to either invalidate individual pages using invlpg()
@@ -388,22 +388,22 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
     // Now find the region corresponding to this address
 
     // if there is no such region, this is an unfixable fault
-    //   (if this is a user thread, we now would signal it or kill it, but there are no user threads in Nautilus)
+    //   (If this is a user thread, and if the process abstraction had signals, we would send one here.)
     //   if it's a kernel thread, the kernel should panic
     //   if it's within an interrupt handler, the kernel should panic
 
     // Is the problem that the page table entry is not present?
     // if so, drill the entry and then return from the function
     // so the faulting instruction can try again
-    //    This is the lazy construction of the page table entries
-    // Be sure to handle anonymous and file-backed mappings.
+    //  - This is the lazy construction of the page table entries
+    //  - Be sure to handle anonymous and file-backed mappings like you do add_region. 
 
     // Assuming the page table entry is present, check the region's
     // protections and compare to the error code
 
     // if the region has insufficient permissions for the request,
     // then this is an unfixable fault
-    //   (if this is a user thread, we now would signal it or kill it, but there are no user threads in Nautilus)
+    //   (If this is a user thread, and if the process abstraction had signals, we would send one here.)
     //   if it's a kernel thread, the kernel should panic
     //   if it's within an interrupt handler, the kernel should panic
     

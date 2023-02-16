@@ -101,17 +101,7 @@ void nk_user_init(void) {
   printk("Userspace enabled on core %d\n", cpu->id);
 }
 
-// Low level interrupt handler for system call requests
-int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
-  struct user_frame *r = (struct user_frame *)((addr_t)excp + -128);
-  per_cpu_get(system);
-  nk_process_t *proc = get_cur_process();
-  if (proc == NULL) {
-    return -1; // TODO: what?
-  }
-  r->rax = process_dispatch_syscall(proc, r->rax, r->rdi, r->rsi, r->rdx);
-  return 0;
-}
+
 
 
 
@@ -205,11 +195,20 @@ static nk_fs_fd_t process_get_fd(nk_process_t *proc, int fd) {
 }
 
 /**
- * THis function 
+ * This function is the main implementation of the process abstraction's
+ * systemcall interface. System calls in this kernel are comprised of 4
+ * arguments:
+ *    nr:      Which system call is being made?
+ *    a, b, c: Arguments for the specific system call
+ * This function returns an unsigned long, which upon returning to the
+ * userspace, will be placed into the `rax` register. 
+ * See the `user_syscall_handler` function below to learn more about the
+ * lowlevel workings of system call dispatch.
 */
 unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
                                        uint64_t b, uint64_t c) {
-  // TODO: add more system calls!
+
+  // EXIT: just exit the current thread. This will in turn exit the process.
   if (nr == SYSCALL_EXIT) {
     nk_thread_exit(NULL);
     return 0;
@@ -350,6 +349,19 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
   return -1;
 }
 
+
+// Low level interrupt handler for system call requests
+int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
+  struct user_frame *r = (struct user_frame *)((addr_t)excp + -128);
+  per_cpu_get(system);
+  nk_process_t *proc = get_cur_process();
+  if (proc == NULL) {
+    return -1; // TODO: what?
+  }
+  r->rax = process_dispatch_syscall(proc, r->rax, r->rdi, r->rsi, r->rdx);
+  return 0;
+}
+
 /**
  * This is the first function to be run when executing userspace code. You may
  * be asking, "What? This is in the kernel! How can this be user code???". Yes,
@@ -380,10 +392,10 @@ static void process_bootstrap_and_start(void *input, void **output) {
   frame.ss = (SEG_UDATA << 3) | 3;            // user data segment in ring 3
   frame.rflags = 0x00000200;                  // enable interrupts
 
-  // Call the userspace code
+  // `iretq` into the userspace code.
   user_start((void *)&frame, SEG_UDATA);
 
-  panic("'somehow, userspace returned'");
+  panic("'Somehow, userspace returned.' - Poe Dameron");
 }
 
 /*

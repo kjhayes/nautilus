@@ -59,7 +59,14 @@ int main() {
   printf("It better be all zeroes! Otherwise the paging impl has leaked info!\n");
   // allocate a page
   void *x = valloc(1);
-  hexdump(x, 256); // hexdump some bytes
-  memset(x, 0xFA, 4096); // Wipe it ourselves. Maybe nextime we'll get the same page?
+  hexdump(x, 64); // hexdump some bytes
+  printf("Now, I'm gonna try and wipe the kernel memory!\n");
+
+  // The kernel lives at 1MB
+  void *kernel_memory = 0x100000;
+  // zero 1 MB of memory in the kernel!
+  memset(kernel_memory, 0, 0x100000);
+
+  printf("Wow, that actually worked! (it shouldn't have....)\n");
   return 0;
 }
