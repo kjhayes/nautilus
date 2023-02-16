@@ -26,7 +26,7 @@
 #define __NAUTILUS_KERNEL_UAPI__
 
 #define SYSCALL_EXIT 0
-#define SYSCALL_CONWRITE 1
+#define SYSCALL_PUTC 1
 #define SYSCALL_GETC 2
 #define SYSCALL_SPAWN 3
 #define SYSCALL_WAIT 4

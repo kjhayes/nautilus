@@ -188,6 +188,7 @@ static int add_region(void *state, nk_aspace_region_t *region)
 	// page table entries right now, before we return
 
 	// DRILL THE PAGE TABLES HERE
+    // Remember to handle anonymous and file-backed mappings!
 
     }
 
@@ -224,7 +225,9 @@ static int remove_region(void *state, nk_aspace_region_t *region)
 
     // next, remove the region from your data structure
 
-    // next, remove all corresponding page table entries that exist
+    // next, remove all corresponding page table entries that exist.
+    // Make sure to handle anonymous and file-backed mappings. You'll
+    // need to free the physical memory you allocated.
 
     // next, if we are editing the current address space of this cpu,
     // we need to either invalidate individual pages using invlpg()
@@ -391,8 +394,9 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
 
     // Is the problem that the page table entry is not present?
     // if so, drill the entry and then return from the function
-    // so the faulting instruction can try agai
+    // so the faulting instruction can try again
     //    This is the lazy construction of the page table entries
+    // Be sure to handle anonymous and file-backed mappings.
 
     // Assuming the page table entry is present, check the region's
     // protections and compare to the error code

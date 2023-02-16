@@ -55,14 +55,8 @@ void hexdump(void *vbuf, long len) {
 }
 
 int main() {
-  void *kernel_address = (void *)0x1000;
-
-  printf("I'm about to print memory from the kernel.\n");
-  // Nautilus doesn't protect against the user doing sneaky stuff like this!
-  conwrite(kernel_address, 0x1000);
-  printf("\nWhy did that work?\n");
-
-  printf("Now, I'm going to allocate some memory and\nprint it out. It better be all zeroes!\n");
+  printf("I'm going to allocate some memory and print it out\n");
+  printf("It better be all zeroes! Otherwise the paging impl has leaked info!\n");
   // allocate a page
   void *x = valloc(1);
   hexdump(x, 256); // hexdump some bytes

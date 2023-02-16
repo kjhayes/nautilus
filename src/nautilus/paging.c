@@ -332,13 +332,6 @@ nk_pf_handler (excp_entry_t * excp,
     cpu_id_t id = cpu_info_ready ? my_cpu_id() : 0xffffffff;
     uint64_t fault_addr = read_cr2();
 
-    printk("\n+++ Page Fault +++\n"
-        "RIP: %p    Fault Address: 0x%llx \n"
-        "Error Code: 0x%x    (core=%u)\n", 
-        (void*)excp->rip, 
-        fault_addr, 
-        excp->error_code, 
-        id);
     
 #ifdef NAUT_CONFIG_HVM_HRT
     if (excp->error_code == UPCALL_MAGIC_ERROR) {
@@ -388,20 +381,21 @@ nk_gpf_handler (excp_entry_t * excp,
 		excp_vec_t     vector,
 		void         * state)
 {
-
     cpu_id_t id = cpu_info_ready ? my_cpu_id() : 0xffffffff;
-    printk("\n+++ GPF +++\n"
-            "RIP: %p\n"
-            "Error Code: 0x%x    (core=%u)\n", 
-            (void*)excp->rip,
-            excp->error_code, 
-            id);
+
 #ifdef NAUT_CONFIG_ASPACES
     if (!nk_aspace_exception(excp,vector,state)) {
     return null_excp_handler(excp,vector,state);
 	// return 0;
     }
 #endif
+
+    printk("\n+++ GPF +++\n"
+            "RIP: %p\n"
+            "Error Code: 0x%x    (core=%u)\n", 
+            (void*)excp->rip,
+            excp->error_code, 
+            id);
 
     // if monitor is active, we will fall through to it
     // by calling null_excp_handler

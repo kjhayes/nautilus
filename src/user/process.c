@@ -46,9 +46,80 @@ static int proc_next_pid = 1; // start with pid 1
   spin_unlock_irq_restore(&proc->process_lock, _process_lock_flags);
 // ==========================================================
 
+
+// Load a new global descriptor table.
+static inline void user_lgdt(void *data, int size) {
+  struct gdt_desc64 gdt;
+  gdt.limit = size - 1;
+  gdt.base = (uint64_t)data;
+
+  asm volatile("lgdt %0" ::"m"(gdt));
+}
+// Load a 
+static inline void user_ltr(uint16_t sel) {
+  asm volatile("ltr %0" : : "r"(sel));
+}
+
+
+
+// Called per CPU, this function initializes the CPU state in a way that enables
+// it to enter ring 3 code. THe main thing that it does is configures a new GDT
+// with segments for user code and data, as well as a segment for the TSS
+// (task state segment) which is where the IST lives
+void nk_user_init(void) {
+  printk("initializing userspace\n");
+  // Load a new gdt which includes the userspace flags
+  struct cpu *cpu = get_cpu();
+  cpu->tss = kmem_malloc(4096);
+
+  uint32_t *tss = (uint32_t *)cpu->tss;
+  uint64_t *gdt = (uint64_t *)(((char *)tss) + 1024);
+
+  tss[16] = 0x00680000; // IO Map Base = End of TSS
+  tss[0x64] |= (0x64 * sizeof(uint32_t)) << 16;
+
+  // Load a fresh GDT to enable userspace isolation. Loading a new one now we
+  // are in C is easier than if we hardcoded all this in the boot.S file
+  // considering the TSS needs to be configured correctly so we can have a
+  // kernel stack
+  uint64_t addr = (uint64_t)tss;
+  gdt[0] = 0x0000000000000000;
+  gdt[SEG_KCODE] = 0x00af9a000000ffff; // Code, DPL=0, R/X
+  gdt[SEG_KDATA] = 0x00af92000000ffff; // Data, DPL=0, W
+  gdt[SEG_KCPU] = 0x000000000000FFFF;  // unused
+  gdt[SEG_UCODE] = 0x0020F8000000FFFF; // Code, DPL=3, R/X
+  gdt[SEG_UDATA] = 0x0000F2000000FFFF; // Data, DPL=3, W
+  gdt[SEG_TSS + 0] = (0x0067) | ((addr & 0xFFFFFF) << 16) | (0x00E9LL << 40) |
+                     (((addr >> 24) & 0xFF) << 56);
+  gdt[SEG_TSS + 1] = (addr >> 32);
+
+  printk("Loading new userspace-capabale gdt\n");
+  user_lgdt((void *)gdt, 8 * sizeof(uint64_t));
+  user_ltr(SEG_TSS << 3);
+
+  // msr_write(0xC0000102, msr_read(0xC0000101));
+  printk("Userspace enabled on core %d\n", cpu->id);
+}
+
+// Low level interrupt handler for system call requests
+int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
+  struct user_frame *r = (struct user_frame *)((addr_t)excp + -128);
+  per_cpu_get(system);
+  nk_process_t *proc = get_cur_process();
+  if (proc == NULL) {
+    return -1; // TODO: what?
+  }
+  r->rax = process_dispatch_syscall(proc, r->rax, r->rdi, r->rsi, r->rdx);
+  return 0;
+}
+
+
+
+
 // The assembly function which calls `iret` to enter userspace from the kernel.
-extern void __attribute__((noreturn))
-user_start(void *tf_rsp, int data_segment);
+// The implementation is in src/user/userstart.S
+extern void __attribute__((noreturn)) user_start(void *tf_rsp, int data_segment);
+
 // Set the CPU trap stack pointer (Which stack should be used when an interrupt
 // happens in userspace?)
 static void tss_set_rsp(uint32_t *tss, uint32_t n, uint64_t rsp) {
@@ -133,33 +204,30 @@ static nk_fs_fd_t process_get_fd(nk_process_t *proc, int fd) {
   return proc->open_files[fd];
 }
 
-// Dispatch on a system call `nr` on process `proc
+/**
+ * THis function 
+*/
 unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
                                        uint64_t b, uint64_t c) {
-
   // TODO: add more system calls!
   if (nr == SYSCALL_EXIT) {
     nk_thread_exit(NULL);
     return 0;
   }
 
-  // Write some characters to the console
-  if (nr == SYSCALL_CONWRITE) {
-    // TODO: reading directly from user memory is dangerous.
-    //       see /user/bin/hack.c to know why...
-    //       How could we fix this?
-    char *x = (char *)a;
-    for (int i = 0; i < b; i++) {
-      nk_vc_printf("%c", x[i]);
-    }
+  // GETC: Write a single character to the console
+  if (nr == SYSCALL_PUTC) {
+    nk_vc_putchar(a);
     return 0;
   }
 
+  // GETC: Read a single character from the console
   if (nr == SYSCALL_GETC) {
-    // probably a bad idea to forward directly... but whatever
     return nk_vc_getchar(a);
   }
 
+  // SPAWN: given a command and argument, spawn a process running that
+  // command and return it's PID.
   if (nr == SYSCALL_SPAWN) {
     const char *program = (const char *)a;  // TODO: copy_from_user
     const char *argument = (const char *)b; // TODO: copy_from_user
@@ -169,26 +237,28 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
     return proc->pid;
   }
 
+  // WAIT: Given a PID, wait for that process to exit.
   if (nr == SYSCALL_WAIT) {
     nk_process_t *target_proc = get_process_pid(a);
     if (target_proc == NULL)
       return -1;
 
     // Note, there are some hideous race conditions that could happen between
-    // the call to `get_process_id` and here relating to multiple processes
-    // calling SYSCALL_WAIT at the same time. It isn't really a problem in this
-    // toy process abstraction, due to it being single-threaded and there not
-    // being a real way to communicate between processes. In a real system, you
-    // would need to guarentee that someone isn't currently waiting on this
-    // thread, as they could free the threads state between when you find the
-    // process and when you call wait. This is a *really* hard thing to solve
-    // correctly (and robustly), so we won't quite do it here.
-    // If you are interested to see how Nautilus fixes it (with normal threads)
+    // the call to `get_process_id` and `nk_process_wait` relating to multiple
+    // processes calling SYSCALL_WAIT at the same time. It isn't really a
+    // problem in this toy process abstraction, due to it being single-threaded
+    // and there not being a real way to communicate between processes. In a
+    // real system, you would need to guarentee that someone isn't currently
+    // waiting on this thread, as they could free the threads state between when
+    // you find the process and when you call wait. This is a *really* hard
+    // thing to solve correctly (and robustly), so we won't quite do it here. If
+    // you are interested to see how Nautilus fixes it (with normal threads)
     // check out the implementation of `handle_special_switch` and the exit
     // function (which avoid the use of the stack entirely.)
     return nk_process_wait(target_proc);
   }
 
+  // VALLOC: allocate _V_irtual memory :)
   if (nr == SYSCALL_VALLOC) {
     // Allocate `a` pages in the processes' address space, and return a pointer
     // to the start of the new region. This region should be anonoymously
@@ -196,17 +266,20 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
     return process_valloc(proc, a);
   }
 
+  // VFREE: free virtual memory. This currently doesn't work.
   if (nr == SYSCALL_VFREE) {
     // TODO
     return -1;
   }
 
+  // YIELD: yields the processor.
   if (nr == SYSCALL_YIELD) {
     // Simply forward the request to the scheduler.
     nk_sched_yield(NULL);
     return 0;
   }
 
+  // OPEN: open a file and return a file descriptor
   if (nr == SYSCALL_OPEN) {
     // UNSAFE! Bad to read directly from userspace like this.
     char *path = (char *)a;
@@ -231,6 +304,8 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
     return fd_nr;
   }
 
+
+  // CLOSE: close a file descriptor
   if (nr == SYSCALL_CLOSE) {
     nk_fs_fd_t fd = process_get_fd(proc, a);
     if (fd == FS_BAD_FD)
@@ -240,6 +315,7 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
     return 0;
   }
 
+  // READ: read from a file descriptor
   if (nr == SYSCALL_READ) {
     int fd_nr = (int)a;
     void *dst = (void *)b;
@@ -249,11 +325,12 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
       return -1;
     // Note: this is *very* dangerous. We are letting random parts of the
     // kernel, namely the filesystem, write to an arbitrary pointer the user has
-    // provided.
+    // provided. TODO: protect this w/ a copy_to_user function
     long n = nk_fs_read(fd, dst, size);
     return n;
   }
 
+  // READ: write to a file descriptor
   if (nr == SYSCALL_WRITE) {
     int fd_nr = (int)a;
     void *dst = (void *)b;
@@ -262,8 +339,8 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
     if (fd == FS_BAD_FD)
       return -1;
     // Note: this is *very* dangerous. We are letting random parts of the
-    // kernel, namely the filesystem, write to an arbitrary pointer the user has
-    // provided.
+    // kernel, namely the filesystem, read from an arbitrary pointer the user
+    // has provided. TODO: protect this w/ a copy_from_user function
     long n = nk_fs_write(fd, dst, size);
     return n;
   }
@@ -363,6 +440,9 @@ clean_up:
   return -1;
 }
 
+
+
+// Free a given process.
 static void process_free(nk_process_t *process) {
   PTABLE_LOCK_CONF;
 
@@ -386,6 +466,8 @@ static void process_free(nk_process_t *process) {
   free(process);
 }
 
+// Spawn a new process running `program` with the argument string, `argument`. Immediately
+// start the processs, then return it to the caller so they can do what they please.
 nk_process_t *nk_process_spawn(const char *program, const char *argument) {
   PTABLE_LOCK_CONF;
   nk_process_t *proc = NULL;
@@ -393,7 +475,7 @@ nk_process_t *nk_process_spawn(const char *program, const char *argument) {
   struct nk_fs_stat stat;
   nk_fs_fd_t fd;
 
-  // Check that the program exists
+  // Check that the program exists by calling stat on it.
   if (nk_fs_stat((char *)program, &stat) < 0) {
     ERROR("No such program exists (%s)\n", program);
     goto clean_up;
@@ -495,6 +577,7 @@ clean_up:
   return NULL;
 }
 
+
 // An implementation of process waiting. Most of the heavy lifting of this
 // function piggy-backs on nk_join, which does the hard work of dealing with the
 // scheduler.
@@ -505,3 +588,33 @@ int nk_process_wait(nk_process_t *process) {
   process_free(process);
   return 0;
 }
+
+
+
+// The shell command used to spawn a user program
+static int handle_urun(char *buf, void *priv) {
+  // TODO: parse the command
+  char command[256];
+  char argument[256];
+  int scanned = sscanf(buf, "urun %s %s", command, argument);
+  // no argument passed
+  if (scanned < 1) strcpy(command, "/init");
+  if (scanned < 2) strcpy(argument, "");
+
+  // create the process
+  nk_process_t *proc = nk_process_spawn(command, argument);
+  if (proc == NULL) {
+    ERROR("Could not spawn process.\n");
+    return 0;
+  }
+  // wait for the process (it's main thread) to exit, and free it's memory
+  nk_process_wait(proc);
+  return 0;
+}
+
+static struct shell_cmd_impl urun_impl = {
+    .cmd = "urun",
+    .help_str = "urun <path> <arg>",
+    .handler = handle_urun,
+};
+nk_register_shell_cmd(urun_impl);

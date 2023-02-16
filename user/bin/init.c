@@ -26,11 +26,12 @@
 int main(char *argument) {
   printf("Hello from userspace!\n");
 
-  while (1) {
-    printf("[init] starting shell (/sh)\n");
-    pid_t pid = spawn("/sh", "");
-    wait(pid);
-    break;
-  }
+  // If this were a more complex userspace, we'd read some kind of runtime
+  // configuration file which would startup all the daemons required for a
+  // user to hapilly use the system (networking, user interface, sound, etc)
+  // But since this is a minimal environment, we'll just start a shell
+  printf("[init] starting shell (/sh). Run the `help` program for help\n");
+  pid_t pid = spawn("/sh", "");
+  wait(pid);
   return 0;
 }

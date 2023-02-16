@@ -38,7 +38,6 @@ __attribute__((section(".init"), noinline)) void start(const char *cmd,
 
 // The syscalls
 void exit(void) { syscall0(SYSCALL_EXIT); }
-void conwrite(void *buf, long len) { syscall2(SYSCALL_CONWRITE, buf, len); }
 int getc() { return syscall1(SYSCALL_GETC, 1); }
 
 // read a line into dst, with a maximum size of `len`
@@ -179,7 +178,12 @@ void printf(char *fmt, ...) {
 }
 
 // Simply write a single byte to the console
-void putc(char c) { syscall2(SYSCALL_CONWRITE, &c, 1); }
+void putc(char c) { syscall1(SYSCALL_PUTC, c); }
+void conwrite(void *buf, long len) {
+  for (int i = 0; i < len; i++)
+    putc(((char *)buf)[i]);
+}
+
 void puts(const char *s) { conwrite((void *)s, strlen(s)); }
 
 pid_t spawn(const char *program, const char *argument) {
@@ -225,13 +229,10 @@ int liballoc_free(void *ptr, size_t pages) {
   return 0;
 }
 
-
 int open(const char *filename, int flags) {
   return syscall2(SYSCALL_OPEN, filename, flags);
 }
-void close(int fd) {
-  syscall1(SYSCALL_CLOSE, fd);
-}
+void close(int fd) { syscall1(SYSCALL_CLOSE, fd); }
 long read(int fd, void *buf, long size) {
   return syscall3(SYSCALL_READ, fd, buf, size);
 }
