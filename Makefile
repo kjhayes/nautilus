@@ -193,7 +193,7 @@ HOSTCC      := gcc
 HOSTCXX     := g++
 
 HOSTCFLAGS	= -Wall -Wstrict-prototypes  -fomit-frame-pointer \
-			-Wno-unused -Wno-format-security -U_FORTIFY_SOURCE
+			-Wno-unused -Wno-format-security -U_FORTIFY_SOURCE -Wno-address-of-packed-member
 HOSTCXXFLAGS	= -O
 
 # 	Decide whether to build built-in, modular, or both.
@@ -408,7 +408,8 @@ CFLAGS:=   $(COMMON_FLAGS) \
 		   -Wno-unused-function \
 		   -Wno-unused-variable \
 		   -fno-common \
-		   -Wstrict-overflow=5 
+		   -Wstrict-overflow=5 \
+			 -Wno-address-of-packed-member
 
 #                   -Wextra \
 #                   -Wpedantic \
