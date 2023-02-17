@@ -288,6 +288,7 @@ int eager_drill_wrapper(nk_aspace_paging_t *p, nk_aspace_region_t *region) {
             // printk("allocated %p\n", paddr);
             // if it's a file mapping, read the file into the page
             if (file_mapping) {
+								// seek?
                 nk_fs_read(region->file, (void*)paddr, PAGE_SIZE_4KB);
                 uint64_t val = *(uint64_t*)(void*)paddr;
             }
@@ -857,7 +858,6 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
                     vaddr, paddr, ret, page_granularity
             );
             ASPACE_UNLOCK(p);
-            nk_thread_exit(NULL);
             return ret;
         }
         
@@ -892,7 +892,6 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
         } else{
             ASPACE_UNLOCK(p);
             nk_vc_printf("Permission not allowed\n");
-            nk_thread_exit(NULL);
             return -1;
         }
     }

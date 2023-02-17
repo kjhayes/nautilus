@@ -46,7 +46,6 @@ static int proc_next_pid = 1; // start with pid 1
   spin_unlock_irq_restore(&proc->process_lock, _process_lock_flags);
 // ==========================================================
 
-
 // Load a new global descriptor table.
 static inline void user_lgdt(void *data, int size) {
   struct gdt_desc64 gdt;
@@ -55,12 +54,10 @@ static inline void user_lgdt(void *data, int size) {
 
   asm volatile("lgdt %0" ::"m"(gdt));
 }
-// Load a 
+// Load a
 static inline void user_ltr(uint16_t sel) {
   asm volatile("ltr %0" : : "r"(sel));
 }
-
-
 
 // Called per CPU, this function initializes the CPU state in a way that enables
 // it to enter ring 3 code. THe main thing that it does is configures a new GDT
@@ -101,14 +98,10 @@ void nk_user_init(void) {
   printk("Userspace enabled on core %d\n", cpu->id);
 }
 
-
-
-
-
-
 // The assembly function which calls `iret` to enter userspace from the kernel.
 // The implementation is in src/user/userstart.S
-extern void __attribute__((noreturn)) user_start(void *tf_rsp, int data_segment);
+extern void __attribute__((noreturn))
+user_start(void *tf_rsp, int data_segment);
 
 // Set the CPU trap stack pointer (Which stack should be used when an interrupt
 // happens in userspace?)
@@ -201,10 +194,10 @@ static nk_fs_fd_t process_get_fd(nk_process_t *proc, int fd) {
  *    nr:      Which system call is being made?
  *    a, b, c: Arguments for the specific system call
  * This function returns an unsigned long, which upon returning to the
- * userspace, will be placed into the `rax` register. 
+ * userspace, will be placed into the `rax` register.
  * See the `user_syscall_handler` function below to learn more about the
  * lowlevel workings of system call dispatch.
-*/
+ */
 unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
                                        uint64_t b, uint64_t c) {
 
@@ -303,7 +296,6 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
     return fd_nr;
   }
 
-
   // CLOSE: close a file descriptor
   if (nr == SYSCALL_CLOSE) {
     nk_fs_fd_t fd = process_get_fd(proc, a);
@@ -348,7 +340,6 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
 
   return -1;
 }
-
 
 // Low level interrupt handler for system call requests
 int user_syscall_handler(excp_entry_t *excp, excp_vec_t vector, void *state) {
@@ -452,8 +443,6 @@ clean_up:
   return -1;
 }
 
-
-
 // Free a given process.
 static void process_free(nk_process_t *process) {
   PTABLE_LOCK_CONF;
@@ -478,8 +467,9 @@ static void process_free(nk_process_t *process) {
   free(process);
 }
 
-// Spawn a new process running `program` with the argument string, `argument`. Immediately
-// start the processs, then return it to the caller so they can do what they please.
+// Spawn a new process running `program` with the argument string, `argument`.
+// Immediately start the processs, then return it to the caller so they can do
+// what they please.
 nk_process_t *nk_process_spawn(const char *program, const char *argument) {
   PTABLE_LOCK_CONF;
   nk_process_t *proc = NULL;
@@ -544,11 +534,14 @@ nk_process_t *nk_process_spawn(const char *program, const char *argument) {
   fd = nk_fs_open((char *)program, O_RDONLY, 0);
   nk_aspace_region_t region;
   region.va_start = USER_ASPACE_START;
-  region.pa_start = 0;
-  region.len_bytes = round_up(stat.st_size, 0x1000); // map the
+  region.pa_start =
+      (off_t)-1 & ~0xFFF; // invalid pa_start (should be meaningless, and cause GPF)
+  region.len_bytes = round_up(
+      stat.st_size, 0x1000); // Round up the size of the file to the nearest 4k
   region.file = fd;
-  region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC |
-                         NK_ASPACE_PIN | NK_ASPACE_EAGER | NK_ASPACE_FILE;
+  region.protect.flags =
+      NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN |
+      NK_ASPACE_EAGER | NK_ASPACE_FILE; // NOTE: no _KERN, as it's a user region
   nk_aspace_add_region(proc->aspace, &region);
   // cache this in the last file descriptor so it gets closed *after* the aspace
   // is destroyed when the process exits.
@@ -589,19 +582,15 @@ clean_up:
   return NULL;
 }
 
-
 // An implementation of process waiting. Most of the heavy lifting of this
 // function piggy-backs on nk_join, which does the hard work of dealing with the
 // scheduler.
 int nk_process_wait(nk_process_t *process) {
-
   // Join the thread, which transitively frees it's state
   nk_join(process->main_thread, NULL);
   process_free(process);
   return 0;
 }
-
-
 
 // The shell command used to spawn a user program
 static int handle_urun(char *buf, void *priv) {
@@ -610,8 +599,10 @@ static int handle_urun(char *buf, void *priv) {
   char argument[256];
   int scanned = sscanf(buf, "urun %s %s", command, argument);
   // no argument passed
-  if (scanned < 1) strcpy(command, "/init");
-  if (scanned < 2) strcpy(argument, "");
+  if (scanned < 1)
+    strcpy(command, "/init");
+  if (scanned < 2)
+    strcpy(argument, "");
 
   // create the process
   nk_process_t *proc = nk_process_spawn(command, argument);

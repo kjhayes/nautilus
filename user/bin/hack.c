@@ -54,7 +54,18 @@ void hexdump(void *vbuf, long len) {
   }
 }
 
+// The kernel lives at 1MB
+void *kernel_memory = 0x100000;
+
 int main() {
+
+	int fd = open("/test.txt", O_RDWR);
+
+	write(fd, (void*)kernel_memory, 0x1000);
+
+	close(fd);
+	return 0;
+
   printf("I'm going to allocate some memory and print it out\n");
   printf("It better be all zeroes! Otherwise the paging impl has leaked info!\n");
   // allocate a page
@@ -62,8 +73,6 @@ int main() {
   hexdump(x, 64); // hexdump some bytes
   printf("Now, I'm gonna try and wipe the kernel memory!\n");
 
-  // The kernel lives at 1MB
-  void *kernel_memory = 0x100000;
   // zero 1 MB of memory in the kernel!
   memset(kernel_memory, 0, 0x100000);
 

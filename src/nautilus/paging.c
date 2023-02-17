@@ -365,6 +365,15 @@ nk_pf_handler (excp_entry_t * excp,
     nk_print_regs(r);
     backtrace(r->rbp);
 
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+    nk_thread_t *thread = get_cur_thread();
+    if (thread && thread->process) {
+        printk("Exiting userspace process.\n");
+        // exit the thread.
+        nk_thread_exit(NULL);
+    }
+#endif
+
     panic("+++ HALTING +++\n");
     return 0;
 }

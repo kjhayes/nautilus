@@ -30,7 +30,7 @@ int main() {
   char *buf = malloc(4096);
   while (1) {
     // Display the prompt
-    printf("$ ");
+    printf("user# ");
 
     // Ask the user for input.
     long len = readline(buf, 4096);
