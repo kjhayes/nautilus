@@ -46,6 +46,11 @@
 #include "paging_helpers.h"
 #include "region_list.h"
 
+// Signal handling stuff
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+#include <nautilus/user.h>
+#endif
+
 
 //
 // Add debugging and other optional output to this subsytem
@@ -892,7 +897,11 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
         } else{
             ASPACE_UNLOCK(p);
             nk_vc_printf("Permission not allowed\n");
-            return -1;
+            #ifdef NAUT_CONFIG_ENABLE_USERSPACE
+                return set_pending_signal();
+            #else
+                return -1;
+            #endif
         }
     }
 

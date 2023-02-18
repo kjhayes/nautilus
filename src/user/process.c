@@ -110,6 +110,53 @@ static void tss_set_rsp(uint32_t *tss, uint32_t n, uint64_t rsp) {
   tss[n * 2 + 2] = rsp >> 32;
 }
 
+// This will handle the return to userspace from excp_early.
+// If a signal exists && the process has registered a signal handler: jump to signal handler
+void nk_ret_to_user(struct user_frame *frame_ptr) {
+  PROCESS_LOCK_CONF;
+  nk_process_t * process = get_cur_process();
+
+  if (process == NULL) { return; }
+
+  PROCESS_LOCK(process);
+  if (process->pending_signal && process->signal_handler) {
+    process->pending_signal = false;
+    frame_ptr->rip = (uint64_t) process->signal_handler;
+  }
+  PROCESS_UNLOCK(process);
+  return;
+}
+
+// Flip the pending_signal bit
+int set_pending_signal() { 
+  PROCESS_LOCK_CONF;
+  nk_process_t * process = get_cur_process();
+
+  if (process == NULL) { return -1; }
+
+  PROCESS_LOCK(process);
+  if (!process->signal_handler) {
+    return -1;
+  }
+  process->pending_signal = true;
+  PROCESS_UNLOCK(process);
+  return 0;
+}
+
+
+// This will allow users to register signal handlers
+int set_signal_handler(void * signal_handler) {
+  PROCESS_LOCK_CONF;
+  nk_process_t * process = get_cur_process();
+  if (process == NULL) { return -1; }
+
+  PROCESS_LOCK(process);
+  process->signal_handler = signal_handler;
+  PROCESS_UNLOCK(process);
+  return 0;
+}
+
+
 // This function is called whenever a thread is about to be context
 // switched into. The main function is to initialize some CPU state
 // so that the context switch into userspace can succeed.
@@ -334,6 +381,11 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
     // has provided. TODO: protect this w/ a copy_from_user function
     long n = nk_fs_write(fd, dst, size);
     return n;
+  }
+
+  if (nr == SYSCALL_SIGNAL) {
+    void * signal_handler = (void *) a;
+    return set_signal_handler(signal_handler);
   }
 
   printk("Unknown system call. Nr=%d, args=%d,%d,%d\n", nr, a, b, c);

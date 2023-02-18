@@ -239,3 +239,8 @@ long read(int fd, void *buf, long size) {
 long write(int fd, void *buf, long size) {
   return syscall3(SYSCALL_WRITE, fd, buf, size);
 }
+
+// If pending_signal -> iretq takes us to signal_handler
+void signal(void * signal_handler) {
+  return syscall1(SYSCALL_SIGNAL, signal_handler);
+}

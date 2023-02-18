@@ -10,6 +10,7 @@
     "sstream": "c",
     "stop_token": "c",
     "streambuf": "c",
-    "atomic": "c"
+    "atomic": "c",
+    "ulib.h": "c"
   }
 }

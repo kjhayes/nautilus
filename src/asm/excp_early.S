@@ -217,6 +217,11 @@ skip_cat_exit:
 
 #endif
 
+    #ifdef NAUT_CONFIG_ENABLE_USERSPACE
+    movq %rsp, %rdi
+    callq nk_ret_to_user
+    #endif
+
     RESTORE_GPRS()
 
     
@@ -290,6 +295,11 @@ skip_per_cpu_update1:
 
 skip_per_cpu_update2:   
     
+    #ifdef NAUT_CONFIG_ENABLE_USERSPACE
+    movq %rsp, %rdi
+    callq nk_ret_to_user
+    #endif
+
     RESTORE_GPRS()
     /* pop error code and excp number */
     addq $16, %rsp

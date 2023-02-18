@@ -57,14 +57,21 @@ void hexdump(void *vbuf, long len) {
 // The kernel lives at 1MB
 void *kernel_memory = 0x100000;
 
+void my_signal_handler() {
+  printf("Hit signal handler due to permission denial\n");
+  exit();
+}
+
 int main() {
 
-	int fd = open("/test.txt", O_RDWR);
+  signal((void*)my_signal_handler);
 
-	write(fd, (void*)kernel_memory, 0x1000);
+	// int fd = open("/test.txt", O_RDWR);
 
-	close(fd);
-	return 0;
+	// write(fd, (void*)kernel_memory, 0x1000);
+
+	// close(fd);
+	// return 0;
 
   printf("I'm going to allocate some memory and print it out\n");
   printf("It better be all zeroes! Otherwise the paging impl has leaked info!\n");

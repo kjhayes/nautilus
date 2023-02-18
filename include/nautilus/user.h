@@ -105,6 +105,13 @@ typedef struct nk_process {
   // Simply a bunch of open files. All initialized to FS_BAD_FD
   nk_fs_fd_t open_files[PROCESS_FD_TABLE_SIZE];
 
+  // Super basic: just indicate whether there is a signal or not
+  // No different types of signals yet
+  bool_t pending_signal;
+
+  // Signal Handler for the process
+  void * signal_handler;
+
 	// TODO: More state :)
 } nk_process_t;
 
@@ -127,5 +134,8 @@ extern nk_process_t *nk_process_get(int pid);
 extern nk_process_t *nk_get_current_process(void);
 unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a, uint64_t b, uint64_t c);
 extern void nk_user_init(void);
+// handle signals
+extern void nk_ret_to_user(struct user_frame *frame_ptr);
+extern int set_pending_signal(void);
 
 #endif

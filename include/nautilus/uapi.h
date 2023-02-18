@@ -37,5 +37,6 @@
 #define SYSCALL_CLOSE 9  // close a file
 #define SYSCALL_READ 10
 #define SYSCALL_WRITE 11
+#define SYSCALL_SIGNAL 12 // register signal handler
 
 #endif

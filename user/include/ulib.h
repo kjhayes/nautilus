@@ -128,3 +128,7 @@ extern void free(void *);
   });
 
 #endif
+
+// Userspace processes can register signal handlers w/ this
+// Right now, no way to specify diff types of signals.
+void signal(void * signal_handler);
