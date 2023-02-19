@@ -2,6 +2,7 @@
 *.cmd
 tags
 # .config*
+.vscode/
 *.bin
 *.iso
 *.img
