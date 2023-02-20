@@ -25,6 +25,8 @@
 #define __PAGING_HELPERS_H__
 
 
+#include <nautilus/fs.h>
+
 /*
   All abstractions provide here are for long mode paging
   with basic 4-level page tables.   Good documentation

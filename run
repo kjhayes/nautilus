@@ -13,5 +13,5 @@ rm -f src/asm/ramdisk.o
 make isoimage -j $(nproc)
 
 
-# qemu-system-x86_64 -smp 2 -m 2048 -vga std -serial stdio -cdrom nautilus.iso $@
-qemu-system-x86_64 -cdrom nautilus.iso -m 2G -smp 1 -serial mon:stdio $@
+qemu-system-x86_64 -cdrom nautilus.iso -m 2G -smp 1 -serial mon:stdio -vga std $@
+# qemu-system-x86_64 -cdrom nautilus.iso -m 2G -smp 1 -display curses # -serial mon:stdio -vga std $@

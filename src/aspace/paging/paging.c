@@ -184,12 +184,11 @@ static int add_region(void *state, nk_aspace_region_t *region)
 
     if (region->protect.flags & NK_ASPACE_EAGER) {
 	
-	// an eager region means that we need to build all the corresponding
-	// page table entries right now, before we return
+        // an eager region means that we need to build all the corresponding
+        // page table entries right now, before we return
 
-	// DRILL THE PAGE TABLES HERE
-    // Remember to handle anonymous and file-backed mappings when getting processes working!
-
+        // DRILL THE PAGE TABLES HERE
+        // Remember to handle file-backed and anonymous mappings when getting processes working!
     }
 
     // if we are editing the current address space of this cpu, then we
@@ -218,7 +217,7 @@ static int remove_region(void *state, nk_aspace_region_t *region)
 
     ASPACE_LOCK(p);
 
-    // WRITE ME!
+    // WRITE ME!!
     
     // first, find the region in your data structure
     // it had better exist and be identical.
@@ -226,8 +225,8 @@ static int remove_region(void *state, nk_aspace_region_t *region)
     // next, remove the region from your data structure
 
     // next, remove all corresponding page table entries that exist.
-    // Make sure to handle anonymous and file-backed mappings. You'll
-    // need to free the physical memory you allocated when drilling.
+    // Make sure to handle anonymous and file-backed mappings. For task 5,
+    // remember to free the file-backed and anonymous memory you allocated
 
     // next, if we are editing the current address space of this cpu,
     // we need to either invalidate individual pages using invlpg()
@@ -251,7 +250,7 @@ static int protect_region(void *state, nk_aspace_region_t *region, nk_aspace_pro
 
     ASPACE_LOCK(p);
 
-    // WRITE ME!
+    // WRITE ME!!
     
     // first, find the region in your data structure
     // it had better exist and be identical except for protections
@@ -279,7 +278,7 @@ static int move_region(void *state, nk_aspace_region_t *cur_region, nk_aspace_re
 
     ASPACE_LOCK(p);
 
-    // WRITE ME!
+    // WRITE ME!!
     
     // first, find the region in your data structure
     // it had better exist and be identical except for the physical addresses
@@ -382,15 +381,19 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
     ASPACE_LOCK(p);
 
     //
-    // WRITE ME!
+    // WRITE ME!!
     //
     
     // Now find the region corresponding to this address
 
     // if there is no such region, this is an unfixable fault
-    //   (If this is a user thread, and if the process abstraction had signals, we would send one here.)
-    //   if it's a kernel thread, the kernel should panic
-    //   if it's within an interrupt handler, the kernel should panic
+    //  - if it's within an interrupt handler, the kernel should panic
+    //  - if this is a user thread (nk_thread_is_user_thread(thread) from nautilus/user.h),
+    //    we would signal with `return set_pending_signal();`
+    //  - if it's a kernel thread, the kernel should panic
+
+
+
 
     // Is the problem that the page table entry is not present?
     // if so, drill the entry and then return from the function
@@ -398,14 +401,17 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
     //  - This is the lazy construction of the page table entries
     //  - Be sure to handle anonymous and file-backed mappings like you do add_region. 
 
+
+
+
     // Assuming the page table entry is present, check the region's
     // protections and compare to the error code
 
     // if the region has insufficient permissions for the request,
-    // then this is an unfixable fault
-    //   (If this is a user thread, and if the process abstraction had signals, we would send one here.)
-    //   if it's a kernel thread, the kernel should panic
-    //   if it's within an interrupt handler, the kernel should panic
+    //  - if it's within an interrupt handler, the kernel should panic
+    //  - if this is a user thread (nk_thread_is_user_thread(thread) from nautilus/user.h),
+    //    we would signal with `return set_pending_signal();`
+    //  - if it's a kernel thread, the kernel should panic
     
     ASPACE_UNLOCK(p);
     
@@ -428,9 +434,9 @@ static int print(void *state, int detailed)
 		 ASPACE_NAME(p), p->chars.granularity, p->chars.alignment, p->cr3.val, p->cr4);
 
     if (detailed) {
-	// print region set data structure here
+        // print region set data structure here
 
-	// perhaps print out all the page tables here...
+        // perhaps print out all the page tables here...
     }
 
     return 0;

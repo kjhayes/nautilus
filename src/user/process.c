@@ -29,6 +29,8 @@
 #define ERROR(fmt, args...) ERROR_PRINT("userspace: " fmt, ##args)
 #define LEN_4GB (0x100000000UL)
 
+#define INVALID_PA_START (void *)((off_t)-1 & ~0xFFF)
+
 // ================ PROCESS TABLE STRUCTURES ================
 static spinlock_t ptable_lock;
 // A simple (slow) linked list that represents the "process table"
@@ -111,28 +113,33 @@ static void tss_set_rsp(uint32_t *tss, uint32_t n, uint64_t rsp) {
 }
 
 // This will handle the return to userspace from excp_early.
-// If a signal exists && the process has registered a signal handler: jump to signal handler
+// If a signal exists && the process has registered a signal handler: jump to
+// signal handler
 void nk_ret_to_user(struct user_frame *frame_ptr) {
   PROCESS_LOCK_CONF;
-  nk_process_t * process = get_cur_process();
+  nk_process_t *process = get_cur_process();
 
-  if (process == NULL) { return; }
+  if (process == NULL) {
+    return;
+  }
 
   PROCESS_LOCK(process);
   if (process->pending_signal && process->signal_handler) {
     process->pending_signal = false;
-    frame_ptr->rip = (uint64_t) process->signal_handler;
+    frame_ptr->rip = (uint64_t)process->signal_handler;
   }
   PROCESS_UNLOCK(process);
   return;
 }
 
 // Flip the pending_signal bit
-int set_pending_signal() { 
+int set_pending_signal() {
   PROCESS_LOCK_CONF;
-  nk_process_t * process = get_cur_process();
+  nk_process_t *process = get_cur_process();
 
-  if (process == NULL) { return -1; }
+  if (process == NULL) {
+    return -1;
+  }
 
   PROCESS_LOCK(process);
   if (!process->signal_handler) {
@@ -143,19 +150,19 @@ int set_pending_signal() {
   return 0;
 }
 
-
 // This will allow users to register signal handlers
-int set_signal_handler(void * signal_handler) {
+int set_signal_handler(void *signal_handler) {
   PROCESS_LOCK_CONF;
-  nk_process_t * process = get_cur_process();
-  if (process == NULL) { return -1; }
+  nk_process_t *process = get_cur_process();
+  if (process == NULL) {
+    return -1;
+  }
 
   PROCESS_LOCK(process);
   process->signal_handler = signal_handler;
   PROCESS_UNLOCK(process);
   return 0;
 }
-
 
 // This function is called whenever a thread is about to be context
 // switched into. The main function is to initialize some CPU state
@@ -194,7 +201,7 @@ static nk_process_t *get_process_pid(long pid) {
   return NULL;
 }
 
-static addr_t process_valloc(nk_process_t *proc, off_t incr_pages) {
+static addr_t process_valloc(nk_process_t *proc, off_t incr_pages, int eager) {
   PROCESS_LOCK_CONF;
 
   PROCESS_LOCK(proc);
@@ -206,17 +213,15 @@ static addr_t process_valloc(nk_process_t *proc, off_t incr_pages) {
   PROCESS_UNLOCK(proc);
 
   // Allocate the region
-  nk_aspace_region_t stack_region;
-  stack_region.va_start = (void *)vaddr;
-  stack_region.pa_start = 0; // anonymous.
-  stack_region.len_bytes = bytes;
-  // Readable, writable, anonymous, and eager.
-  // Note: NOT executable
-  stack_region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE |
-                               NK_ASPACE_EXEC | NK_ASPACE_ANON |
-                               NK_ASPACE_EAGER;
-  nk_aspace_add_region(proc->aspace,
-                       &stack_region); // cross fingers this works!
+  nk_aspace_region_t region;
+  region.va_start = (void *)vaddr;
+  region.pa_start = INVALID_PA_START; // anonymous.
+  region.len_bytes = bytes;
+  region.protect.flags =
+      NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_ANON;
+  if (eager)
+    region.protect.flags |= NK_ASPACE_EAGER;
+  nk_aspace_add_region(proc->aspace, &region); // cross fingers this works!
 
   return vaddr;
 }
@@ -302,7 +307,7 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
     // Allocate `a` pages in the processes' address space, and return a pointer
     // to the start of the new region. This region should be anonoymously
     // allocated to zero pages.
-    return process_valloc(proc, a);
+    return process_valloc(proc, a, 0 /* Not eager */);
   }
 
   // VFREE: free virtual memory. This currently doesn't work.
@@ -384,7 +389,7 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a,
   }
 
   if (nr == SYSCALL_SIGNAL) {
-    void * signal_handler = (void *) a;
+    void *signal_handler = (void *)a;
     return set_signal_handler(signal_handler);
   }
 
@@ -424,7 +429,7 @@ static void process_bootstrap_and_start(void *input, void **output) {
   nk_aspace_move_thread(p->aspace);
 
   // allocate one page for the stack
-  addr_t stack_top = process_valloc(p, 1);
+  addr_t stack_top = process_valloc(p, 1, 1 /* Eager mapping for the stack */);
 
   // Initialize the registers for this thread (mainly RIP and RSP)
   struct user_frame frame;
@@ -477,7 +482,8 @@ static int setup_process_aspace(nk_process_t *proc,
   region.len_bytes = 0x100000000UL;
   // set protections for kernel
   // use EAGER to tell paging implementation that it needs to build all these
-  // PTs right now
+  // PTs right now. If it wasn't eager, the kernel would not be mapped into
+  // memory when a pagefault occurs, and your system would tripple fault!
   region.protect.flags = NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC |
                          NK_ASPACE_PIN | NK_ASPACE_EAGER | NK_ASPACE_KERN;
 
@@ -586,14 +592,15 @@ nk_process_t *nk_process_spawn(const char *program, const char *argument) {
   fd = nk_fs_open((char *)program, O_RDONLY, 0);
   nk_aspace_region_t region;
   region.va_start = USER_ASPACE_START;
-  region.pa_start =
-      (off_t)-1 & ~0xFFF; // invalid pa_start (should be meaningless, and cause GPF)
+  region.pa_start = INVALID_PA_START; // invalid pa_start (should be
+                                      // meaningless, and cause GPF)
   region.len_bytes = round_up(
       stat.st_size, 0x1000); // Round up the size of the file to the nearest 4k
   region.file = fd;
+  // map it as a file (with exec)
   region.protect.flags =
       NK_ASPACE_READ | NK_ASPACE_WRITE | NK_ASPACE_EXEC | NK_ASPACE_PIN |
-      NK_ASPACE_EAGER | NK_ASPACE_FILE; // NOTE: no _KERN, as it's a user region
+      NK_ASPACE_FILE; // NOTE: no _KERN, as it's a user region
   nk_aspace_add_region(proc->aspace, &region);
   // cache this in the last file descriptor so it gets closed *after* the aspace
   // is destroyed when the process exits.

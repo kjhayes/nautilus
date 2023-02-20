@@ -29,9 +29,9 @@
 
 #include <ulib.h>
 
+// this is a simple hexdump implementation
 void hexdump(void *vbuf, long len) {
   unsigned char *buf = vbuf;
-
   int w = 16;
   for (int i = 0; i < len; i += w) {
     unsigned char *line = buf + i;
@@ -57,21 +57,15 @@ void hexdump(void *vbuf, long len) {
 // The kernel lives at 1MB
 void *kernel_memory = 0x100000;
 
-void my_signal_handler() {
+void my_signal_handler(void) {
   printf("Hit signal handler due to permission denial\n");
   exit();
+  // This function cannot return!
 }
 
 int main() {
-
+  // configure a signal handler (the only signal is segfault, so there isn't a distinction)
   signal((void*)my_signal_handler);
-
-	// int fd = open("/test.txt", O_RDWR);
-
-	// write(fd, (void*)kernel_memory, 0x1000);
-
-	// close(fd);
-	// return 0;
 
   printf("I'm going to allocate some memory and print it out\n");
   printf("It better be all zeroes! Otherwise the paging impl has leaked info!\n");
@@ -83,6 +77,6 @@ int main() {
   // zero 1 MB of memory in the kernel!
   memset(kernel_memory, 0, 0x100000);
 
-  printf("Wow, that actually worked! (it shouldn't have....)\n");
+  printf("Wow, that actually worked! (it shouldn't have...)\n");
   return 0;
 }

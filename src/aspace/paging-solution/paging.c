@@ -293,9 +293,9 @@ int eager_drill_wrapper(nk_aspace_paging_t *p, nk_aspace_region_t *region) {
             // printk("allocated %p\n", paddr);
             // if it's a file mapping, read the file into the page
             if (file_mapping) {
-								// seek?
-                nk_fs_read(region->file, (void*)paddr, PAGE_SIZE_4KB);
-                uint64_t val = *(uint64_t*)(void*)paddr;
+                off_t sought = nk_fs_seek(region->file, page * 4096,  0);
+                off_t read = nk_fs_read(region->file, (void*)paddr, 4096);
+
             }
         }
 
@@ -819,7 +819,7 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
     
     // Now find the region corresponding to this address
     // if there is no such region, this is an unfixable fault
-    //   (if this is a user thread, we now would signal it or kill it, but there are no user threads in Nautilus)
+    //   (if this is a user thread (nk_thread_is_user_thread from nautilus/user.h), we now would signal it or kill it)
     //   if it's a kernel thread, the kernel should panic
     //   if it's within an interrupt handler, the kernel should panic
     nk_aspace_region_t * region = mm_find_reg_at_addr(p->llist_tracker, (addr_t) virtaddr);
@@ -844,12 +844,33 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
         addr_t va_start = (addr_t) region->va_start;
         addr_t pa_start = (addr_t) region->pa_start;
 
+        int file_mapping = (region->protect.flags & NK_ASPACE_FILE) != 0;
+        int anon_mapping = (region->protect.flags & NK_ASPACE_ANON) != 0;
+
         
 
         addr_t vaddr_4KB_align = virtaddr - ADDR_TO_OFFSET_4KB(virtaddr);
 
         vaddr = vaddr_4KB_align;
         paddr = vaddr - va_start + pa_start;
+
+
+        if (anon_mapping || file_mapping) {
+            // if we are mapping anonymous memory, or a file, we need to allocate the backing memory here.
+            paddr = (addr_t)malloc(PAGE_SIZE_4KB);
+
+            // if it's a file mapping, read the file into the page
+            if (file_mapping) {
+                nk_fs_seek(region->file, (vaddr - va_start), 0);
+                nk_fs_read(region->file, (void*)paddr, 4096);
+            } else {
+                memset((void*)paddr, 0, 4096);
+            }
+            
+        }
+
+
+        
         remained = region->len_bytes - (vaddr - va_start);
         page_granularity = PAGE_SIZE_4KB;
 
@@ -873,7 +894,7 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
 
         // if the region has insufficient permissions for the request,
         // then this is an unfixable fault
-        //   if this is a user thread, we now would signal it or kill it
+        //   (if this is a user thread (nk_thread_is_user_thread from nautilus/user.h), we now would signal it or kill it)
         //   if it's a kernel thread, the kernel should panic
         //   if it's within an interrupt handler, the kernel should panic
 
@@ -907,7 +928,7 @@ static int exception(void *state, excp_entry_t *exp, excp_vec_t vec)
 
     // if the region has insufficient permissions for the request,
     // then this is an unfixable fault
-    //   (if this is a user thread, we now would signal it or kill it, but there are no user threads in Nautilus)
+    //   (if this is a user thread (nk_thread_is_user_thread from nautilus/user.h), we now would signal it or kill it)
     //   if it's a kernel thread, the kernel should panic
     //   if it's within an interrupt handler, the kernel should panic
     

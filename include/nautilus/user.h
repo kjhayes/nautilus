@@ -136,6 +136,13 @@ unsigned long process_dispatch_syscall(nk_process_t *proc, int nr, uint64_t a, u
 extern void nk_user_init(void);
 // handle signals
 extern void nk_ret_to_user(struct user_frame *frame_ptr);
+// Set the `signal pending` bit in the current process. If that wasn't successful,
+// this function will return -1 to indicate failure.
 extern int set_pending_signal(void);
+
+static inline int nk_thread_is_user_thread(nk_thread_t *thread) {
+  // A thread is a userspace thread if the process field is non-null
+  return thread->process != NULL;
+}
 
 #endif

@@ -35,7 +35,7 @@
 #define DEBUG(fmt, args...) DEBUG_PRINT("littlefs: " fmt, ##args)
 #define ERROR(fmt, args...) ERROR_PRINT("littlefs: " fmt, ##args)
 
-#ifndef NAUT_CONFIG_DEBUG_lfs_FILESYSTEM_DRIVER
+#ifndef NAUT_CONFIG_DEBUG_LFS_FILESYSTEM_DRIVER
 #undef DEBUG
 #define DEBUG(fmt, args...)
 #endif

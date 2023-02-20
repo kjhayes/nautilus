@@ -48,6 +48,12 @@
 #include <nautilus/aspace.h>
 #endif
 
+
+// Include userspace signal delivery functions
+#ifdef NAUT_CONFIG_ENABLE_USERSPACE
+#include <nautilus/user.h>
+#endif
+
 #ifndef NAUT_CONFIG_DEBUG_PAGING
 #undef DEBUG_PRINT
 #define DEBUG_PRINT(fmt, args...)

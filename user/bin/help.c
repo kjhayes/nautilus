@@ -26,19 +26,10 @@
 // This is a simple program which prints help messages
 
 int main() {
-  // clang-format off
-  printf("Welcome to the Nautilus userspace!\n");
-  printf("You are currently in a very simple shell, and there are a few commands available to you. ");
-  printf("To exit the shell, type `exit`. ");
-  printf("The `hello` program is the simplest program there is, and just prints Hello world to the console. ");
-  printf("In a real system, the `init` program would be responsible for starting up all the userspace services such as the desktop environment, any networking daemons, or whatever your userspace env needs. ");
-  printf("Here, `init` is very simple and only runs `sh`. ");
-  printf("The `hack` program tests some security features of the kernel. Mainly, it focuses on checking if pages are zeroed when they are allocated to the process. ");
-  printf("This userspace is *NOT* secure, and has many vulnerabilities. If you want to prove this to yourself, write a program and pass a kernel address into the second argument of the `write` system call. ");
-  printf("(the kernel blindly accepts this pointer and writes the contents of the file argument to it). ");
-  // clang-format on
-
-  // printf("The `hello` program is the simplest program there is, and just prints Hello world to the console. ");
-  printf("\n");
+  printf("Welcome to the Nautilus userspace! Here are some commands:\n");
+  printf(" - exit: exit the shell.\n");
+  printf(" - hello: print 'hello world'\n");
+  printf(" - hack: tests some security features of the aspace implementation\n");
+  printf("   This userspace is *NOT* secure, and has many vulnerabilities.\n");
   return 0;
 }
