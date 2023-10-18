@@ -134,7 +134,7 @@ int dw_8250_pre_vc_init(uint64_t dtb)
   memset(&pre_vc_dw_8250, 0, sizeof(struct dw_8250));
 
   // KJH - HACK for getting to rockpro64 uart2
-  int uart_num = 2;
+  int uart_num = 0;
   // UART 0
   int offset = fdt_node_offset_by_compatible((void*)dtb, -1, "snps,dw-apb-uart");
   for(int i = 0; i < uart_num; i++) {

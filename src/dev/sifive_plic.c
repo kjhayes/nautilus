@@ -102,10 +102,10 @@ static int plic_dev_revmap(void *state, nk_hwirq_t hwirq, nk_irq_t *irq)
 
 static int plic_dev_translate(void *state, nk_dev_info_type_t type, void *raw, nk_hwirq_t *out) 
 {
+  uint32_t *raw_cells = (uint32_t*)raw;
   struct sifive_plic *plic = (struct sifive_plic*)state;
   switch(type) {
     case NK_DEV_INFO_OF:
-      uint32_t *raw_cells = (uint32_t*)raw;
       *out = be32toh(raw_cells[0]);
       return 0;
     default:

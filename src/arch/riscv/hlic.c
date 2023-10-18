@@ -51,10 +51,10 @@ static int hlic_dev_revmap(void *state, nk_hwirq_t hwirq, nk_irq_t *irq)
 
 static int hlic_dev_translate(void *state, nk_dev_info_type_t type, void *raw_irq, nk_hwirq_t *out_hwirq) 
 {
+  uint32_t *raw_cells = (uint32_t*)raw_irq;
   struct hlic *hlic = (struct hlic*)state;
   switch(type) {
     case NK_DEV_INFO_OF:
-      uint32_t *raw_cells = (uint32_t*)raw_irq;
       *out_hwirq = be32toh(raw_cells[0]);
       if(*out_hwirq <= 0 || *out_hwirq > HLIC_NUM_IRQ + HLIC_BASE_HWIRQ) {
         HLIC_ERROR("Invalid hwirq number when translating raw OF IRQ: (hwirq = 0x%x)!\n", *out_hwirq);

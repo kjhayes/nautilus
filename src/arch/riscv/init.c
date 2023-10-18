@@ -73,6 +73,10 @@
 #include <dev/8250/of_8250.h>
 #endif
 
+#ifdef NAUT_CONFIG_DW_8250_UART
+#include<dev/8250/dw_8250.h>
+#endif
+
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/trap.h>
 
@@ -242,6 +246,10 @@ void init(unsigned long hartid, unsigned long fdt) {
   }
 #endif
 
+#ifdef NAUT_CONFIG_DW_8250_UART_EARLY_OUTPUT
+  dw_8250_pre_vc_init(fdt);
+#endif
+
   printk_init();
 
   printk(NAUT_WELCOME);
@@ -343,6 +351,9 @@ void init(unsigned long hartid, unsigned long fdt) {
 
 #ifdef NAUT_CONFIG_OF_8250_UART
   of_8250_init();
+#endif
+#ifdef NAUT_CONFIG_DW_8250_UART
+  dw_8250_init();
 #endif
 
   nk_dump_irq_info();

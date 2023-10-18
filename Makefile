@@ -180,9 +180,9 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/  )
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 ARCH		?= $(SUBARCH)
 
-#CROSS_COMPILE ?=
+CROSS_COMPILE ?=
 #CROSS_COMPILE ?= /home/kjhayes/opt/toolchain/aarch64/bin/aarch64-linux-gnu-
-CROSS_COMPILE ?= /home/kjhayes/opt/toolchain/riscv64/bin/
+#CROSS_COMPILE ?= /home/kjhayes/opt/toolchain/riscv64/bin/
 #CROSS_COMPILE	?= /home/kyle/opt/cross/bin/x86_64-elf-
 
 # Architecture as present in compile.h
@@ -862,6 +862,7 @@ nautilus: $(BIN_NAME) $(SYM_NAME) $(SEC_NAME)
 
 UBOOT_BIN = ../u-boot.bin
 
+# TODO: KIR HACK: Use llvm-objcopy if using clang/wllvm
 uImage: $(BIN_NAME)
 	$(OBJCOPY) -O binary $(BIN_NAME) Image
 ifdef NAUT_CONFIG_ARCH_RISCV
