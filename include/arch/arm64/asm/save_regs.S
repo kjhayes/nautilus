@@ -20,7 +20,7 @@
 
   stp x30, x1, [sp, 0xa0]
 
-.ENDM
+.endmacro
 
 .MACRO RESTORE_CALLER_GPRS
 
@@ -40,5 +40,5 @@
 
   add sp, sp, 0xb0
 
-.ENDM
+.endmacro
 

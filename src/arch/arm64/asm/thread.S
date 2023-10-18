@@ -29,7 +29,7 @@ nk_thread_entry:
 
   // Make sure that lr is zero if we don't enter through intr entry
   mov x30, 0
-.ENDM
+.endmacro
   
 .MACRO BECOME_THREADLESS
   // If we enter through interrupts, x30 should now be non-zero.
@@ -77,7 +77,7 @@ nk_thread_entry:
   mov x2, sp
   str x2, [x16] // RSP field of thread struct
 
-.ENDM
+.endmacro
 
 .MACRO RESTORE_THREAD
   // Get the current thread
@@ -118,7 +118,7 @@ nk_thread_entry:
 
   RESTORE_CALLER_GPRS
 1:
-.ENDM
+.endmacro
 
 nk_thread_switch:
   BECOME_THREADLESS_THREAD

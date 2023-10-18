@@ -404,6 +404,18 @@ endif
 	-mcmodel=medany
 endif
 
+ifdef NAUT_CONFIG_ARCH_ARM64
+
+# we want this for clang and wllvm
+ifndef NAUT_CONFIG_USE_GCC
+  COMMON_FLAGS += --target=aarch64
+endif
+
+#   COMMON_FLAGS += \
+#   	-march=aarch64 \
+# 	-mabi=eabi \
+# 	-mcmodel=medany
+endif
 
 ifdef NAUT_CONFIG_ARCH_X86
   COMMON_FLAGS += -mcmodel=large -mno-red-zone

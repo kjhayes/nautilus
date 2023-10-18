@@ -27,7 +27,7 @@
   strh w3, [x2, 8]
 1: 
 
-.ENDM
+.endmacro
 
 .MACRO NESTABLE_EXCP_EXIT
 
@@ -38,7 +38,7 @@
 
   add sp, sp, 0x20
 
-.ENDM
+.endmacro
 
 .MACRO DEC_EXCP_DEPTH
   mrs x2, TPIDR_EL1
@@ -48,7 +48,7 @@
   sub w3, w3, 1
   strh w3, [x2, 8]
 1:
-.ENDM
+.endmacro
 
 .EXTERN route_interrupt
 .EXTERN nk_thread_switch_intr_entry
