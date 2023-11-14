@@ -525,9 +525,9 @@ add_free_pages (struct mem_region * region)
         int mask = (1<<bit);
         void *address = (void*)(((uint64_t)(i+bit))<<PAGE_SHIFT);
         if(free_bits & mask) {
-          if(is_usable_ram(address,PAGE_SIZE)) {
+          if(is_usable_ram((uint64_t)address,PAGE_SIZE)) {
             BMM_DEBUG("Handing page at %p (%p bytes) to kmem\n", address, PAGE_SIZE);
-            kmem_add_memory(region, address, PAGE_SIZE);
+            kmem_add_memory(region, (uint64_t)address, PAGE_SIZE);
             ++count;
           } else {
 	    ERROR_PRINT("Skipping addition of memory at %p (%p bytes) - Likely memory map / SRAT mismatch\n",address,PAGE_SIZE);

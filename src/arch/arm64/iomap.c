@@ -15,7 +15,7 @@ int arch_handle_io_map(struct nk_io_mapping *mapping)
     return 0;
   } else {
     int flags = atomic_or(mapping->flags, NK_IO_MAPPING_FLAG_ENABLED);
-    return pt_init_table_device(ttbr0_table, mapping->vaddr, mapping->paddr, mapping->size);
+    return pt_init_table_device(ttbr0_table, (uint64_t)mapping->vaddr, (uint64_t)mapping->paddr, mapping->size);
   }
 }
 int arch_handle_io_unmap(struct nk_io_mapping *mapping) 

@@ -506,3 +506,4 @@ int Format_Output(struct Output_Sink *q, const char *format, va_list ap)
 
   return o;
 }
+

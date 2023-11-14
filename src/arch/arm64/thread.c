@@ -9,7 +9,7 @@ void __thread_fork_threadless(struct nk_regs *regs)
   // KJH - I have it set up where we enter this function with our thread saved correctly, and nk_regs is a pointer to it's 
   // registers on it's stack, but we need to actually create the child thread here.
   // For now it just fails "correctly"
-  regs->x0 = NK_BAD_THREAD_ID;
+  regs->x0 = (uint64_t)NK_BAD_THREAD_ID;
   return;
 }
 

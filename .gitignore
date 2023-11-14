@@ -47,18 +47,22 @@ scripts/kconfig/lxdialog/lxdialog
 scripts/kconfig/mconf
 scripts/kconfig/lkc_defs.h
 
+# Python
+*.py[cod]
+**/__pycache__
+
 # Sources for GCC, GDB, and Binutils
 scripts/toolchain/gcc*
 scripts/toolchain/gdb*
 scripts/toolchain/bin*
 
 # QEMU Flash Image
-setups/arm64/flash.img
+setups/**/*.img
 
 /dep
 
 # Linker Script After Preprocessing
-link/processed.ld
+link/link.ld
 
 # Kernel Images
 Image

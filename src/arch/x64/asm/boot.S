@@ -64,7 +64,7 @@ hdr_end:
  * our entry point into the kernel, this is where
  * GRUB2 will drop us
  */
- GLOBAL(nautilus_entry)
+GLOBAL(nautilus_entry)
 
     /* get GRUB multiboot info and stash it */
     movl %ebx, %edi

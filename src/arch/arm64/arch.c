@@ -143,6 +143,6 @@ int arch_atomics_enabled(void) {
 
 void *arch_instr_ptr_reg(struct nk_regs *regs) {
   // This isn't technically correct but until I merge excp_entry_t and nk_regs this will have to do - KJH
-  return regs->link_ptr;
+  return (void*)regs->link_ptr;
 }
 

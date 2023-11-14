@@ -52,6 +52,7 @@ menu "Platform"
         config ARM64_GENERIC
             bool "Generic ARM64 Host" 
 						select ARCH_ARM64
+    endchoice
 
         config GEM5_FORCE_APIC_TIMER_CALIBRATION
 	    depends on GEM5
@@ -80,7 +81,6 @@ menu "Platform"
             help
 	       The smaller this number is, the more frequent timer interrupts will be.
 	       If it is too small, you'll be in an interrupt storm.
-    endchoice
 
     config MAX_CPUS
         int "Maximum Number of CPUs"
@@ -474,7 +474,7 @@ config VIRTUAL_CONSOLE_SERIAL_MIRROR_ALL
 
     config TASK_THREAD
         bool "Handle tasks in a special thread"
-        default true;
+        default true
 	help
 	  When enabled, each cpu has a thread that consumes tasks.
 	  The thread can run at an arbitrary aperiodic priority.
@@ -1051,7 +1051,7 @@ endmenu
       
     
 
-menu Debugging
+menu "Debugging"
 
     config DEBUG_INFO
       bool "Compile with Debug Symbols"
@@ -1520,7 +1520,7 @@ menu "Address Spaces"
 
 
 	  config ASPACE_PAGING_1GB
-            bool "Huge Page 1GB "
+            bool "Huge Page 1GB"
             depends on ASPACE_PAGING
             default y
             help
@@ -1777,14 +1777,14 @@ menu "Runtimes"
 	     Include the NDPC run-time
 
         config NDPC_RT_DEBUG
-            bool "Debug NDPC RT";
+            bool "Debug NDPC RT"
 	    default n
             depends on NDPC_RT
             help 
               Debugging output for the NDPC RT
 
         config NDPC_RT_TESTS
-            bool "Include tests/benchmarks for NDPC RT";
+            bool "Include tests/benchmarks for NDPC RT"
 	    default n
             depends on NDPC_RT
             help 
@@ -1797,14 +1797,14 @@ menu "Runtimes"
 	     Include the NESL run-time (VCODE engine)
 
         config NESL_RT_DEBUG
-            bool "Debug NESL RT";
+            bool "Debug NESL RT"
 	    default n
             depends on NESL_RT
             help 
               Debugging output for the NESL RT
 
         config NESL_RT_TESTS
-            bool "Include tests/benchmarks for NESL RT";
+            bool "Include tests/benchmarks for NESL RT"
 	    default n
             depends on NESL_RT
             help 
@@ -1836,7 +1836,7 @@ menu "Runtimes"
         endchoice
 	
         config OPENMP_RT_DEBUG
-            bool "Debug OpenMP RT";
+            bool "Debug OpenMP RT"
 	    default n
             depends on OPENMP_RT
             help 
@@ -1975,4 +1975,10 @@ config SPARSE_IRQ
     help
       Store Interrupt Vectors's efficiently on a system where there can be large gaps between IRQ numbers.
       If this is disabled, the architecture will need to provide the MAX_IRQ_NUM macro.
+
+config CONFIG
+    def_bool y
+    help
+      This should remain hidden, it can be used to check whether or not the configuration
+      has been loaded correctly and should always be defined and evaluate to "y"
 

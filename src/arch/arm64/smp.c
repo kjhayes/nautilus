@@ -76,7 +76,7 @@ static int fdt_handle_cpu_node (unsigned long fdt, int offset, int cpu_addr_cell
     new_cpu->id         = sys->num_cpus;
 
     // Status
-    const char *status = fdt_getprop(fdt, offset, "status", &lenp);
+    const char *status = fdt_getprop((void*)fdt, offset, "status", &lenp);
     if (status && lenp >= 8 && !strncmp(status, "disabled", 8)) {
       new_cpu->enabled = 0;
     } else {
@@ -84,7 +84,7 @@ static int fdt_handle_cpu_node (unsigned long fdt, int offset, int cpu_addr_cell
     }
 
     // Affinity
-    const uint32_t *regs = fdt_getprop(fdt, offset, "reg", &lenp); 
+    const uint32_t *regs = fdt_getprop((void*)fdt, offset, "reg", &lenp); 
     if(regs == NULL) {
       SMP_ERROR("Cannot get \"regs\" property in \"cpu\" device tree node!\n");
       goto err_free;
@@ -183,7 +183,7 @@ static int fdt_init_cpus(void *dtb, struct sys_info *sys)
     } 
 
     // This is a cpu node
-    if(fdt_handle_cpu_node(dtb, cpu_node_offset, cpu_addr_cells, sys)) {
+    if(fdt_handle_cpu_node((uint64_t)dtb, cpu_node_offset, cpu_addr_cells, sys)) {
       SMP_ERROR("Could not initialize FDT CPU node at offset: %u!\n", cpu_node_offset);
       err_count += 1;
     }

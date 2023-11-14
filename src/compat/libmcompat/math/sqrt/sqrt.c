@@ -8,11 +8,11 @@
 //#define EXIT_FAILURE -1
 //#define EXIT_SUCCESS 0
 
-inline double sqrt(double x)
+double sqrt(double x)
 {
     double ret;
 	#ifdef NAUT_CONFIG_ARCH_X86
-    asm volatile(
+        asm volatile(
 		 "movq %1, %%xmm0 \n"
 		 "sqrtsd %%xmm0, %%xmm1 \n"
 		 "movq %%xmm1, %0 \n"

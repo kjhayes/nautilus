@@ -298,7 +298,7 @@ static int handle_rodata_memory_regions(struct page_table *table) {
   }
 
   PAGING_DEBUG("Drilling FDT as readonly\n");
-  void *fdt = (void*)nautilus_info.sys.dtb;
+  uint64_t fdt = (uint64_t)nautilus_info.sys.dtb;
   if(pt_init_table_rodata(table, fdt, fdt, fdt_totalsize(fdt))) {
     PAGING_ERROR("Failed to drill FDT as readonly!\n");
     return -1;
@@ -349,7 +349,7 @@ int arch_paging_init(struct nk_mem_info *mm_info, void *fdt) {
       PAGING_DEBUG("Skipping adding device region [%p - %p] -> [%p - %p] (already enabled)\n", iter->vaddr, iter->vaddr + iter->size, iter->paddr, iter->paddr + iter->size);
     } else {
       PAGING_DEBUG("Adding device region: [%p - %p] -> [%p - %p] to the ttbr0 table\n", iter->vaddr, iter->vaddr + iter->size, iter->paddr, iter->paddr + iter->size);
-      pt_init_table_device(ttbr0_table, iter->vaddr, iter->paddr, iter->size);
+      pt_init_table_device(ttbr0_table, (uint64_t)iter->vaddr, (uint64_t)iter->paddr, iter->size);
       iter = nk_io_map_next(iter);
     }
   }

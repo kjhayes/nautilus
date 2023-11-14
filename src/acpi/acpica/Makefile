@@ -2,16 +2,13 @@
 # Makefile for ACPICA Core interpreter
 #
 
-obj-y	+= acpi.o
+obj-y += tbxface.o
+obj-y += tbinstal.o
+obj-y += tbutils.o
+obj-y += tbxfroot.o
 
-acpi-y += tbxface.o
-acpi-y += tbinstal.o
-acpi-y += tbutils.o
-acpi-y += tbxfroot.o
+obj-y += utalloc.o
+obj-y += utmisc.o
+obj-y += utglobal.o
+obj-y += utxferror.o
 
-acpi-y += utalloc.o
-acpi-y += utmisc.o
-acpi-y += utglobal.o
-acpi-y += utxferror.o
-
-EXTRA_CFLAGS += $(ACPI_CFLAGS)

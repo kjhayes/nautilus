@@ -191,7 +191,7 @@ int pl011_uart_pre_vc_init(uint64_t dtb) {
   uint64_t clock = QEMU_PL011_VIRT_BASE_CLOCK;
 
   fdt_reg_t reg = { .address = 0, .size = 0 };
-  if(fdt_getreg(dtb, offset, &reg)) {
+  if(fdt_getreg((void*)dtb, offset, &reg)) {
     return 1;
   }
   
@@ -205,19 +205,19 @@ int pl011_uart_pre_vc_init(uint64_t dtb) {
   spinlock_init(&p->input_lock);
   spinlock_init(&p->output_lock);
 
-  p->mmio_base = nk_io_map(reg.address, reg.size, 0);
+  p->mmio_base = nk_io_map((void*)reg.address, reg.size, 0);
 
   if(p->mmio_base == NULL) {
     return 1;
   }
 
   if(pl011_uart_configure(p)) {
-    nk_io_unmap(reg.address);
+    nk_io_unmap((void*)reg.address);
     return 1;
   }
 
   if(nk_pre_vc_register(pl011_uart_pre_vc_putchar, pl011_uart_pre_vc_puts)) {
-    nk_io_unmap(reg.address);
+    nk_io_unmap((void*)reg.address);
     return 1;
   }
 

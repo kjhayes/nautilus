@@ -5200,6 +5200,7 @@ static struct shell_cmd_impl burn_impl = {
 };
 nk_register_shell_cmd(burn_impl);
 
+#ifdef NAUT_CONFIG_ARCH_X86
   static int 
 test_timed_stop (char * buf, void * priv)
 {
@@ -5260,8 +5261,9 @@ static struct shell_cmd_impl timed_stop = {
   .help_str = "timed_stop",
   .handler  = test_timed_stop,
 };
-
 nk_register_shell_cmd(timed_stop);
+#endif
+
   static int 
 test_stop (char * buf, void * priv)
 {
