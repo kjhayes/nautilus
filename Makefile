@@ -48,16 +48,19 @@ endif
 ARCH_SCRIPTS_DIR:=$(SCRIPTS_DIR)/arch/$(ARCH)
 -include $(ARCH_SCRIPTS_DIR)/Makefile.config
 
-# Compiler Specific Build Configurations
+# Toolchain Specific Build Configurations
 ifdef NAUT_CONFIG_USE_CLANG
-include $(SCRIPTS_DIR)/Makefile.clang
+TOOLCHAIN ?= clang
 endif
 ifdef NAUT_CONFIG_USE_GCC
-include $(SCRIPTS_DIR)/Makefile.gcc
+TOOLCHAIN ?= gcc
 endif
 ifdef NAUT_CONFIG_USE_WLLVM
-include $(SCRIPTS_DIR)/Makefile.wllvm
+TOOLCHAIN ?= wllvm
 endif
+
+TOOLCHAIN_SCRIPTS_DIR:=$(SCRIPTS_DIR)/toolchain/$(TOOLCHAIN)
+-include $(TOOLCHAIN_SCRIPTS_DIR)/Makefile.config
 
 # General Build Configuration
 
@@ -69,6 +72,8 @@ COMMON_FLAGS += -fno-omit-frame-pointer \
 			   -fno-stack-protector \
 			   -fno-strict-aliasing \
                            -fno-strict-overflow \
+
+COMMON_FLAGS += -Wno-int-conversion
 
 NAUT_INCLUDE += -D__NAUTILUS__ -I$(INCLUDE_DIR) \
 		     -include $(AUTOCONF)
@@ -137,6 +142,7 @@ $(LINKER_SCRIPT): $(LINKER_SCRIPT_SRC) $(AUTOCONF)
 #
 
 -include $(ARCH_SCRIPTS_DIR)/Makefile.rules
+-include $(TOOLCHAIN_SCRIPTS_DIR)/Makefile.rules
 
 DEFAULT_RULES ?= $(NAUT_BIN)
 default: $(DEFAULT_RULES)

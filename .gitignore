@@ -52,9 +52,9 @@ scripts/kconfig/lkc_defs.h
 **/__pycache__
 
 # Sources for GCC, GDB, and Binutils
-scripts/toolchain/gcc*
-scripts/toolchain/gdb*
-scripts/toolchain/bin*
+scripts/toolchain/gcc/gcc*
+scripts/toolchain/gcc/gdb*
+scripts/toolchain/gcc/bin*
 
 # QEMU Flash Image
 setups/**/*.img
