@@ -11,7 +11,7 @@
 #                include/config/...
 # docproc:	 Used in Documentation/docbook
 
-hostprogs-y	:= fixdep split-include docproc
+hostprogs-y	:= fixdep docproc
 always		:= $(hostprogs-y)
 
 # fixdep is needed to compile other host programs

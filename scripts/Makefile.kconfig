@@ -9,7 +9,7 @@ KCONFIG_DIR := $(SCRIPTS_DIR)/kconfig
 
 $(AUTOCONF): $(DOT_CONFIG)
 	$(call quiet-cmd,GENCONFIG,$(call rel-file, $@, $(ROOT_DIR)))
-	$(Q)$(PYTHON) $(KCONFIG_DIR)/genconfig.py --header-path $@
+	$(Q)$(PYTHON) $(KCONFIG_DIR)/genconfig.py --header-path $@ --sync-dep $(INCLUDE_DIR)/config/
 
 menuconfig:
 	$(Q)$(PYTHON) $(KCONFIG_DIR)/menuconfig.py
