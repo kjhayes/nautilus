@@ -1,17 +1,23 @@
 
-uImage: $(BIN_NAME)
-	$(OBJCOPY) -O binary $(BIN_NAME) Image
-	mkimage -A riscv -O linux -T kernel -C none \
-		-a 0x80100000 -e 0x80100000 -n "Nautilus" \
+uImage: $(NAUT_BIN)
+	$(Q)$(OBJCOPY) -O binary $(NAUT_BIN) Image
+	$(Q)mkimage -A riscv -O linux -T kernel -C none \
+		-a $(NAUT_CONFIG_KERNEL_LINK_ADDR) -e $(NAUT_CONFIG_KERNEL_LINK_ADDR) -n "Nautilus" \
 		-d Image uImage
-	rm Image
+	$(Q)rm Image
 
-qemu: nautilus.bin
-        qemu-system-riscv64 -bios default -m 2G -M sifive_u -kernel nautilus.bin -serial mon:stdio -display none -gdb tcp::1234
+qemu: uImage
+	qemu-system-riscv64 \
+            -bios default \
+            -m 2G \
+            -M virt \
+            -kernel uImage \
+            -serial stdio \
+            -gdb tcp\:\:1234
 
 riscv-clean:
-        rm -f uImage
-        rm -f Image
+	$(Q)rm -f uImage
+	$(Q)rm -f Image
 
 DEFAULT_RULES += uImage
 CLEAN_RULES += riscv-clean
