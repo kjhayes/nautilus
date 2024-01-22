@@ -40,8 +40,8 @@ nautilus.asm
 scripts/basic/docproc
 scripts/basic/fixdep
 scripts/basic/split-include
-scripts/format_secs
-scripts/format_syms
+scripts/arch/x64/format_secs
+scripts/arch/x64/format_syms
 scripts/kconfig/conf
 scripts/kconfig/lxdialog/lxdialog
 scripts/kconfig/mconf
