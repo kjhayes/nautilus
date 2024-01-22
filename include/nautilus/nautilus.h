@@ -142,6 +142,11 @@ do {									\
     }									\
 } while (0)
 
+//#define DEBUG_PRINT(fmt, args...)
+//#define ERROR_PRINT(fmt, args...)
+//#define WARN_PRINT(fmt, args...)
+//#define INFO_PRINT(fmt, args...)
+
 void panic(const char *, ...) __attribute__((noreturn));
 
 #define panic(fmt, args...)         panic("PANIC at %s(%d): " fmt, __FILE__, __LINE__, ##args)
@@ -162,7 +167,7 @@ void panic(const char *, ...) __attribute__((noreturn));
 #include <nautilus/numa.h>
 #include <nautilus/smp.h>
 
-
+#ifdef NAUT_CONFIG_ARCH_X86
 struct ioapic;
 struct irq_mapping {
     struct ioapic * ioapic;
@@ -177,6 +182,7 @@ struct nk_int_info {
 
     struct irq_mapping irq_map[256];
 };
+#endif
 
 struct hpet_dev;
 struct nk_locality_info;
@@ -207,7 +213,9 @@ struct sys_info {
     struct pci_info * pci;
     struct hpet_dev * hpet;
 
+#ifdef NAUT_CONFIG_ARCH_X86
     struct nk_int_info int_info;
+#endif
 
     struct nk_locality_info locality_info;
 
@@ -249,10 +257,12 @@ nk_get_nautilus_info (void)
 #ifdef NAUT_CONFIG_ARCH_X86
 #define INTERRUPT __attribute__((target("no-sse")))
 #else
+#ifdef NAUT_CONFIG_BEANDIP
+#define INTERRUPT __attribute__((annotate("nohook")))
+#else 
 #define INTERRUPT
 #endif
-
-
+#endif
 
 #include <nautilus/arch.h>
 #ifdef NAUT_CONFIG_XEON_PHI
@@ -265,6 +275,7 @@ nk_get_nautilus_info (void)
 #include <arch/gem5/main.h>
 #elif defined NAUT_CONFIG_ARCH_RISCV
 #include <arch/riscv/main.h>
+#include <arch/riscv/math_emul.h>
 #elif defined NAUT_CONFIG_ARCH_ARM64
 #include <arch/arm64/main.h>
 #else

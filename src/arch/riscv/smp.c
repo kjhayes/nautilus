@@ -22,7 +22,7 @@ static int
 configure_cpu (unsigned long fdt, int offset) {
     off_t reg_addr = fdt_getreg_address(fdt, offset);
     int lenp = 0;
-    char *status = fdt_getprop(fdt, offset, "status", &lenp);
+    char *status = (char *)fdt_getprop(fdt, offset, "status", &lenp);
     int enabled = 1;
     // sifive disables 1 CPU and indicates it with this property
     if (status && !strcmp(status, "disabled")) {
@@ -52,6 +52,9 @@ configure_cpu (unsigned long fdt, int offset) {
     new_cpu->system     = sys;
     new_cpu->cpu_khz    = 0;
 
+    // TODO: HACKY
+    new_cpu->plic_claim_register = 0xc202004;
+
     SMP_DEBUG("CPU %u\n", new_cpu->id);
     SMP_DEBUG("\tEnabled?=%01d\n", new_cpu->enabled);
     SMP_DEBUG("\tBSP?=%01d\n", new_cpu->is_bsp);
@@ -66,7 +69,7 @@ configure_cpu (unsigned long fdt, int offset) {
 
 int fdt_node_get_cpu(const void *fdt, int offset, int depth) {
     int lenp = 0;
-    char *name = fdt_get_name(fdt, offset, &lenp);
+    const char *name = fdt_get_name(fdt, offset, &lenp);
     // maybe not the ideal way to do this
     if(name && !strncmp(name, "cpu@", 4)) {
         // printk("Hit: %s\n", name);

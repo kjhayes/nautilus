@@ -1,6 +1,10 @@
 #include <nautilus/arch.h>
 #include <nautilus/printk.h>
 #include <arch/riscv/plic.h>
+#include <arch/riscv/trap.h>
+#include <arch/riscv/riscv_idt.h>
+
+// static volatile int x = 0;
 
 struct trap_regs {
   uint64_t sepc;

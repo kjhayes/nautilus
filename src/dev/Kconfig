@@ -42,6 +42,13 @@ config SERIAL_DEBUGGER_PORT
       
 endmenu      
 
+config RISCV_GPIO_ENABLE
+    bool "Enable RISC-V GPIO"
+    depends on ARCH_RISCV
+    default y
+    help
+       Enable RISC-V GPIO
+
 config SIFIVE_PLIC
     bool "SiFive Platform Level Interrupt Controller"
     depends on ARCH_RISCV

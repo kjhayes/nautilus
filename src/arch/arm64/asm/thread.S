@@ -6,7 +6,11 @@
 
 nk_thread_entry:
 
-  mov x18, 0b1111
+#ifdef NAUT_CONFIG_BEANDIP
+  mov x18, (0b1111<<6)
+#else
+  mov x18, (0b0000<<6)
+#endif
   msr DAIF, x18
 
   ldr x18, [sp, 0x0]
@@ -39,7 +43,9 @@ nk_thread_entry:
   sub sp, sp, 0x70
 
   // Store flags
+#ifndef NAUT_CONFIG_BEANDIP
   mrs x2, DAIF
+#endif
   mrs x3, NZCV
   stp x2, x3, [sp, 0x60]
 
@@ -108,7 +114,9 @@ nk_thread_entry:
 
   // Restore flags
   ldp x2, x3, [sp, 0x60]
+#ifndef NAUT_CONFIG_BEANDIP
   msr DAIF, x2
+#endif
   msr NZCV, x3
  
   add sp, sp, 0x70
@@ -204,11 +212,11 @@ nk_fp_save:
   str q29, [x0, 0x1d0]
   str q30, [x0, 0x1e0]
   str q31, [x0, 0x1f0]
-  mrs x1, FPSR
-  mrs x2, FPCR
- 
+
   // Out of range for dereference offset
   add x0, x0, 0x200
+  mrs x1, FPSR
+  mrs x2, FPCR 
   stp x1, x2, [x0, 0x0]
 
   ret

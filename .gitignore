@@ -60,6 +60,7 @@ scripts/toolchain/gcc/bin*
 setups/**/*.img
 
 /dep
+src/test/NPB-NAS/*/npbparams.h
 
 # Linker Script After Preprocessing
 link/link.ld
@@ -70,3 +71,4 @@ uImage
 
 # Debug Output
 output.txt
+ct.out

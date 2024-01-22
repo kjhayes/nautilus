@@ -12,6 +12,9 @@
 #include<nautilus/netdev.h>
 #include<nautilus/gpudev.h>
 #include<nautilus/irqdev.h>
+#include<nautilus/gpiodev.h>
+#include<nautilus/gpio.h>
+#include<nautilus/iomap.h>
 #include<nautilus/arch.h>
 #include<nautilus/interrupt.h>
 #include<nautilus/mm.h>
@@ -29,6 +32,8 @@
 #include<nautilus/fs.h>
 #include<nautilus/shell.h>
 
+#include<nautilus/ipi.h>
+
 #include<nautilus/of/dt.h>
 
 #include<arch/arm64/unimpl.h>
@@ -36,6 +41,7 @@
 #include<arch/arm64/excp.h>
 #include<arch/arm64/timer.h>
 #include<arch/arm64/psci.h>
+#include<arch/arm64/paging.h>
 
 #ifdef NAUT_CONFIG_PL011_UART
 #include<dev/pl011.h>
@@ -82,6 +88,8 @@
   "+===============================================+  \n" \
   " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
   "+===============================================+  \n\n"
+
+void smp_ap_stack_switch(void *new_stack, void *new_base, void *survive);
 
 int arch_paging_init(struct nk_mem_info *mm_info, void *fdt);
 
@@ -194,7 +202,9 @@ void secondary_init(void) {
   nk_sched_start();
  
   // Enable interrupts
+#ifndef NAUT_CONFIG_BEANDIP
   arch_enable_ints(); 
+#endif
 
   INIT_PRINT("Interrupts are now enabled\n");
 
@@ -346,6 +356,7 @@ int rockchip_halt_and_flash(int val0, int val1, int fast) {
   return 0;
 }
 
+__attribute__((annotate("nohook")))
 void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x3) {
 
   // Zero out .bss
@@ -373,8 +384,6 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   printk(NAUT_WELCOME);
 
   printk("initializing in EL%u\n", arm64_get_current_el());
-
-  printk("some number: %16x\n", 100);
 
   per_cpu_sys_ctrl_reg_init();
 
@@ -512,8 +521,6 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
 
   global_timer_init();
 
-  nk_dump_irq_info();
- 
   // Let the secondary processors into their second phase
   finish_secondaries(&(nautilus_info.sys)); 
 
@@ -541,6 +548,8 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   arch_enable_ints(); 
 
   INIT_PRINT("Interrupts are now enabled\n"); 
+
+  ipi_stress_init();
 
   INIT_DEBUG("Starting the virtual console...\n");
   nk_vc_init();

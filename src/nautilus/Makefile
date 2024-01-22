@@ -49,6 +49,7 @@ obj-y += \
 	getopt.o \
 	cmdline.o \
 	lru_cache.o \
+	ipi.o \
 	iomap.o
 
 obj-$(NAUT_CONFIG_ARCH_X86) += \
@@ -99,3 +100,4 @@ obj-$(NAUT_CONFIG_LINUX_SYSCALLS) += syscalls/
 
 obj-$(NAUT_CONFIG_USE_IST) += gdt.o
 
+obj-$(NAUT_CONFIG_BEANDIP) += simplified_timehook.o

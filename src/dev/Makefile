@@ -10,6 +10,8 @@ ifndef NAUT_CONFIG_XEON_PHI
 obj-$(NAUT_CONFIG_ARCH_X86) += serial.o
 endif
 
+obj-$(NAUT_CONFIG_ARCH_RISCV) += sifive_gpio.o
+
 obj-$(NAUT_CONFIG_ARCH_ARM64) += \
 	pci.o
 

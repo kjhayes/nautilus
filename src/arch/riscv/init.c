@@ -59,6 +59,7 @@
 #include <nautilus/timer.h>
 #include <nautilus/vc.h>
 #include <nautilus/waitqueue.h>
+#include <nautilus/timehook.h>
 #include <nautilus/of/fdt.h>
 
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING
@@ -75,7 +76,10 @@
 
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/trap.h>
+#include <arch/riscv/riscv_idt.h>
+#include <arch/riscv/npb.h>
 
+#include <dev/sifive_gpio.h>
 #include <dev/sifive_serial.h>
 
 #define QUANTUM_IN_NS (1000000000ULL / NAUT_CONFIG_HZ)
@@ -210,7 +214,14 @@ int start_secondary(struct sys_info *sys) {
 
 void my_monitor_entry(void);
 
-void init(unsigned long hartid, unsigned long fdt) {
+__attribute__((noinline)) int do_some_work(int x) {
+  for (int i = 0; i < 10000; i++) {
+    x = x % i;
+  }
+  return x;
+}
+
+__attribute__((annotate("nohook"))) void init(unsigned long hartid, unsigned long fdt) {
 
   if (!fdt) panic("Invalid FDT: %p\n", fdt);
 
@@ -226,7 +237,7 @@ void init(unsigned long hartid, unsigned long fdt) {
   write_csr(sscratch, r_tp());
 
   // Zero out tp for now until cls is set up
-  w_tp(0);
+  // w_tp(0);
 
   struct naut_info *naut = &nautilus_info;
   nk_low_level_memset(naut, 0, sizeof(struct naut_info));
@@ -288,9 +299,16 @@ void init(unsigned long hartid, unsigned long fdt) {
   /* now we switch to the real kernel memory allocator, pages
    * allocated in the boot mem allocator are kept reserved */
   mm_boot_kmem_init();
+
+  // KJH - Not sure what this is
+  //riscv_setup_idt();
   
   // We now have serial output without SBI
   //sifive_serial_init(fdt);
+
+#ifdef NAUT_CONFIG_RISCV_GPIO_ENABLE
+  sifive_gpio_init(fdt);
+#endif
 
   // my_monitor_entry();
 
@@ -338,6 +356,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 #endif
 
   arch_enable_ints();
+#endif
 
   /* interrupts are now on */
 
@@ -361,28 +380,248 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   nk_fs_init();
 
-  // nk_linker_init(naut);
-  // nk_prog_init(naut);
+  // // nk_linker_init(naut);
+  // // nk_prog_init(naut);
 
-  // nk_loader_init();
+  // // nk_loader_init();
 
-  // nk_pmc_init();
+  // // nk_pmc_init();
 
   //nk_cmdline_init(naut);
   // nk_test_init(naut);
 
-  // kick off the timer subsystem by setting a timer sometime in the future
-  sbi_set_timer(read_csr(time) + TICK_INTERVAL);
+  // // kick off the timer subsystem by setting a timer sometime in the future
+  // sbi_set_timer(read_csr(time) + TICK_INTERVAL);
 
-  // sifive_test();
-  /* my_monitor_entry(); */
+  // // sifive_test();
+  // /* my_monitor_entry(); */
 
 //  nk_launch_shell("root-shell",0,0,0);
   //execute_threading(NULL);
 
   execute_threading(NULL);
 
+  // printk("%d\n", 5.0 / 0);
+  
   printk("Nautilus boot thread yielding (indefinitely)\n");
+
+  nk_time_hook_start();
+
+  // int res = do_some_work(hartid);
+  // nk_time_hook_stop();
+  // printk("Res: %d\n", res);
+
+  // sifive_gpio_set_pin(1);
+
+  // int x = 0;
+  // for (int i = 0; i < 100000; i++) {
+  //   x += 1;
+  // }
+
+  // printk("Val: %d\n", x);
+
+  // sifive_gpio_set_pin(0);
+
+  // plic_claim();
+
+  printk("Current CPU: %d\n", my_cpu_id());
+
+  // do work: BT
+  // works, issue after running it the first time, sometimes load fault: MG
+  // works but verification fails: LU
+  // options that don't work: CG, EP, IS
+  // might work: SP
+
+#ifdef NAUT_BENCHMARK_FT
+program_FT(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_FT(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_FT(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_FT(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_FT(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_FT(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_FT(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_FT(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_FT(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_FT(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+
+#elif defined NAUT_BENCHMARK_EP
+program_EP_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_EP_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_EP_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_EP_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_EP_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_EP_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_EP_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_EP_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_EP_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_EP_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+
+
+#elif defined NAUT_BENCHMARK_MG
+program_MG_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_MG_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_MG_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_MG_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_MG_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_MG_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_MG_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_MG_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_MG_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_MG_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+
+
+#elif defined NAUT_BENCHMARK_LU
+program_LU_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_LU_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_LU_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_LU_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_LU_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_LU_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_LU_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_LU_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_LU_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_LU_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+
+#else
+program_BT_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_BT_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_BT_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_BT_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_BT_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_BT_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_BT_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_BT_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_BT_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+
+program_BT_profile(NULL, NULL);
+sifive_gpio_print_ints_received_and_reset();
+#endif
+
+  // uint64_t t1 = read_csr(cycle);
+
+  // for (int i = 0; i < 1000; i++) {
+  //   int irq = plic_claim();
+  // }
+
+  // uint64_t t2 = read_csr(cycle);
+
+  // uint64_t diff = t2 - t1;
+  // printk("%ld\n", diff);
+
+
+
+
+  // sifive_gpio_set_pin(1);
+
+  // uint64_t diff = t2 - t1;
+  // printk("\n\nTotal Time: %ld\n\n\n", diff);
+
+  // program_CG_profile();
+  // // program_LU_profile();
+  // // program_LU_profile();
+
+  // // weird negative clock numbers printing when timing IS
+  // // program_IS_profile();
+  // program_LU_profile();
+  // // program_LU_profile();
+  // program_SP_profile();
 
   idle(NULL, NULL);
 }
@@ -403,7 +642,7 @@ void init_simple(unsigned long hartid, unsigned long fdt) {
   nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
   // Initialize platform level interrupt controller for this HART
-  //plic_init(fdt);
+  plic_init(fdt);
 
   //plic_init_hart(hartid);
 

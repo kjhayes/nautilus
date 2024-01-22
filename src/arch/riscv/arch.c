@@ -3,11 +3,16 @@
 #include <nautilus/of/numa.h>
 #include <nautilus/endian.h>
 
-void arch_enable_ints(void)  { set_csr(sstatus, SSTATUS_SIE); }
+void arch_enable_ints(void)  {
+    printk("ENABLED INTS\n");
+
+    set_csr(sstatus, SSTATUS_SIE);
+}
 void arch_disable_ints(void) { clear_csr(sstatus, SSTATUS_SIE); }
 int  arch_ints_enabled(void) { return read_csr(sstatus) & SSTATUS_SIE; };
 
 #include <arch/riscv/plic.h>
+
 /*
 void arch_irq_enable(int irq) { plic_enable(irq, 1); }
 void arch_irq_disable(int irq) { 

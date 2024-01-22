@@ -211,7 +211,7 @@ _nk_thread_init (nk_thread_t * t,
     return 0;
 }
 
-uint64_t __nk_thread_fpu_state_offset = offsetof(struct nk_thread, fpu_state);
+const uint64_t __nk_thread_fpu_state_offset = offsetof(struct nk_thread, fpu_state);
 
 void
 thread_cleanup (void)
@@ -323,7 +323,12 @@ thread_setup_init_stack (nk_thread_t * t, nk_thread_fun_t fun, void * arg)
         *(uint64_t*)(t->rsp-GPR_X0_OFFSET) = (uint64_t)arg;
         *(uint64_t*)(t->rsp-GPR_LR_OFFSET)  = (uint64_t)nk_thread_entry;
         *(uint64_t*)(t->rsp-INTERRUPT_RETURN_OFFSET) = (uint64_t)0;
-        *(uint64_t*)(t->rsp-DAIF_OFFSET) = (uint64_t)0b1111;
+        *(uint64_t*)(t->rsp-DAIF_OFFSET) = 
+#ifdef NAUT_CONFIG_BEANDIP
+          (uint64_t)(0b1111<<6);
+#else
+          (uint64_t)(0b0000<<6);
+#endif
     }
 #endif
 

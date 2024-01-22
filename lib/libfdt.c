@@ -51,6 +51,9 @@
 
 #include<lib/libfdt.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wincompatible-pointer-types-discards-qualifiers"
+
 int fdt_check_header(const void *fdt)
 {
 	if (fdt_magic(fdt) == FDT_MAGIC) {
