@@ -29,6 +29,9 @@
 #include <nautilus/thread.h>
 #include <nautilus/mm.h>
 
+#ifdef NAUT_CONFIG_XCALL_SUPPORT
+#include <nautilus/xcall.h>
+#endif
 
 #ifndef NAUT_CONFIG_DEBUG_BARRIER
 #undef DEBUG_PRINT
@@ -235,11 +238,17 @@ nk_core_barrier_raise (void)
                 continue;
             }
 
-            if (smp_xcall(i,
+            if (
+#ifdef NAUT_CONFIG_XCALL_SUPPORT
+                smp_xcall(i,
                         barrier_xcall_handler,
                         NULL, // no need for args
                         0)    // blocking would be catastrophic here
-                    != 0) {
+                    != 0
+#else
+                    1
+#endif
+                    ) {
                 ERROR_PRINT("Could not force cpu %u to wait at barrier\n", i);
                 return -EINVAL;
             }

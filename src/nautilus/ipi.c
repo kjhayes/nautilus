@@ -10,6 +10,7 @@
 #define IPI_DEBUG(fmt, args...) DEBUG_PRINT("[IPI] " fmt, ##args)
 #define IPI_PRINT(fmt, args...) printk("[IPI] " fmt, ##args)
 
+#ifdef NAUT_CONFIG_IPI_STRESS
 struct stress_state {
   int stressing;
   int running;
@@ -165,7 +166,7 @@ static int handle_clear_spam_ipi(char * buf, void * priv)
   printk("Cleared IPI spamming state of CPU %d\n", from_n);
   return 0;
 }
-
+#endif
 
 
 static int
@@ -234,6 +235,7 @@ static struct shell_cmd_impl send_ipi_impl = {
 };
 nk_register_shell_cmd(send_ipi_impl);
 
+#ifdef NAUT_CONFIG_STRESS_IPI
 static struct shell_cmd_impl spam_ipi_impl = {
     .cmd      = "spamipi",
     .help_str = "spamipi [IPI] [TO] [FROM]",
@@ -247,5 +249,5 @@ static struct shell_cmd_impl clear_spam_ipi_impl = {
     .handler  = handle_clear_spam_ipi,   
 };
 nk_register_shell_cmd(clear_spam_ipi_impl);
-
+#endif
 

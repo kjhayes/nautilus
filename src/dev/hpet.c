@@ -338,7 +338,3 @@ nk_hpet_init (void)
     return 0;
 }
 
-
-
-
-

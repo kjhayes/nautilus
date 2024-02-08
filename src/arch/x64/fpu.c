@@ -25,9 +25,9 @@
 #include <nautilus/printk.h>
 #include <nautilus/fpu.h>
 #include <nautilus/cpu.h>
-#include <nautilus/cpuid.h>
 #include <nautilus/smp.h>
 
+#include <arch/x64/cpuid.h>
 #include <arch/x64/idt.h>
 #include <arch/x64/msr.h>
 #include <arch/x64/irq.h>

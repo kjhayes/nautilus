@@ -21,8 +21,8 @@
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
 #include <nautilus/nautilus.h>
-#include <nautilus/cpuid.h>
 #include <nautilus/mwait.h>
+#include <arch/x64/cpuid.h>
 
 
 static struct mwait_info {

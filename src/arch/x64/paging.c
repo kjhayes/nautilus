@@ -26,7 +26,6 @@
 #include <nautilus/mb_utils.h>
 #include <nautilus/cpu.h>
 #include <nautilus/errno.h>
-#include <nautilus/cpuid.h>
 #include <nautilus/backtrace.h>
 #include <nautilus/macros.h>
 #include <nautilus/naut_assert.h>
@@ -34,6 +33,10 @@
 #include <nautilus/mm.h>
 #include <lib/bitmap.h>
 #include <nautilus/percpu.h>
+
+#include <arch/x64/idt.h>
+
+#include <arch/x64/cpuid.h>
 
 #ifdef NAUT_CONFIG_XEON_PHI
 #include <nautilus/sfi.h>

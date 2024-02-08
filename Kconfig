@@ -1942,6 +1942,12 @@ config HAS_CONTIGUOUS_CPU_ID
     help
       cpu_id_t values are all contiguous for this architecture
 
+config XCALL_SUPPORT
+    def_bool y
+    help
+      Just leaving this in for now until RISC-V and ARM64 both nicely wrap the xcall framework,
+      once both support it, this should be removed.
+
 # FDT
 config USE_FDT
     def_bool n

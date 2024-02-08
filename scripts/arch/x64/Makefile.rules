@@ -16,18 +16,18 @@ isoimage: $(NAUT_ISO) FORCE
 
 $(NAUT_SYM): $(NAUT_BIN)
 	$(call quiet_cmd,GENSYMS,$@)
-	$(Q)$(GENSYMS) $(NAUT_SYM) tmp.sym
+	$(Q)$(GENSYMS) $(NAUT_BIN) tmp.sym
 
 $(NAUT_SEC): $(NAUT_BIN)
 	$(call quiet_cmd,GENSECS,$@)
-	$(Q)$(GENSECS) $(NAUT_SEC) tmp.sec
+	$(Q)$(GENSECS) $(NAUT_BIN) tmp.sec
 
 $(NAUT_ISO): $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC)
 	$(call quiet_cmd,MKISO,$@)
 	$(Q)mkdir -p .iso/boot/grub
 	$(Q)cp configs/grub.cfg .iso/boot/grub
 	$(Q)cp $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC) .iso/boot
-	$(Q)$(GRUBMKRESCUE) -o $(NAUT_ISO) .iso
+	$(Q)$(GRUBMKRESCUE) -o $(NAUT_ISO) .iso >/dev/null 2>&1
 	$(Q)rm -rf .iso
 
 DEFAULT_RULES += $(NAUT_ISO)

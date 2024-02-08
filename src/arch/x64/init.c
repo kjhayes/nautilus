@@ -26,13 +26,14 @@
 #include <arch/x64/irq.h>
 #include <arch/x64/msr.h>
 #include <arch/x64/mtrr.h>
+#include <arch/x64/cpuid.h>
+#include <arch/x64/smp.h>
 
 #include <nautilus/nautilus.h>
 #include <nautilus/paging.h>
 #include <nautilus/spinlock.h>
 #include <nautilus/mb_utils.h>
 #include <nautilus/cpu.h>
-#include <nautilus/cpuid.h>
 #include <nautilus/smp.h>
 #include <nautilus/interrupt.h>
 #include <nautilus/thread.h>
@@ -64,6 +65,7 @@
 #include <nautilus/blkdev.h>
 #include <nautilus/netdev.h>
 #include <nautilus/gpudev.h>
+#include <nautilus/gpiodev.h>
 #include <nautilus/fs.h>
 #include <nautilus/loader.h>
 #include <nautilus/linker.h>
@@ -555,7 +557,6 @@ init (unsigned long mbd,
 
     /* interrupts are now on */
 
-    nk_dump_irq_info();
     nk_vc_init();
 
     

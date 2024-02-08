@@ -21,8 +21,6 @@
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
 #include <nautilus/nautilus.h>
-#include <nautilus/cpu.h>
-#include <nautilus/cpuid.h>
 #include <nautilus/percpu.h>
 #include <nautilus/naut_types.h>
 #include <nautilus/naut_string.h>
@@ -31,9 +29,9 @@
 #include <nautilus/topo.h>
 #include <dev/i8254.h>
 
-#ifdef NAUT_CONFIG_ARCH_X86
+#include <arch/x64/cpuid.h>
 #include <arch/x64/irq.h>
-#endif
+#include <arch/x64/cpu.h>
 
 static int
 get_vendor_string (char name[13])

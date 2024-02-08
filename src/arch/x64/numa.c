@@ -26,6 +26,9 @@
 #include <nautilus/macros.h>
 #include <nautilus/errno.h>
 #include <nautilus/acpi.h>
+#include <nautilus/math.h>
+
+#include <arch/x64/cpuid.h>
 
 #define u8  uint8_t
 #define u16 uint16_t
@@ -42,6 +45,338 @@ static int srat_rev;
 #define NUMA_PRINT(fmt, args...) printk("NUMA: " fmt, ##args)
 #define NUMA_DEBUG(fmt, args...) DEBUG_PRINT("NUMA: " fmt, ##args)
 #define NUMA_ERROR(fmt, args...) ERROR_PRINT("NUMA: " fmt, ##args)
+#define NUMA_WARN(fmt, args...)  WARN_PRINT("NUMA: " fmt, ##args)
+
+
+static inline uint32_t 
+next_pow2 (uint32_t v)
+{
+    v--;
+    v |= v>>1;
+    v |= v>>2;
+    v |= v>>4;
+    v |= v>>8;
+    return ++v;
+}
+
+/* logical processor count */
+static uint8_t
+get_max_id_per_pkg (void)
+{
+    cpuid_ret_t ret;
+    cpuid(1, &ret);
+    return ((ret.b >> 16) & 0xff);
+}
+
+
+static uint8_t
+amd_get_cmplegacy (void)
+{
+    cpuid_ret_t ret;
+    cpuid(CPUID_AMD_FEATURE_INFO, &ret);
+    return ret.c & 0x2;
+}
+
+static uint8_t
+has_leafb (void)
+{
+    cpuid_ret_t ret;
+    cpuid_sub(11, 0, &ret);
+    return (ret.b != 0);
+}
+
+static uint8_t 
+has_htt (void)
+{
+    cpuid_ret_t ret;
+    cpuid(1, &ret);
+    return !!(ret.d & (1<<28));
+}
+
+
+static void
+intel_probe_with_leafb (struct nk_topo_params *tp)
+{
+	cpuid_ret_t ret;
+	unsigned subleaf = 0;
+	unsigned level_width = 0;
+	uint8_t level_type = 0;
+	uint8_t found_core = 0;
+	uint8_t found_smt = 0;
+
+	// iterate through the 0xb subleafs until EBX == 0
+	do {
+		cpuid_sub(0xb, subleaf, &ret);
+		
+		// this is an invalid subleaf
+		if ((ret.b & 0xffff) == 0) 
+			break;
+
+		level_type  = (ret.c >> 8) & 0xffff;
+		level_width = ret.a & 0xf;
+
+		switch (level_type) {
+			case 0x1: // level type is SMT, which means level_width holds the SMT mask width
+				NUMA_DEBUG("Found smt mask width: %d\n", level_width);
+				tp->smt_mask_width = level_width;
+				tp->smt_select_mask = ~(0xffffffff << tp->smt_mask_width);
+				found_smt = 1;
+				break;
+			case 0x2: // level type is SMT + core, which means level_width holds the width of both
+				NUMA_DEBUG("Found smt + core mask width: %d\n", level_width);
+				found_core = 1;
+				break;
+			default:
+				break;
+		}
+		subleaf++;
+	} while (1);
+
+	tp->core_plus_mask_width = level_width;
+	tp->core_plus_select_mask = ~(0xffffffff << tp->core_plus_mask_width);
+	tp->pkg_select_mask_width = level_width;
+	tp->pkg_select_mask = 0xffffffff ^ tp->core_plus_select_mask;
+
+	if (found_smt && found_core)
+		tp->core_only_select_mask = tp->core_plus_select_mask ^ tp->smt_select_mask;
+	else 
+		NUMA_WARN("Strange Intel hardware topology detected\n");
+}
+
+static void
+intel_probe_with_leaves14 (struct nk_topo_params * tp)
+{
+    cpuid_ret_t ret;
+    if (cpuid_leaf_max() >= 0x4) {
+        NUMA_DEBUG("Intel probing topo with leaves 1 and 4\n");
+        cpuid(1, &ret);
+        uint32_t first = next_pow2((ret.b >> 16) & 0xff);
+        cpuid_sub(4, 0, &ret);
+        uint32_t second = ((ret.a >> 26) & 0xfff) + 1;
+        tp->smt_mask_width = ilog2(first/second);
+        tp->smt_select_mask = ~(0xffffffff << tp->smt_mask_width);
+        uint32_t core_only_mask_width = ilog2(second);
+        tp->core_only_select_mask = (~(0xffffffff << (core_only_mask_width + tp->smt_mask_width))) ^ tp->smt_select_mask;
+        tp->core_plus_mask_width = core_only_mask_width + tp->smt_mask_width;
+        tp->pkg_select_mask = 0xffffffff << tp->core_plus_mask_width;
+    } else { 
+        NUMA_ERROR("SHOULDN'T GET HERE!\n");
+    }
+}
+
+static void
+amd_get_topo_legacy (struct nk_topo_params * tp)
+{
+    cpuid_ret_t ret;
+    uint32_t coreidsize;
+
+    cpuid(0x80000008, &ret);
+
+    coreidsize = (ret.c >> 12) & 0xf;
+
+    if (!coreidsize) 
+        tp->max_ncores = (ret.c & 0xff) + 1;
+    else
+        tp->max_ncores = 1 << coreidsize;
+
+    tp->max_nthreads = 1;
+}
+
+
+static void
+amd_get_topo_secondary (struct nk_topo_params * tp)
+{
+    cpuid_ret_t ret;
+    uint32_t largest_extid;
+    uint8_t has_x2;
+
+    NUMA_DEBUG("Attempting AMD topo probe\n");
+
+    cpuid(0x80000000, &ret);
+    largest_extid = ret.a;
+
+    cpuid(0x1, &ret);
+    has_x2 = (ret.c >> 21) & 1;
+
+
+    cpuid(0x80000001, &ret);
+    tp->has_topoext = (ret.c >> 22) & 1;
+
+    if (largest_extid >= 0x80000008 && !has_x2) 
+        amd_get_topo_legacy(tp);
+
+}
+
+
+static void 
+intel_get_topo_secondary (struct nk_topo_params * tp)
+{
+	if (cpuid_leaf_max() >= 0xb && has_leafb()) {
+		intel_probe_with_leafb(tp);
+	}  else {
+		intel_probe_with_leaves14(tp);
+	}
+}
+
+
+static void
+intel_get_topo_params (struct nk_topo_params * tp)
+{
+    if (has_htt()) {
+        intel_get_topo_secondary(tp);
+    } else {
+        NUMA_DEBUG("No HTT support, using default values\n");
+        /* no HTT support, 1 core per package */
+        tp->core_only_select_mask = 0;
+        tp->smt_mask_width = 0;
+        tp->smt_select_mask = 0;
+        tp->pkg_select_mask = 0xffffffff;
+        tp->pkg_select_mask_width = 0;
+    }
+
+    NUMA_DEBUG("Finished Intel topo probe...\n");
+    NUMA_DEBUG("\tsmt_mask_width=%d\n", tp->smt_mask_width);
+    NUMA_DEBUG("\tsmt_select_mask=0x%x\n", tp->smt_select_mask);
+    NUMA_DEBUG("\tcore_plus_mask_width=%d\n", tp->core_plus_mask_width);
+    NUMA_DEBUG("\tcore_only_select_mask=0x%x\n", tp->core_only_select_mask);
+    NUMA_DEBUG("\tcore_plus_select_mask=0x%x\n", tp->core_plus_select_mask);
+    NUMA_DEBUG("\tpkg_select_mask_width=%d\n", tp->pkg_select_mask_width);
+    NUMA_DEBUG("\tpkg_select_mask=0x%x\n", tp->pkg_select_mask);
+
+}
+
+static void
+amd_get_topo_params (struct nk_topo_params * tp)
+{
+    amd_get_topo_secondary(tp);
+}
+
+
+static void
+get_topo_params (struct nk_topo_params * tp)
+{
+    if (nk_is_intel()) {
+		intel_get_topo_params(tp);
+	} else {
+		amd_get_topo_params(tp);
+    }
+}
+
+
+static void
+assign_core_coords_intel (struct cpu * me, struct nk_cpu_coords * coord, struct nk_topo_params *tp)
+{
+	uint32_t my_apic_id;
+
+	/* 
+	 * use the x2APIC ID if it's supported 
+	 * and this is the right environment
+	 */
+	if (cpuid_leaf_max() >= 0xb && has_leafb()) {
+		cpuid_ret_t ret;
+		cpuid_sub(0xb, 0, &ret);
+		NUMA_DEBUG("Using x2APIC for ID\n");
+		my_apic_id = ret.d;
+	} else {
+        cpuid_ret_t ret;
+        cpuid_sub(0x1, 0, &ret);
+        my_apic_id = ret.b >> 24;
+		my_apic_id = apic_get_id(per_cpu_get(apic));
+	}
+
+    coord->smt_id  = my_apic_id & tp->smt_select_mask;
+    coord->core_id = (my_apic_id & tp->core_only_select_mask) >> tp->smt_mask_width;
+    coord->pkg_id  = (my_apic_id & tp->pkg_select_mask) >> tp->core_plus_mask_width;
+}
+
+
+static void
+assign_core_coords_amd (struct cpu * me, struct nk_cpu_coords * coord, struct nk_topo_params *tp)
+{
+    uint32_t my_apic_id = apic_get_id(per_cpu_get(apic));
+
+    if (tp->has_topoext) {
+        cpuid_ret_t ret;
+        cpuid(0x8000001e, &ret);
+
+        // compute unit is a physical processor (or a CMT core)
+        // A "Compute Unit Core" is our equivalent of an SMT thread.
+        int cores_per_cu = ((ret.b >> 8) & 0x3) + 1;
+        int cu_id = ret.b & 0xff;
+
+        coord->smt_id  = my_apic_id % cores_per_cu;
+        coord->core_id = cu_id;
+        // "Node" is a package (die). On MCM systems we can
+        // have more than one die (package) in a processor (socket).
+        // TODO: we are not guaranteed to get linear numbering here
+        // for package IDs
+        coord->pkg_id  = (uint32_t)(ret.c & 0xff);
+    } else {
+        uint32_t logprocid = (tp->max_ncores !=0) ? my_apic_id % tp->max_ncores : 0;
+        coord->smt_id  = (tp->max_nthreads != 0) ? (my_apic_id % tp->max_nthreads) : 0;
+        coord->core_id = (tp->max_nthreads != 0) ? (logprocid / tp->max_nthreads) : 0;
+        coord->pkg_id  = (tp->max_ncores != 0) ? (my_apic_id / tp->max_ncores) : 0;
+    }
+}
+
+static void 
+assign_core_coords (struct cpu * me, struct nk_cpu_coords * coord, struct nk_topo_params *tp)
+{
+
+	/* 
+	 * use the x2APIC ID if it's supported 
+	 * and this is the right environment
+	 */
+	if (nk_is_intel())
+		assign_core_coords_intel(me, coord, tp);
+	else
+		assign_core_coords_amd(me, coord, tp);
+
+    NUMA_DEBUG("Core OS ID: %u:\n", me->id);
+    NUMA_DEBUG("\tLogical Core ID:  %u\n", coord->smt_id);
+    NUMA_DEBUG("\tPhysical Core ID: %u\n", coord->core_id);
+    NUMA_DEBUG("\tPhysical Package ID: %u\n", coord->pkg_id);
+}
+
+/* 
+ *
+ * to be called by all cores
+ *
+ */
+int
+nk_cpu_topo_discover (struct cpu * me)
+{
+    struct nk_cpu_coords * coord = NULL;
+    struct nk_topo_params * tp = NULL;
+
+    coord = (struct nk_cpu_coords*)malloc(sizeof(struct nk_cpu_coords));
+    if (!coord) {
+        NUMA_ERROR("Could not allocate coord struct for CPU %u\n", my_cpu_id());
+        return -1;
+    }
+    memset(coord, 0, sizeof(struct nk_cpu_coords));
+
+    tp = (struct nk_topo_params*)malloc(sizeof(struct nk_topo_params));
+    if (!tp) {
+        NUMA_ERROR("Could not allocate param struct for CPU %u\n", my_cpu_id());
+        goto out_err;
+    }
+    memset(tp, 0, sizeof(struct nk_topo_params));
+
+    get_topo_params(tp);
+
+    /* now we can determine the CPU coordinates */
+    assign_core_coords(me, coord, tp);
+
+    me->tp    = tp;
+    me->coord = coord;
+
+    return 0;
+
+out_err:
+    free(coord);
+    return -1;
+}
 
 static void 
 acpi_table_print_srat_entry (struct acpi_subtable_header * header)

@@ -146,7 +146,7 @@
  * Peter Dinda 2017
  */
 
-#define isdigit(d) ((d) >= '0' && (d) <= '9')
+//#define isdigit(d) ((d) >= '0' && (d) <= '9')
 #define Ctod(c) ((c) - '0')
 
 #define MAXBUF (sizeof(long int) * 8)		 /* enough for binary */

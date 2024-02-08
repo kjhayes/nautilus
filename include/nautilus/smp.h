@@ -40,10 +40,12 @@ uint32_t nk_get_num_cpus (void);
 #include <nautilus/mm.h>
 #include <nautilus/queue.h>
 
+#ifdef NAUT_CONFIG_XCALL_SUPPORT
+#include <nautilus/xcall.h>
+#endif
+
 #ifdef NAUT_CONFIG_ARCH_X86
-
 #include <dev/apic.h>
-
 #ifdef NAUT_CONFIG_USE_IST
 #include <arch/x86/gdt.h>
 #endif
@@ -59,15 +61,6 @@ struct nk_thread;
 
 //typedef struct nk_wait_queue nk_wait_queue_t;
 //typedef struct nk_thread nk_thread_t;
-typedef void (*nk_xcall_func_t)(void * arg);
-
-struct nk_xcall {
-    nk_queue_entry_t xcall_node;
-    void * data;
-    nk_xcall_func_t fun;
-    uint8_t xcall_done;
-    uint8_t has_waiter;
-};
 
 
 #ifdef NAUT_CONFIG_PROFILE
@@ -150,8 +143,10 @@ struct cpu {
 
     struct nk_sched_percpu_state *sched_state;
 
+#ifdef NAUT_CONFIG_XCALL_SUPPORT
     nk_queue_t * xcall_q;
     struct nk_xcall xcall_nowait_info;
+#endif
 
     ulong_t cpu_khz; 
     
@@ -219,7 +214,9 @@ static inline void dump_cpu(struct cpu *cpu) {
   PF(system, "%p");
   PF(lock, "%u");
   PF(sched_state, "%p");
+#ifdef NAUT_CONFIG_XCALL_SUPPORT
   PF(xcall_q, "%p");
+#endif
   PF(cpu_khz, "0x%u");
   PF(tp, "%p");
   PF(coord, "%p");
@@ -234,11 +231,6 @@ static inline void dump_cpu(struct cpu *cpu) {
 #endif
 #undef PF
 }
-
-struct nk_irq_action;
-struct nk_regs;
-int xcall_handler(struct nk_irq_action *, struct nk_regs *, void *);
-int smp_xcall(cpu_id_t cpu_id, nk_xcall_func_t fun, void * arg, uint8_t wait);
 
 #ifdef __cplusplus
 }

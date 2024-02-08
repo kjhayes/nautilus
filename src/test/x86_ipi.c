@@ -30,6 +30,7 @@
 #include <nautilus/fprintk.h>
 #include <nautilus/shell.h>
 #include <nautilus/getopt.h>
+#include <nautilus/interrupt.h>
 #include <dev/apic.h>
 #include <test/test.h>
 #include <test/ipi.h>

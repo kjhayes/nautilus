@@ -23,9 +23,9 @@
 
 #include <nautilus/nautilus.h>
 #include <nautilus/smp.h>
-#include <nautilus/cpuid.h>
 #include <nautilus/shell.h>
 
+#include <arch/x64/cpuid.h>
 #include <arch/x64/mtrr.h>
 #include <arch/x64/msr.h>
 

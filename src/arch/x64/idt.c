@@ -217,7 +217,7 @@ reserved_irq_handler (struct nk_irq_action * action,
 static int
 df_handler (struct nk_irq_action * action,
             struct nk_regs *regs,
-            addr_t unused)
+            void *unused)
 {
     panic("DOUBLE FAULT. Dying.\n");
     return 0;
@@ -227,7 +227,7 @@ df_handler (struct nk_irq_action * action,
 static int
 pic_spur_int_handler (struct nk_irq_action * action,
                       struct nk_regs *regs,
-                      addr_t unused)
+                      void *unused)
 {
     WARN_PRINT("Received Spurious interrupt from PIC\n");
     // No EOI should be done for a spurious interrupt

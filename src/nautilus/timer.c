@@ -34,6 +34,10 @@
 #include <nautilus/shell.h>
 #include <nautilus/atomic.h>
 
+#ifdef NAUT_CONFIG_XCALL_SUPPORT
+#include <nautilus/xcall.h>
+#endif
+
 #include <stddef.h>
 
 
@@ -403,23 +407,27 @@ uint64_t nk_timer_handler (void)
 	    int wait = !!(cur->flags & NK_TIMER_CALLBACK_WAIT);
 	    
 	    if (cur->cpu == NK_TIMER_CALLBACK_ALL_CPUS) {
-		min_cpu = 0;
-		max_cpu = nk_get_num_cpus() - 1;
+		  min_cpu = 0;
+		  max_cpu = nk_get_num_cpus() - 1;
 	    } else {
-		min_cpu = cur->cpu;
-		max_cpu = cur->cpu;
+		  min_cpu = cur->cpu;
+		  max_cpu = cur->cpu;
 	    }
 	    
-	    for (cur_cpu=min_cpu; cur_cpu<= max_cpu; cur_cpu++) {
-		
-		if ((cur_cpu == my_cpu) && (cur->flags & NK_TIMER_CALLBACK_LOCAL_SYNC)) {
+	    for (cur_cpu=min_cpu; cur_cpu<= max_cpu; cur_cpu++) 
+        {	
+		  if ((cur_cpu == my_cpu) && (cur->flags & NK_TIMER_CALLBACK_LOCAL_SYNC)) {
 		    cur->callback(cur->priv);
-		} else {
+		  } else {
+#ifdef NAUT_CONFIG_XCALL_SUPPORT
 		    smp_xcall(cur_cpu,
 			      cur->callback,
 			      cur->priv,
 			      wait);
-		}
+#else
+            ERROR("Cannot place xcall during NK_TIMER_CALLBACK_ALL_CPUS handling without NAUT_CONFIG_XCALL_SUPPORT set!\n");
+#endif
+		  }
 	    }
 	} else {
 	    ERROR("unsupported 0x%lx\n", cur->flags);

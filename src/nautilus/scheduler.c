@@ -57,7 +57,6 @@
 #include <nautilus/timer.h>
 #include <nautilus/scheduler.h>
 #include <nautilus/cpu.h>
-#include <nautilus/cpuid.h>
 #include <nautilus/random.h>
 #include <nautilus/backtrace.h>
 #include <nautilus/shell.h>

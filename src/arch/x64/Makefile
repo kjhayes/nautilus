@@ -9,10 +9,14 @@ obj-y += asm/ \
 		arch.o \
 		irq.o \
 		fpu.o \
-                idt.o \
-                msr.o \
-                mtrr.o \
-                cpuid.o \
-                thread.o
+        idt.o \
+        msr.o \
+        mtrr.o \
+        cpuid.o \
+        thread.o \
+		cpu.o \
+		smp.o \
+		paging.o \
+		pmc.o
 
 obj-$(NAUT_CONFIG_REAL_MODE_INTERFACE) += realmode.o

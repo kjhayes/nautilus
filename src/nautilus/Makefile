@@ -31,7 +31,6 @@ obj-y += \
 	group_sched.o \
 	barrier.o \
 	backtrace.o \
-	cpu.o \
 	env.o \
 	setjmp.o \
 	mm/ \
@@ -50,17 +49,15 @@ obj-y += \
 	cmdline.o \
 	lru_cache.o \
 	ipi.o \
-	iomap.o
+	iomap.o \
+	xcall.o
 
 obj-$(NAUT_CONFIG_ARCH_X86) += \
 	mb_utils.o \
-	paging.o \
 	ticketlock.o \
-	cpu.o \
 	acpi.o \
 	numa.o \
 	nemo.o \
-	pmc.o \
 	setjmp.o \
 	prog.o \
 

@@ -20,7 +20,8 @@
  * This is free software.  You are permitted to use,
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
-#ifdef __CPU_H__
+#ifndef __X64_CPU_H__
+#define __X64_CPU_H__
 
 ulong_t nk_detect_cpu_freq(uint32_t);
 uint8_t nk_is_amd(void);

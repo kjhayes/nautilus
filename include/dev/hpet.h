@@ -27,8 +27,8 @@
 #include <nautilus/bits.h>
 
 int nk_hpet_init(void);
-inline uint64_t nk_hpet_get_freq(void);
-inline uint64_t nk_hpet_get_cntr(void);
+//inline uint64_t nk_hpet_get_freq(void);
+//inline uint64_t nk_hpet_get_cntr(void);
 
 #define HPET_GEN_CAP_ID_REG   0x00
 #define HPET_GEN_CFG_REG      0x10

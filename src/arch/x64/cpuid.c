@@ -20,8 +20,10 @@
  * This is free software.  You are permitted to use,
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
+
+#include <arch/x64/cpuid.h>
+
 #include <nautilus/nautilus.h>
-#include <nautilus/cpuid.h>
 #include <nautilus/naut_string.h>
 #include <nautilus/shell.h>
 
