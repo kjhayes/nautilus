@@ -1076,6 +1076,7 @@ menu "Debugging"
     config PROVENANCE
       bool "Enable Runtime Provenance Information"
       default n
+      depends on USE_MULTIBOOT
       help
         This will enable runtime provenance (debug) information. If this is
         disabled, it will not be generated

@@ -25,7 +25,6 @@
 #define __MB_UTIL_H__
 #include <nautilus/naut_types.h>
 #include <nautilus/list.h>
-#include <nautilus/paging.h>
 #include <nautilus/multiboot2.h>
 
 

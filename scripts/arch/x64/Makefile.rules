@@ -9,18 +9,41 @@ GENSYMS := $(ARCH_SCRIPTS_DIR)/gen_sym_file.sh
 GENSECS := $(ARCH_SCRIPTS_DIR)/gen_sec_file.sh
 
 NAUT_ISO := $(OUTPUT_DIR)/nautilus.iso
+
+# KJH - I really want to avoid needing to worry about
+#       HOSTCC's at all because it makes cross compilation
+#       more easy to mess up, not a big deal though
+#       (If someone wants to rewrite format_syms/format_secs 
+#        in python though be my guest)
+HOSTCC := gcc
+
+ifdef NAUT_CONFIG_PROVENANCE
+FORMAT_SYMS := $(ARCH_SCRIPTS_DIR)/format_syms
+FORMAT_SECS := $(ARCH_SCRIPTS_DIR)/format_secs
 NAUT_SYM := $(OUTPUT_DIR)/nautilus.syms
 NAUT_SEC := $(OUTPUT_DIR)/nautilus.secs
+endif
 
 isoimage: $(NAUT_ISO) FORCE
 
-$(NAUT_SYM): $(NAUT_BIN)
+ifdef NAUT_CONFIG_PROVENANCE
+
+$(FORMAT_SYMS): $(ARCH_SCRIPTS_DIR)/format_syms.c
+	$(call quiet_cmd,HOSTCC,$@)
+	$(Q)$(HOSTCC) $^ -o $@
+
+$(FORMAT_SECS): $(ARCH_SCRIPTS_DIR)/format_secs.c
+	$(call quiet_cmd,HOSTCC,$@)
+	$(Q)$(HOSTCC) $^ -o $@
+
+$(NAUT_SYM): $(FORMAT_SYMS) $(NAUT_BIN)
 	$(call quiet_cmd,GENSYMS,$@)
 	$(Q)$(GENSYMS) $(NAUT_BIN) tmp.sym
 
-$(NAUT_SEC): $(NAUT_BIN)
+$(NAUT_SEC): $(FORMAT_SECS) $(NAUT_BIN)
 	$(call quiet_cmd,GENSECS,$@)
 	$(Q)$(GENSECS) $(NAUT_BIN) tmp.sec
+endif
 
 $(NAUT_ISO): $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC)
 	$(call quiet_cmd,MKISO,$@)
