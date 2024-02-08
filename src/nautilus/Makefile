@@ -50,7 +50,8 @@ obj-y += \
 	lru_cache.o \
 	ipi.o \
 	iomap.o \
-	xcall.o
+	xcall.o \
+	topo.o
 
 obj-$(NAUT_CONFIG_ARCH_X86) += \
 	mb_utils.o \

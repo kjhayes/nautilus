@@ -29,7 +29,7 @@ int smp_init_tpidr(void)
 
   extern struct naut_info nautilus_info;
   
-  struct cpu *cpu;
+  struct cpu *cpu = NULL;
   for(int i = 0; i < nautilus_info.sys.num_cpus; i++) 
   {
     struct cpu *cur = nautilus_info.sys.cpus[i];
@@ -48,7 +48,7 @@ int smp_init_tpidr(void)
     return 1;
   }
 
-  STORE_SYS_REG(TPIDR_EL1, (uint64_t)(void*)cpu);
+  STORE_SYS_REG(TPIDR_EL1, (uintptr_t)cpu);
   return 0;
 }
 

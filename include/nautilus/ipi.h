@@ -6,6 +6,7 @@
 #include<nautilus/timer.h>
 #include<nautilus/thread.h>
 
+#ifdef NAUT_CONFIG_IPI_STRESS
 int ipi_stress_init(void);
 int set_ipi_stress(cpu_id_t from, cpu_id_t to, nk_irq_t ipi, uint64_t delay);
 int clear_ipi_stress(cpu_id_t stressor, uint64_t *num_sent);
@@ -64,5 +65,6 @@ static inline void end_ipi_stress_test(cpu_id_t cpu)
 
   preempt_enable();
 }
+#endif
 
 #endif

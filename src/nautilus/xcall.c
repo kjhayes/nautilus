@@ -206,8 +206,10 @@ smp_xcall (cpu_id_t cpu_id,
 
         irq_enable_restore(flags);
 
+        /*
         struct apic_dev * apic = per_cpu_get(apic);
         apic_ipi(apic, sys->cpus[cpu_id]->apic->id, IPI_VEC_XCALL);
+        */
 
         if (wait) {
             wait_xcall(xc);

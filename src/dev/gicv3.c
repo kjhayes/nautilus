@@ -446,7 +446,7 @@ static int gicr_v3_dev_revmap(void *state, nk_hwirq_t hwirq, nk_irq_t *irq)
   return gicd_v3_dev_revmap((void*)gicr->gicd, hwirq, irq);
 }
 
-static int gicv3_translate_of_irq(struct gicd_v3 *gicd, uint32_t *raw, nk_hwirq_t *out) 
+static int gicv3_translate_of_irq(struct gicd_v3 *gicd, const uint32_t *raw, nk_hwirq_t *out) 
 {
   if(gicd->interrupt_cells < 3) {
     GIC_DEBUG("Could not translate GICv3 IRQ with #interrupt-cells = %u!\n", gicd->interrupt_cells);
@@ -467,7 +467,7 @@ static int gicv3_translate_of_irq(struct gicd_v3 *gicd, uint32_t *raw, nk_hwirq_
   return 0;
 }
 
-static int gicd_v3_dev_translate(void *state, nk_dev_info_type_t type, void *raw, nk_hwirq_t *out) 
+static int gicd_v3_dev_translate(void *state, nk_dev_info_type_t type, const void *raw, nk_hwirq_t *out) 
 {
   struct gicd_v3 *gicd = (struct gicd_v3*)state;
 
@@ -480,7 +480,7 @@ static int gicd_v3_dev_translate(void *state, nk_dev_info_type_t type, void *raw
   }
 }
 
-static int gicr_v3_dev_translate(void *state, nk_dev_info_type_t type, void *raw, nk_hwirq_t *out) 
+static int gicr_v3_dev_translate(void *state, nk_dev_info_type_t type, const void *raw, nk_hwirq_t *out) 
 {
   GIC_WARN("Using GICR device to translate interrupts (shouldn't be happening but recoverable)\n");
   struct gicr_v3 *gicr = (struct gicr_v3*)state;
@@ -696,7 +696,7 @@ static int gicv3_init_dev_info(struct nk_dev_info *info)
     // Required register blocks
     gicd->dist_size = (uint64_t)reg_sizes[0];
     gicd->dist_base = (uint64_t)nk_io_map(reg_bases[0], gicd->dist_size, 0);
-    if(gicd->dist_base == NULL) {
+    if((void*)gicd->dist_base == NULL) {
       GIC_ERROR("Failed to map GICD register region!\n");
       goto err_exit;
     }
@@ -705,7 +705,7 @@ static int gicv3_init_dev_info(struct nk_dev_info *info)
     for(int i = 1; i < 1+gicd->num_redist_regions; i++) {
       gicd->redist_sizes[i-1] = (uint64_t)reg_sizes[i];
       gicd->redist_bases[i-1] = (uint64_t)nk_io_map(reg_bases[i], reg_sizes[i], 0);
-      if(gicd->redist_bases[i-1] == NULL) {
+      if((void*)gicd->redist_bases[i-1] == NULL) {
         GIC_ERROR("Failed to map GICR%u register region!\n", i-1);
         goto err_exit;
       }

@@ -1,6 +1,7 @@
 #ifndef __GICV2_H__
 #define __GICV2_H__
 
+#include<nautilus/nautilus.h>
 #include<nautilus/naut_types.h>
 
 #ifndef NAUT_CONFIG_DEBUG_GIC

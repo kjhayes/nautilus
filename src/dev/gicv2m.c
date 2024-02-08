@@ -1,12 +1,12 @@
 
-#include<dev/gic.h>
-#include<dev/gicv2.h>
-#include<dev/gicv2m.h>
-
 #include<nautilus/endian.h>
 #include<nautilus/interrupt.h>
 #include<nautilus/of/dt.h>
 #include<nautilus/iomap.h>
+
+#include<dev/gic.h>
+#include<dev/gicv2.h>
+#include<dev/gicv2m.h>
 
 typedef union msi_type_reg {
   uint32_t raw;

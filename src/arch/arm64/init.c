@@ -286,7 +286,7 @@ extern void* _bssStart[];
 
 
 // The stack switch which happens halfway through "init" makes this needed
-static volatile const char *chardev_name = NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE_NAME;
+static const char *chardev_name = NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE_NAME;
 
 //#define ROCKCHIP
 
@@ -356,7 +356,9 @@ int rockchip_halt_and_flash(int val0, int val1, int fast) {
   return 0;
 }
 
+#ifdef NAUT_CONFIG_BEANDIP
 __attribute__((annotate("nohook")))
+#endif
 void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x3) {
 
   // Zero out .bss
@@ -549,7 +551,9 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
 
   INIT_PRINT("Interrupts are now enabled\n"); 
 
+#ifdef NAUT_CONFIG_IPI_STRESS
   ipi_stress_init();
+#endif
 
   INIT_DEBUG("Starting the virtual console...\n");
   nk_vc_init();

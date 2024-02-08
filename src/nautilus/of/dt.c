@@ -118,12 +118,12 @@ static struct dt_node *dt_node_get_interrupt_parent(struct dt_node *node)
  * Device Info Interface Functions
  */
 
-static char *dt_node_get_name(void *state) 
+static const char *dt_node_get_name(void *state) 
 {
   struct dt_node *node = (struct dt_node *)state;
 
   int lenp;
-  char *name = fdt_get_name(node->dtb, node->dtb_offset, &lenp);
+  const char *name = fdt_get_name(node->dtb, node->dtb_offset, &lenp);
 
   if(name == NULL || lenp < 0) {
     return NULL;
@@ -146,7 +146,7 @@ static int dt_node_read_int_array(void *state, const char *prop_name, int elem_s
 {
   struct dt_node *node = (struct dt_node *)state;
 
-  struct fdt_property *prop = fdt_get_property(node->dtb, node->dtb_offset, prop_name, NULL);
+  const struct fdt_property *prop = fdt_get_property(node->dtb, node->dtb_offset, prop_name, NULL);
 
   if(prop == NULL) {
     return -1;
@@ -172,7 +172,7 @@ static int dt_node_read_int_array(void *state, const char *prop_name, int elem_s
 
   return 0;
 }
-static int dt_node_read_string_array(void *state, const char *prop_name, char **buf, int *buf_count) 
+static int dt_node_read_string_array(void *state, const char *prop_name, const char **buf, int *buf_count) 
 {
   struct dt_node *node = (struct dt_node *)state;
 
@@ -187,7 +187,7 @@ static int dt_node_read_string_array(void *state, const char *prop_name, char **
   for(int i = 0; i < *buf_count; i++) 
   {
     int lenp;
-    char *str = fdt_stringlist_get(node->dtb, node->dtb_offset, prop_name, i, &lenp);
+    const char *str = fdt_stringlist_get(node->dtb, node->dtb_offset, prop_name, i, &lenp);
 
     if(lenp < 0) {
       return lenp;   
@@ -210,7 +210,7 @@ static struct nk_dev_info *dt_node_children_start(void *state)
   struct dt_node *node = (struct dt_node *)state; 
   return &(node->children->dev_info);
 }
-static struct nk_dev_info *dt_node_children_next(void *state, struct nk_dev_info *iter) 
+static struct nk_dev_info *dt_node_children_next(void *state, const struct nk_dev_info *iter) 
 {
   struct dt_node *node = (struct dt_node *)state;
   if(((struct dt_node *)iter->state)->siblings == node->children) {
@@ -258,7 +258,7 @@ static int dt_node_read_register_blocks(void *state, void **bases, int *sizes, i
   return 0;
 }
 
-static nk_irq_t dt_node_translate_irq_from_parent(struct dt_node *node, struct dt_node *interrupt_parent, void *raw_irq)
+static nk_irq_t dt_node_translate_irq_from_parent(struct dt_node *node, struct dt_node *interrupt_parent, const void *raw_irq)
 {
   if(!(interrupt_parent->dev_info.flags & NK_DEV_INFO_FLAG_HAS_DEVICE) || interrupt_parent->dev_info.dev == NULL)  {
     // It has an interrupt parent but it's driver hasn't been called yet
@@ -294,13 +294,13 @@ static nk_irq_t dt_node_translate_irq_from_parent(struct dt_node *node, struct d
 static int dt_node_cache_irq_ext_data(struct dt_node *node) 
 {
   int raw_len;
-  uint32_t *raw = fdt_getprop(node->dtb, node->dtb_offset, "interrupts-extended", &raw_len);
+  const uint32_t *raw = fdt_getprop(node->dtb, node->dtb_offset, "interrupts-extended", &raw_len);
 
   if(raw == NULL) {
     return -1;
   }
 
-  void *original_raw = raw;
+  const void *original_raw = raw;
   int raw_cells = raw_len / 4;
 
   uint32_t phandles[raw_cells];
@@ -308,7 +308,7 @@ static int dt_node_cache_irq_ext_data(struct dt_node *node)
 
   int num_irqs = 0;
 
-  void * raw_end = raw + raw_cells;
+  const uint32_t * raw_end = raw + raw_cells;
 
   while(raw < raw_end) {
     phandles[num_irqs] = be32toh(*raw);
@@ -323,7 +323,7 @@ static int dt_node_cache_irq_ext_data(struct dt_node *node)
     }
 
     int interrupt_cells_len = 0;
-    uint32_t *interrupt_cells_ptr = fdt_getprop(parent->dtb, parent->dtb_offset, "#interrupt-cells", &interrupt_cells_len);
+    const uint32_t *interrupt_cells_ptr = fdt_getprop(parent->dtb, parent->dtb_offset, "#interrupt-cells", &interrupt_cells_len);
 
     if(interrupt_cells_ptr == NULL) {
       ERROR("Could not get \"#interrupt-cells\" property from parent node in \"interrupts-extended\"!\n");
@@ -363,7 +363,7 @@ static nk_irq_t dt_node_read_interrupts_extended(struct dt_node *node, int index
   }
 
   int raw_len;
-  uint32_t *raw = fdt_getprop(node->dtb, node->dtb_offset, "interrupts-extended", &raw_len);
+  const uint32_t *raw = fdt_getprop(node->dtb, node->dtb_offset, "interrupts-extended", &raw_len);
 
   if(raw == NULL) {
     // Should not be possible but check anyways
@@ -371,7 +371,7 @@ static nk_irq_t dt_node_read_interrupts_extended(struct dt_node *node, int index
     return NK_NULL_IRQ;
   }
 
-  void *raw_irq = ((void*)raw) + node->extended_offsets[index]; 
+  const void *raw_irq = ((void*)raw) + node->extended_offsets[index]; 
   uint32_t parent_phandle = node->extended_parent_phandles[index];
 
   struct dt_node *interrupt_parent = dt_get_node_from_phandle(parent_phandle);
@@ -387,7 +387,7 @@ static nk_irq_t dt_node_read_interrupts_extended(struct dt_node *node, int index
 static int dt_node_cache_irq_data(struct dt_node *node)
 {
   int raw_irqs_len;
-  void *raw_irqs = fdt_getprop(node->dtb, node->dtb_offset, "interrupts", &raw_irqs_len);
+  const void *raw_irqs = fdt_getprop(node->dtb, node->dtb_offset, "interrupts", &raw_irqs_len);
 
   if(raw_irqs == NULL) {
     ERROR("DTB node is missing \"interrupts\" property!\n");
@@ -404,7 +404,7 @@ static int dt_node_cache_irq_data(struct dt_node *node)
   }
 
   int interrupt_cells_len = 0;
-  uint32_t *interrupt_cells_ptr = fdt_getprop(interrupt_parent->dtb, interrupt_parent->dtb_offset, "#interrupt-cells", &interrupt_cells_len);
+  const uint32_t *interrupt_cells_ptr = fdt_getprop(interrupt_parent->dtb, interrupt_parent->dtb_offset, "#interrupt-cells", &interrupt_cells_len);
 
   if(interrupt_cells_ptr == NULL) {
     ERROR("Could not read #interrupt-cells property from DTB interrupt parent node!\n");
@@ -439,7 +439,7 @@ static int dt_node_cache_irq_data(struct dt_node *node)
 static nk_irq_t dt_node_read_interrupts(struct dt_node *node, int index) 
 { 
   int raw_irqs_len;
-  void *raw_irqs = fdt_getprop(node->dtb, node->dtb_offset, "interrupts", &raw_irqs_len);
+  const void *raw_irqs = fdt_getprop(node->dtb, node->dtb_offset, "interrupts", &raw_irqs_len);
 
   if(raw_irqs == NULL) {
     ERROR("DTB node is missing \"interrupts\" property!\n");
@@ -467,7 +467,7 @@ static nk_irq_t dt_node_read_interrupts(struct dt_node *node, int index)
     return NK_NULL_IRQ;
   }
 
-  void *raw_irq = ((uint32_t*)raw_irqs) + (node->irq_cells * index);
+  const void *raw_irq = ((uint32_t*)raw_irqs) + (node->irq_cells * index);
 
   return dt_node_translate_irq_from_parent(node, interrupt_parent, raw_irq);
 }
@@ -499,7 +499,7 @@ static int dt_node_num_interrupts_extended(struct dt_node *node, int *num)
 static int dt_node_num_interrupts(struct dt_node *node, int *num) 
 {
   int raw_irqs_len;
-  void *raw_irqs = fdt_getprop(node->dtb, node->dtb_offset, "interrupts", &raw_irqs_len);
+  const void *raw_irqs = fdt_getprop(node->dtb, node->dtb_offset, "interrupts", &raw_irqs_len);
 
   if(raw_irqs == NULL) {
     ERROR("DTB node is missing \"interrupts\" property!\n");
@@ -516,7 +516,7 @@ static int dt_node_num_interrupts(struct dt_node *node, int *num)
   }
 
   int interrupt_cells_len;
-  uint32_t *interrupt_cells_ptr = fdt_getprop(interrupt_parent->dtb, interrupt_parent->dtb_offset, "#interrupt-cells", &interrupt_cells_len);
+  const uint32_t *interrupt_cells_ptr = fdt_getprop(interrupt_parent->dtb, interrupt_parent->dtb_offset, "#interrupt-cells", &interrupt_cells_len);
 
   if(interrupt_cells_ptr == NULL) {
     ERROR("Could not read #interrupt-cells property from DTB interrupt parent node!\n");
@@ -583,7 +583,7 @@ static int fdt_initialize_dt_node(void *fdt, int node_offset, struct dt_node *no
   }
 
   int lenp;
-  uint32_t *interrupt_parent_prop = fdt_getprop(fdt, node_offset, "interrupt-parent", &lenp);
+  const uint32_t *interrupt_parent_prop = fdt_getprop(fdt, node_offset, "interrupt-parent", &lenp);
 
   node->flags |= DT_NODE_FLAG_INT_PARENT_PHANDLE;
   if(interrupt_parent_prop != NULL && lenp == 4) {
@@ -684,7 +684,7 @@ int of_cleanup(void)
   return 0;
 }
 
-static int of_node_matches(struct dt_node *node, struct of_dev_id *id) {
+static int of_node_matches(struct dt_node *node, const struct of_dev_id *id) {
   if(id == NULL || node == NULL) 
   {
     return 0;

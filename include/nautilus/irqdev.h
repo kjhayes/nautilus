@@ -25,9 +25,9 @@ struct nk_irq_dev_int {
 
   int (*revmap)(void *state, nk_hwirq_t hwirq, nk_irq_t *irq);
 
-  int(*translate)(void *state, nk_dev_info_type_t type, void *raw_irq, nk_hwirq_t *out_hwirq);
+  int(*translate)(void *state, nk_dev_info_type_t type, const void *raw_irq, nk_hwirq_t *out_hwirq);
 
-  int(*send_ipi)(struct nk_irq_dev *d, nk_hwirq_t hwirq, cpu_id_t cpu);
+  int(*send_ipi)(void *state, nk_hwirq_t hwirq, cpu_id_t cpu);
 };
 
 struct nk_irq_dev {
@@ -84,7 +84,7 @@ int nk_irq_dev_send_ipi(struct nk_irq_dev *d, nk_hwirq_t hwirq, cpu_id_t cpu);
  * Maps from IRQ device local interrupt numbers to global nk_irq_t
  */
 int nk_irq_dev_revmap(struct nk_irq_dev *d, nk_hwirq_t hwirq, nk_irq_t *out_irq);
-int nk_irq_dev_translate(struct nk_irq_dev *d, nk_dev_info_type_t type, void *raw_irq, nk_hwirq_t *out_hwirq);
+int nk_irq_dev_translate(struct nk_irq_dev *d, nk_dev_info_type_t type, const void *raw_irq, nk_hwirq_t *out_hwirq);
 
 int nk_assign_cpu_irq_dev(struct nk_irq_dev *dev, cpu_id_t cpuid);
 int nk_assign_all_cpus_irq_dev(struct nk_irq_dev *dev);

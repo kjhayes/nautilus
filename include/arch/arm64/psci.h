@@ -27,8 +27,8 @@ int psci_affinity_info(uint64_t target_mpid);
 */
 
 // These functions can fail, so make sure the programmer doesn't ignore that possibility
-int __attribute__((warn_unused_result)) psci_cpu_off(void);
-int __attribute__((warn_usused_result)) psci_system_off(void);
-int __attribute__((warn_unused_result)) psci_system_reset(void);
+int psci_cpu_off(void);
+int psci_system_off(void);
+int psci_system_reset(void);
 
 #endif

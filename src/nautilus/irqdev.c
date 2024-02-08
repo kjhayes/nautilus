@@ -152,7 +152,7 @@ int nk_irq_dev_irq_status(struct nk_irq_dev *dev, nk_hwirq_t hwirq) {
 #endif 
 }
 
-int nk_irq_dev_translate(struct nk_irq_dev *dev, nk_dev_info_type_t type, void *raw_irq, nk_hwirq_t *out_hwirq) 
+int nk_irq_dev_translate(struct nk_irq_dev *dev, nk_dev_info_type_t type, const void *raw_irq, nk_hwirq_t *out_hwirq) 
 { 
   struct nk_dev *d = (struct nk_dev *)(&(dev->dev));
   struct nk_irq_dev_int *di = (struct nk_irq_dev_int *)(d->interface);

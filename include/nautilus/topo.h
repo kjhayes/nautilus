@@ -23,6 +23,8 @@
 #ifndef __TOPO_H__
 #define __TOPO_H__
 
+#include <nautilus/naut_types.h>
+
 typedef enum {
 	NK_TOPO_ALL_FILT,       // all sibling threads/cpus 
     NK_TOPO_HW_THREAD_FILT, // thread on same hw thread (hyperthread)

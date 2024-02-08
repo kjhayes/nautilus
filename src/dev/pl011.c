@@ -264,7 +264,7 @@ int pl011_uart_dev_read(void *state, uint8_t *dest) {
   struct pl011_uart *p = (struct pl011_uart*)state;
 
   int rc = -1;
-  int flags;
+  uint8_t flags;
 
   if(!spin_try_lock_irq_save(&p->input_lock, &flags)) {
     if(pl011_read_empty(p) || pl011_busy(p)) {
@@ -294,7 +294,7 @@ int pl011_uart_dev_write(void *state, uint8_t *src) {
   struct pl011_uart *p = (struct pl011_uart*)state;
 
   int wc = -1;
-  int flags;
+  uint8_t flags;
 
   if(!spin_try_lock_irq_save(&p->output_lock, &flags)) {
     if(pl011_busy(p) || pl011_write_full(p)) {
@@ -316,7 +316,7 @@ static int pl011_uart_dev_status(void *state) {
   struct pl011_uart *p = (struct pl011_uart*)state;
 
   int ret = 0;
-  int flags;
+  uint8_t flags;
 
   flags = spin_lock_irq_save(&p->input_lock);
   if(!pl011_read_empty(p)) {
@@ -357,7 +357,7 @@ static int pl011_interrupt_handler(struct nk_irq_action *action, struct nk_regs 
   }
 
   if(int_status & (UART_INT_RECV | UART_INT_RECV_TIMEOUT)) {
-    nk_dev_signal(p->dev);
+    nk_dev_signal((struct nk_dev*)p->dev);
   }
 
   pl011_write_reg(p, UART_INT_CLR, int_status);
@@ -394,7 +394,8 @@ int pl011_uart_init_one(struct nk_dev_info *info)
 
   int mmio_size;
   int ret;
-  if(ret = nk_dev_info_read_register_block(info, &uart->mmio_base, &mmio_size)) {
+  ret = nk_dev_info_read_register_block(info, &uart->mmio_base, &mmio_size);
+  if(ret) {
     ERROR("init_one: Failed to read register block! ret = %u\n", ret);
     goto err_exit;
   }
@@ -422,7 +423,7 @@ int pl011_uart_init_one(struct nk_dev_info *info)
   }
   registered_device = 1;
 
-  nk_dev_info_set_device(info, uart->dev);
+  nk_dev_info_set_device(info, (struct nk_dev*)uart->dev);
 
   // Clear out spurrious interrupts
   uint32_t int_status = pl011_read_reg(uart, UART_RAW_INT_STAT);

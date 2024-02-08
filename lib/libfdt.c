@@ -51,8 +51,10 @@
 
 #include<lib/libfdt.h>
 
+#ifdef NAUT_CONFIG_USE_CLANG
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wincompatible-pointer-types-discards-qualifiers"
+#endif
 
 int fdt_check_header(const void *fdt)
 {

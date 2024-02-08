@@ -94,11 +94,11 @@ void nk_dev_dump_devices();
  */
 
 struct nk_dev_info_int {
-  char*(*get_name)(void *state);
+  const char*(*get_name)(void *state);
   
   int(*has_property)(void *state, const char *prop_name);
   int(*read_int_array)(void *state, const char *prop_name, int elem_size, void *buf, int *buf_cnt);
-  int(*read_string_array)(void *state, const char *prop_name, char **buf, int *buf_cnt);
+  int(*read_string_array)(void *state, const char *prop_name, const char **buf, int *buf_cnt);
 
   int(*read_register_blocks)(void *state, void **bases, int *sizes, int *count);
   nk_irq_t(*read_irq)(void *state, int index);
@@ -150,7 +150,7 @@ inline static struct nk_dev * nk_dev_info_get_device(struct nk_dev_info *info)
   }
 }
 
-inline static char * nk_dev_info_get_name(const struct nk_dev_info *info)
+inline static const char * nk_dev_info_get_name(const struct nk_dev_info *info)
 {
   if(info && info->interface && info->interface->get_name) {
     return info->interface->get_name(info->state);
@@ -209,7 +209,7 @@ declare_read_int_array(32) //nk_dev_info_read_u32_array(...);
 declare_read_int(64) //nk_dev_info_read_u64(...);
 declare_read_int_array(64) //nk_dev_info_read_u64_array(...);
 
-inline static int nk_dev_info_read_string_array(const struct nk_dev_info *info, const char *prop_name, char **buf, int *cnt) 
+inline static int nk_dev_info_read_string_array(const struct nk_dev_info *info, const char *prop_name, const char **buf, int *cnt) 
 {
   if(info && info->interface && info->interface->read_string_array) {
     return info->interface->read_string_array(info->state, prop_name, buf, cnt);
@@ -217,7 +217,7 @@ inline static int nk_dev_info_read_string_array(const struct nk_dev_info *info, 
     return -1;
   }
 }
-inline static int nk_dev_info_read_string(const struct nk_dev_info *info, const char *prop_name, char **str)
+inline static int nk_dev_info_read_string(const struct nk_dev_info *info, const char *prop_name, const char **str)
 {
   int read = 1;
   int ret = nk_dev_info_read_string_array(info->state, prop_name, str, &read);

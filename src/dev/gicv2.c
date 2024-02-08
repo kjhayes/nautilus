@@ -1,7 +1,4 @@
 
-#include<dev/gic.h>
-#include<dev/gicv2.h>
-
 #include<nautilus/nautilus.h>
 #include<nautilus/irqdev.h>
 #include<nautilus/interrupt.h>
@@ -10,6 +7,9 @@
 #include<nautilus/of/dt.h>
 #include<nautilus/atomic.h>
 #include<nautilus/iomap.h>
+
+#include<dev/gic.h>
+#include<dev/gicv2.h>
 
 #include<arch/arm64/sys_reg.h>
 #include<arch/arm64/excp.h>
@@ -137,7 +137,7 @@ static int gicv2_dev_revmap(void *state, nk_hwirq_t hwirq, nk_irq_t *irq)
   return -1;
 }
 
-static int gicv2_dev_translate(void *state, nk_dev_info_type_t type, void *raw_irq, nk_hwirq_t *out_hwirq) 
+static int gicv2_dev_translate(void *state, nk_dev_info_type_t type, const void *raw_irq, nk_hwirq_t *out_hwirq) 
 {
   if(type != NK_DEV_INFO_OF) {
     GIC_ERROR("Currently only support Device Tree interrupt format, but another type of device info was provided! dev_info_type = %u\n", type);
@@ -329,12 +329,12 @@ static int gicv2_init_dev_info(struct nk_dev_info *info)
   }
 
   gic->dist_base = (uint64_t)nk_io_map(bases[0], sizes[0], 0);
-  if(gic->dist_base == NULL) {
+  if((void*)gic->dist_base == NULL) {
     GIC_ERROR("Failed to map GICD register region!\n");
     goto err_exit;
   }
   gic->cpu_base = (uint64_t)nk_io_map(bases[1], sizes[0], 0);
-  if(gic->cpu_base == NULL) {
+  if((void*)gic->cpu_base == NULL) {
     GIC_ERROR("Failed to map GICC register region!\n");
     goto err_exit;
   }
