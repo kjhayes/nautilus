@@ -328,7 +328,7 @@ static int plic_init_dev_info(struct nk_dev_info *info)
     plic->contexts[i].irq = nk_dev_info_read_irq(info, i);
 
     if(plic->contexts[i].irq == NK_NULL_IRQ) {
-      PLIC_DEBUG("Context (%u) does not exist\n", i);
+      PLIC_ERROR("Context (%u) does not exist\n", i);
       continue;
     }
 

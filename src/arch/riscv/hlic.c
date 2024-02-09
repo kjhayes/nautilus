@@ -5,6 +5,8 @@
 #include <nautilus/endian.h>
 #include <nautilus/of/dt.h>
 
+#include <arch/riscv/trap.h>
+
 #ifndef NAUT_CONFIG_DEBUG_PRINTS
 #undef DEBUG_PRINT
 #define DEBUG_PRINT(fmt, args...)
@@ -49,7 +51,7 @@ static int hlic_dev_revmap(void *state, nk_hwirq_t hwirq, nk_irq_t *irq)
   return -1;
 }
 
-static int hlic_dev_translate(void *state, nk_dev_info_type_t type, void *raw_irq, nk_hwirq_t *out_hwirq) 
+static int hlic_dev_translate(void *state, nk_dev_info_type_t type, const void *raw_irq, nk_hwirq_t *out_hwirq) 
 {
   struct hlic *hlic = (struct hlic*)state;
   switch(type) {
@@ -106,6 +108,7 @@ static int hlic_dev_disable_irq(void *state, nk_hwirq_t hwirq)
 
 static int hlic_dev_irq_status(void *state, nk_hwirq_t hwirq) 
 {
+  printk("hlic_status!\n");
   struct hlic *hlic = (struct hlic*)state;
 
   int status = 0;

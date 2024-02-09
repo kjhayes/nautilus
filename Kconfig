@@ -11,6 +11,7 @@ menu "Platform"
                         select HAS_CONTIGUOUS_CPU_ID
                         select USE_PCI_CAM
                         select USE_MULTIBOOT
+                        select XCALL_SUPPORT
 			bool
 
 		config ARCH_RISCV
@@ -24,6 +25,7 @@ menu "Platform"
                         select USE_FDT
                         select USE_PCI_ECAM
                         select SPARSE_IRQ
+                        select XCALL_SUPPORT
 
     choice
         prompt "Platform Selection"
@@ -1944,7 +1946,7 @@ config HAS_CONTIGUOUS_CPU_ID
       cpu_id_t values are all contiguous for this architecture
 
 config XCALL_SUPPORT
-    def_bool y
+    def_bool n
     help
       Just leaving this in for now until RISC-V and ARM64 both nicely wrap the xcall framework,
       once both support it, this should be removed.

@@ -1,6 +1,7 @@
 
 #include<nautilus/nautilus.h>
 #include<nautilus/naut_types.h>
+#include<nautilus/interrupt.h>
 #include<dev/8250/core.h>
 #include<dev/8250/pc_8250.h>
 
@@ -158,7 +159,7 @@ int pc_8250_init(void)
       num_failed += 1;
       continue;
     }
-    com_ports[i]->dev = dev;
+    com_ports[i]->dev = (struct nk_dev*)dev;
 
     generic_8250_disable_fifos(com_ports[i]);
     generic_8250_clear_fifos(com_ports[i]);

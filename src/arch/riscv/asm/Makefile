@@ -4,4 +4,6 @@ obj-y += \
 	thread_lowlevel.o \
 	smpboot.o \
 	setjmp_low.o \
-	poll.o \
+
+
+obj-$(NAUT_CONFIG_BEANDIP) += poll.o \

@@ -4,7 +4,7 @@
 #include <nautilus/endian.h>
 
 void arch_enable_ints(void)  {
-    printk("ENABLED INTS\n");
+    //printk("ENABLED INTS\n");
 
     set_csr(sstatus, SSTATUS_SIE);
 }

@@ -1,8 +1,9 @@
 #include <nautilus/nautilus.h>
-#include <nautilus/irq.h>
+#include <nautilus/naut_types.h>
+#include <nautilus/interrupt.h>
 #include <arch/riscv/riscv_idt.h>
 #include <dev/sifive_gpio.h>
-#include <nautilus/fdt.h>
+#include <nautilus/of/fdt.h>
 #include <arch/riscv/plic.h>
 
 #define SIFIVE_GPIO_INPUT_VAL	0x00

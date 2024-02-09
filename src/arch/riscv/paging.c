@@ -26,7 +26,6 @@
 #include <nautilus/mb_utils.h>
 #include <nautilus/cpu.h>
 #include <nautilus/errno.h>
-#include <nautilus/cpuid.h>
 #include <nautilus/backtrace.h>
 #include <nautilus/macros.h>
 #include <nautilus/naut_assert.h>

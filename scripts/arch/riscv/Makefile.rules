@@ -9,6 +9,7 @@ uImage: $(NAUT_BIN)
 qemu: uImage
 	qemu-system-riscv64 \
             -bios default \
+		    -smp cpus=1 \
             -m 2G \
             -M virt \
             -kernel uImage \

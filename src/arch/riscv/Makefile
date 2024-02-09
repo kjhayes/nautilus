@@ -10,8 +10,9 @@ obj-y += asm/ \
 	 paging.o \
 	 shutdown.o \
 	 irq.o \
-	 idt.o \
-         hlic.o
+     hlic.o \
+
+	 #idt.o \
 
 # KJH - I'm going to leave the idt.c stuff alone for now because the focus is ARM64 beandip,
 # but I'd like to go back and patch that to work with interrupt system

@@ -5,6 +5,7 @@
 #include<nautilus/endian.h>
 #include<nautilus/of/fdt.h>
 #include<nautilus/of/dt.h>
+#include<nautilus/interrupt.h>
 #include<nautilus/iomap.h>
 
 #ifndef NAUT_CONFIG_DEBUG_OF_8250_UART
@@ -18,11 +19,11 @@
 #define WARN(fmt, args...) WARN_PRINT("[8250] " fmt, ##args)
 
 #ifdef NAUT_CONFIG_OF_8250_UART_EARLY_OUTPUT
-static int of_8250_fdt_init(uint64_t dtb, uint64_t offset, struct uart_8250_port *port) {
+static int of_8250_fdt_init(void * dtb, uint64_t offset, struct uart_8250_port *port) {
 
     fdt_reg_t reg = { .address = 0, .size = 0 };
 
-    if(fdt_getreg((void*)dtb, offset, &reg)) {
+    if(fdt_getreg(dtb, offset, &reg)) {
       return -1;
     }
 
@@ -70,7 +71,7 @@ static void of_8250_early_putchar(char c) {
 
 #define OF_8250_PRE_VC_COMPAT "ns16550a"
 
-int of_8250_pre_vc_init(uint64_t dtb) 
+int of_8250_pre_vc_init(void *dtb) 
 {
   memset(&pre_vc_of_8250, 0, sizeof(struct uart_8250_port));
 
@@ -148,7 +149,7 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
   uart_8250_struct_init(port);
 #endif
 
-  uint64_t reg_base;
+  void * reg_base;
   int reg_size;
   if(nk_dev_info_read_register_block(info, &reg_base, &reg_size)) {
     ERROR("Failed to read register block for UART!\n");
@@ -203,7 +204,7 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
   snprintf(name_buf,DEV_NAME_LEN,"serial%u",nk_dev_get_serial_device_number());
 
   struct nk_char_dev *dev = nk_char_dev_register(name_buf,NK_DEV_FLAG_NO_WAIT,&generic_8250_char_dev_int,(void*)port);
-  port->dev = dev;
+  port->dev = (struct nk_dev*)dev;
 
   if(dev == NULL) {
     ERROR("Failed to register UART as a character device!\n");
