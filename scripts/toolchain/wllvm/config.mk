@@ -1,12 +1,14 @@
 
-CC := wllvm
-CXX := wllvm++
+CC := gclang
+CXX := gclang++
 AS := llvm-as
 LD := ld.lld
 CPP := cpp
 
 OBJCOPY := llvm-objcopy
 OBJDUMP := llvm-objdump
+
+export GLLVM_OBJCOPY:=$(OBJCOPY)
 
 COMMON_FLAGS += -O2  # -fno-delete-null-pointer-checks
 # -O3 will also work - PAD

@@ -2,7 +2,7 @@
 bitcode: $(NAUT_BIN)
 	# Set up whole kernel bitcode via WLLVM
 	$(call quiet-cmd,EXTRACT,$(call rel-file, $(NAUT_BC), $(ROOT_DIR)))
-	$(Q)extract-bc $(NAUT_BIN) 
+	$(Q)get-bc $(NAUT_BIN) 
 	$(Q)mv $(NAUT_BIN).bc $(NAUT_BC) 
 	$(call quiet-cmd,DISAS,$(call rel-file, $(NAUT_LL), $(ROOT_DIR)))
 	$(Q)llvm-dis $(NAUT_BC) -o $(NAUT_LL)
@@ -40,7 +40,7 @@ strip: FORCE
 
 ifdef NAUT_CONFIG_USE_WLLVM_WHOLE_OPT
 whole_opt: $(BIN_NAME) # FIX --- should be deprecated 
-	extract-bc $(BIN_NAME) -o $(NAUT_BC)
+	get-bc $(BIN_NAME) -o $(NAUT_BC)
 	opt -strip-debug $(NAUT_BC)
 	clang $(CFLAGS) -c $(NAUT_BC) -o .nautilus.o
 	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) -o $(BIN_NAME) -T $(LD_SCRIPT) .nautilus.o `scripts/findasm.pl`
