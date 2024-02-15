@@ -223,7 +223,7 @@ static int handle_send_ipi(char * buf, void * priv)
 
 static struct shell_cmd_impl ls_ipi_impl = {
     .cmd      = "lsipi",
-    .help_str = "List registered IPI's",
+    .help_str = "lsipi",
     .handler  = handle_ls_ipi,
 };
 nk_register_shell_cmd(ls_ipi_impl);
