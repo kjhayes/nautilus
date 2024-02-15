@@ -46,7 +46,7 @@ ARCH ?= arm64
 endif
 
 ARCH_SCRIPTS_DIR:=$(SCRIPTS_DIR)/arch/$(ARCH)
--include $(ARCH_SCRIPTS_DIR)/Makefile.config
+-include $(ARCH_SCRIPTS_DIR)/config.mk
 
 # Toolchain Specific Build Configurations
 ifdef NAUT_CONFIG_USE_CLANG
@@ -60,7 +60,7 @@ TOOLCHAIN ?= wllvm
 endif
 
 TOOLCHAIN_SCRIPTS_DIR:=$(SCRIPTS_DIR)/toolchain/$(TOOLCHAIN)
--include $(TOOLCHAIN_SCRIPTS_DIR)/Makefile.config
+-include $(TOOLCHAIN_SCRIPTS_DIR)/config.mk
 
 # General Build Configuration
 
@@ -141,8 +141,8 @@ $(LINKER_SCRIPT): $(LINKER_SCRIPT_SRC) $(AUTOCONF)
 # Utility Rules
 #
 
--include $(ARCH_SCRIPTS_DIR)/Makefile.rules
--include $(TOOLCHAIN_SCRIPTS_DIR)/Makefile.rules
+-include $(ARCH_SCRIPTS_DIR)/rules.mk
+-include $(TOOLCHAIN_SCRIPTS_DIR)/rules.mk
 
 DEFAULT_RULES ?= $(NAUT_BIN)
 default: $(DEFAULT_RULES)
