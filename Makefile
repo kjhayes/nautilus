@@ -64,8 +64,8 @@ TOOLCHAIN_SCRIPTS_DIR:=$(SCRIPTS_DIR)/toolchain/$(TOOLCHAIN)
 
 # General Build Configuration
 
-LINKER_SCRIPT_SRC ?= $(LINK_DIR)/nautilus.ld.$(ARCH)
-LINKER_SCRIPT = $(LINK_DIR)/link.ld
+LD_SCRIPT_SRC ?= $(LINK_DIR)/nautilus.ld.$(ARCH)
+LD_SCRIPT = $(LINK_DIR)/link.ld
 
 COMMON_FLAGS += -fno-omit-frame-pointer \
 			   -ffreestanding \
@@ -123,9 +123,9 @@ root-builtin := $(addsuffix /builtin.o, $(root-builtin-dirs))
 
 # Kernel Link Rule
 $(NAUT_BIN_NAME): $(NAUT_BIN)
-$(NAUT_BIN): $(LINKER_SCRIPT) $(root-builtin)
+$(NAUT_BIN): $(LD_SCRIPT) $(root-builtin)
 	$(call quiet-cmd,LD,$(NAUT_BIN_NAME))
-	$(Q)$(LD) $(LDFLAGS) -T$(LINKER_SCRIPT) \
+	$(Q)$(LD) $(LDFLAGS) -T$(LD_SCRIPT) \
 		$(sort \
 		$(wildcard $(SOURCE_DIR)/builtin.o)\
 		$(wildcard $(LIBRARY_DIR)/builtin.o)\
@@ -133,7 +133,7 @@ $(NAUT_BIN): $(LINKER_SCRIPT) $(root-builtin)
 		/dev/null -o $(NAUT_BIN)
 
 # Linker Script Generation
-$(LINKER_SCRIPT): $(LINKER_SCRIPT_SRC) $(AUTOCONF)
+$(LD_SCRIPT): $(LD_SCRIPT_SRC) $(AUTOCONF)
 	$(call quiet-cmd,CPP,$@)
 	$(Q)$(CPP) -P $(CPPFLAGS) $< -o $@
 
@@ -155,7 +155,7 @@ clean: $(CLEAN_RULES)
 	$(Q)find $(OUTPUT_DIR) -name "*.bin" -delete
 	$(Q)find $(SCRIPTS_DIR) -name "*.o" -delete
 	$(Q)find $(SCRIPTS_DIR) -name "*.cmd" -delete
-	$(Q)rm -f $(LINKER_SCRIPT)
+	$(Q)rm -f $(LD_SCRIPT)
 	$(Q)rm -f $(AUTOCONF)
 
 FORCE:
