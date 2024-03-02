@@ -97,7 +97,5 @@ obj-$(NAUT_CONFIG_LINUX_SYSCALLS) += syscalls/
 
 obj-$(NAUT_CONFIG_USE_IST) += gdt.o
 
-obj-$(NAUT_CONFIG_BEANDIP) += simplified_timehook.o
-
 obj-$(NAUT_CONFIG_XCALL_SUPPORT) += xcall.o
 

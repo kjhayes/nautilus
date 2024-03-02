@@ -21,6 +21,9 @@ GTAGS
 *.dts
 ./src/llvm/toolchain
 
+# Binary Folder for LLVM Passes
+llvm
+
 # LSP-related tools
 .clangd
 .ccls-cache

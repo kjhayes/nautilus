@@ -29,6 +29,7 @@ $(2): $$($(1)-objects) $$($(1)-builtins)
 		$$(wildcard $$($(1)-objects)) \
 		/dev/null) \
 		-o $$@
+
 endef
 
 $(eval $(call builtin_rule,obj-y,builtin.o))

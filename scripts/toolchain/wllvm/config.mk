@@ -1,4 +1,14 @@
 
+LLVM_PASS_DIR:=$(ROOT_DIR)/llvm
+LLVM_PASS_LIST:=$(LLVM_PASS_DIR)/passes.txt
+LLVM_PASS_PLUGIN_LIST:=$(LLVM_PASS_DIR)/passplugins.txt
+
+$(shell mkdir -p $(LLVM_PASS_DIR))
+$(shell rm $(LLVM_PASS_LIST))
+$(shell touch $(LLVM_PASS_LIST))
+$(shell rm $(LLVM_PASS_PLUGIN_LIST))
+$(shell touch $(LLVM_PASS_PLUGIN_LIST))
+
 CC := gclang
 CXX := gclang++
 AS := llvm-as
@@ -29,4 +39,16 @@ endif
 
 NAUT_BC := $(OUTPUT_DIR)/nautilus.bc
 NAUT_LL := $(OUTPUT_DIR)/nautilus.ll
+
+define add_llvm_lib =
+	$(Q)cp $$(1) $(LLVM_PASS_DIR)/$$(2)
+endef
+define add_llvm_pass =
+    $(Q)echo "$$(1)" >> $(LLVM_PASS_LIST)
+endef
+define add_llvm_pass_plugin =
+    $(Q)echo "$$(1)" >> $(LLVM_PASS_PLUGIN_LIST)
+endef
+
+DEFAULT_RULES := passes
 

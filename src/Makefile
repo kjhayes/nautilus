@@ -30,3 +30,5 @@ obj-$(NAUT_CONFIG_LOAD_LUA) += lua_src/
 obj-$(NAUT_CONFIG_RUST_SUPPORT) += rust/
 obj-$(NAUT_CONFIG_ASPACES) += aspace/
 obj-$(NAUT_CONFIG_ALLOCS) += alloc/
+
+obj-$(NAUT_CONFIG_USE_WLLVM) += pass/

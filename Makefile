@@ -123,7 +123,7 @@ root-builtin := $(addsuffix /builtin.o, $(root-builtin-dirs))
 
 # Kernel Link Rule
 $(NAUT_BIN_NAME): $(NAUT_BIN)
-$(NAUT_BIN): $(LD_SCRIPT) $(root-builtin)
+$(NAUT_BIN): $(LD_SCRIPT) $(root-builtin) FORCE
 	$(call quiet-cmd,LD,$(NAUT_BIN_NAME))
 	$(Q)$(LD) $(LDFLAGS) -T$(LD_SCRIPT) \
 		$(sort \

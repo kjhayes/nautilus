@@ -1,11 +1,84 @@
 menu "Tests"
 
+config TEST_ALLOC_IMPLICIT
+	  bool "Test the implicit free list allocator"
+	  depends on ALLOC_IMPLICIT
+	  default n
+	  help
+	     Allocator test program
+	     
+config TEST_TRACE_ALLOC_IMPLICIT
+	  bool "Test the implicit free list allocator using a trace"
+	  depends on ALLOC_IMPLICIT
+	  default n
+	  help
+	     Allocator test program w/trace
+
+config ALLOC_TEST
+	  bool "Allocator Test"
+	  depends on ALLOCS
+	  default n
+	  help
+	     test framework for allocator.
+
+config NDPC_RT_TESTS
+      bool "Include tests/benchmarks for NDPC RT"
+	  default n
+      depends on NDPC_RT
+      help 
+        Include NDPC simple tests 
+
+
+config NESL_RT_TESTS
+      bool "Include tests/benchmarks for NESL RT"
+	  default n
+      depends on NESL_RT
+      help 
+        Include NESL simple tests 
+
+config OPENMP_RT_TESTS
+      bool "Include tests/benchmarks for OpenMP RT"
+	  default n
+      depends on OPENMP_RT
+      help 
+        Include OpenMP simple tests and Edinburgh microbenchmarks
+
+config TEST_FIBERS
+    bool "Enable fiber tests commands in the shell"
+    depends on FIBER_ENABLE
+    default false
+    help
+      This option will enable fiber test commands in the shell.
+
+config TEST_CACHEPART
+   bool "Add cache partitioning tests"
+   default n
+   depends on CACHEPART
+   help
+      Adds the tests for for cache partitioning
+
 config NPB_NAS_TEST
     bool "NPB NAS Tests"
     depends on !BASE_LIBM_COMPAT
     default n
     help
         Include the NAS Parallel Benchmark Test Suite
+
+config TEST_BDWGC 
+   bool "Include the BDWGC garbage collection test suite"
+   default n
+   depends on ENABLE_BDWGC
+   help
+      Adds test suite for BDWGC, which can be run from the shell
+
+config BASE_PTHREAD_COMPAT_TESTS
+    bool "Add POSIX threads compatability layer tests"
+    depends on BASE_PTHREAD_COMPAT
+    default n	
+    help 
+      Enable tests for this layer
+	 
+
 
 config NPB_NAS_BT
     bool "BT Benchmark"

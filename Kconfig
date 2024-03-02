@@ -693,14 +693,6 @@ config VIRTUAL_CONSOLE_SERIAL_MIRROR_ALL
          help
            The amount of time the fiber thread will sleep for when
            there are no fibers on the fiber queue.
-
-    config TEST_FIBERS
-        bool "Enable fiber tests commands in the shell"
-        depends on FIBER_ENABLE
-        default false
-        help
-          This option will enable fiber test commands in the shell.
-
   endmenu 
 
 config REAL_MODE_INTERFACE
@@ -818,13 +810,6 @@ config DEBUG_CACHEPART
    help
       Adds debugging output for cache partitioning
 
-config TEST_CACHEPART
-   bool "Add cache partitioning tests"
-   default n
-   depends on CACHEPART
-   help
-      Adds the tests for for cache partitioning
-
 menu "Garbage Collection Options"
 
    config GARBAGE_COLLECTION
@@ -891,13 +876,6 @@ menu "Garbage Collection Options"
        depends on ENABLE_PDSGC
        help
          If enabled, print debugging output from PDSGC
-
-  config TEST_BDWGC 
-   bool "Include the BDWGC garbage collection test suite"
-   default n
-   depends on ENABLE_BDWGC
-   help
-      Adddes test suite for BDWGC, which can be run from the shell
 
   endmenu
 
@@ -989,13 +967,6 @@ menu "Compatability"
      help 
          POSIX threads
 
-     config BASE_PTHREAD_COMPAT_TESTS
-       bool "Add POSIX threads compatability layer tests"
-       depends on BASE_PTHREAD_COMPAT
-       default n	
-       help 
-         Enable tests for this layer
-	 
      config DEBUG_BASE_PTHREAD_COMPAT
        bool "Debug basic POSIX threads compatability layer"
        depends on BASE_PTHREAD_COMPAT
@@ -1676,27 +1647,6 @@ menu "Allocators"
 	  help
 	     Turn on debugging prints for the cs213 allocator
 
-        config TEST_ALLOC_IMPLICIT
-	  bool "Test the implicit free list allocator"
-	  depends on ALLOC_IMPLICIT
-	  default n
-	  help
-	     Allocator test program
-	     
-       config TEST_TRACE_ALLOC_IMPLICIT
-	  bool "Test the implicit free list allocator using a trace"
-	  depends on ALLOC_IMPLICIT
-	  default n
-	  help
-	     Allocator test program w/trace
-
-    config ALLOC_TEST
-	  bool "Allocator Test"
-	  depends on ALLOCS
-	  default n
-	  help
-	     test framework for allocator.
-
         config DEBUG_ALLOC_TEST
 	  bool "Debug allocator test"
 	  depends on ALLOC_TEST
@@ -1786,13 +1736,6 @@ menu "Runtimes"
             help 
               Debugging output for the NDPC RT
 
-        config NDPC_RT_TESTS
-            bool "Include tests/benchmarks for NDPC RT"
-	    default n
-            depends on NDPC_RT
-            help 
-              Include NDPC simple tests 
-
 	config NESL_RT
           bool  "NESL RT"
 	  default n
@@ -1805,13 +1748,6 @@ menu "Runtimes"
             depends on NESL_RT
             help 
               Debugging output for the NESL RT
-
-        config NESL_RT_TESTS
-            bool "Include tests/benchmarks for NESL RT"
-	    default n
-            depends on NESL_RT
-            help 
-              Include NESL simple tests 
 
         config OPENMP_RT
           bool  "OpenMP RT"
@@ -1844,13 +1780,6 @@ menu "Runtimes"
             depends on OPENMP_RT
             help 
               Debugging output for the OpenMP RT
-
-        config OPENMP_RT_TESTS
-            bool "Include tests/benchmarks for OpenMP RT"
-	    default n
-            depends on OPENMP_RT
-            help 
-              Include OpenMP simple tests and Edinburgh microbenchmarks
 
        config VIRGIL_RT
             bool "Virgil RT"

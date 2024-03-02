@@ -14,6 +14,12 @@ config CARAT_PASS
   help
     Enables the CARAT LLVM Pass
 
+config LLVM_DEBUG_STRIP
+  bool "Debug Strip Pass"
+  default y
+  help
+    Run Debug Strip Pass
+
 config EXAMPLE_PASS
   bool "Example Pass"
   default n
