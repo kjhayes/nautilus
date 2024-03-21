@@ -2,9 +2,9 @@
 UBOOT_BIN = ../u-boot.bin
 
 uImage: $(NAUT_BIN)
-	$(call quiet_cmd,OBJCOPY,Image)
+	$(call quiet-cmd,OBJCOPY,Image)
 	$(Q)$(OBJCOPY) -O binary $< Image
-	$(call quiet_cmd,MKIMAGE,$@)
+	$(call quiet-cmd,MKIMAGE,$@)
 	$(Q)mkimage -A arm64 -O linux -T kernel -C none \
 		-a $(NAUT_CONFIG_KERNEL_LINK_ADDR) -e $(NAUT_CONFIG_KERNEL_LINK_ADDR) -n "Nautilus" \
 		-d Image uImage

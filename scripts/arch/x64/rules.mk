@@ -29,24 +29,24 @@ isoimage: $(NAUT_ISO) FORCE
 ifdef NAUT_CONFIG_PROVENANCE
 
 $(FORMAT_SYMS): $(ARCH_SCRIPTS_DIR)/format_syms.c
-	$(call quiet_cmd,HOSTCC,$@)
+	$(call quiet-cmd,HOSTCC,$@)
 	$(Q)$(HOSTCC) $^ -o $@
 
 $(FORMAT_SECS): $(ARCH_SCRIPTS_DIR)/format_secs.c
-	$(call quiet_cmd,HOSTCC,$@)
+	$(call quiet-cmd,HOSTCC,$@)
 	$(Q)$(HOSTCC) $^ -o $@
 
 $(NAUT_SYM): $(FORMAT_SYMS) $(NAUT_BIN)
-	$(call quiet_cmd,GENSYMS,$@)
+	$(call quiet-cmd,GENSYMS,$@)
 	$(Q)$(GENSYMS) $(NAUT_BIN) tmp.sym
 
 $(NAUT_SEC): $(FORMAT_SECS) $(NAUT_BIN)
-	$(call quiet_cmd,GENSECS,$@)
+	$(call quiet-cmd,GENSECS,$@)
 	$(Q)$(GENSECS) $(NAUT_BIN) tmp.sec
 endif
 
 $(NAUT_ISO): $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC)
-	$(call quiet_cmd,MKISO,$@)
+	$(call quiet-cmd,MKISO,$@)
 	$(Q)mkdir -p .iso/boot/grub
 	$(Q)cp configs/grub.cfg .iso/boot/grub
 	$(Q)cp $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC) .iso/boot
@@ -54,6 +54,9 @@ $(NAUT_ISO): $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC)
 	$(Q)rm -rf .iso
 
 DEFAULT_RULES += $(NAUT_ISO)
+
+qemu: $(NAUT_ISO)
+	qemu-system-x86_64 -cdrom $(NAUT_ISO) -serial stdio
 
 CLEAN_RULES += x64-clean-isoimage
 
