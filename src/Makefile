@@ -1,28 +1,17 @@
-obj-$(NAUT_CONFIG_ARCH_X86) += \
+
+obj-y += \
 	nautilus/ \
 	arch/ \
 	dev/ \
+	test/ \
+    compat/ \
 	fs/  \
+
+obj-$(NAUT_CONFIG_ARCH_X86) += \
 	gc/  \
 	rt/ \
 	net/ \
 	acpi/ \
-        compat/ \
-	test/ 
-
-obj-$(NAUT_CONFIG_ARCH_RISCV) += \
-	nautilus/ \
-	arch/ \
-	compat/ \
-	dev/ \
-	test/
-
-obj-$(NAUT_CONFIG_ARCH_ARM64) += \
-	nautilus/ \
-	arch/ \
-	compat/ \
-	dev/ \
-	test/
 
 obj-$(NAUT_CONFIG_CXX_SUPPORT) += cxx/
 obj-$(NAUT_CONFIG_LEGION_RT) += legion_runtime/

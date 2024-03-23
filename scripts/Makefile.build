@@ -14,6 +14,8 @@ include Makefile
 
 #obj-y be set past here
 
+NULL_OBJECT := $(SOURCE_DIR)/.null.o
+
 define builtin_rule =
 
 $(1)-subdirs := $$(filter %/,$$($(1)))
@@ -22,12 +24,12 @@ $(1)-cmds := $$(patsubst %.o,.%.cmd,$$($(1)-objects))
 $(1)-builtins := $$(patsubst %/,%/builtin.o,$$($(1)-subdirs))
 
 $$(foreach CMD,$$($(1)-cmds),$$(eval include $$(CMD)))
-$(2): $$($(1)-objects) $$($(1)-builtins)
+$(2): $$($(1)-objects) $$($(1)-builtins) $(NULL_OBJECT)
 	$$(call quiet-cmd,LD,$$(call rel-file, $$@, $(ROOT_DIR)))
 	$$(Q)$$(LD) $$(LDFLAGS) -r \
 		$$(sort $$(wildcard $$($(1)-builtins)) \
 		$$(wildcard $$($(1)-objects)) \
-		/dev/null) \
+		$(NULL_OBJECT)) \
 		-o $$@
 
 endef

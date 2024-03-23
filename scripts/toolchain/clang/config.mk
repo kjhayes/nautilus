@@ -13,17 +13,18 @@ COMMON_FLAGS += -O2  # -fno-delete-null-pointer-checks
 
 ifdef NAUT_CONFIG_ARCH_X86
 COMMON_FLAGS += -mcmodel=large \
-		--target=x86_64
+		        --target=x86_64
 LDFLAGS += -m elf_x86_64
 endif
 
 ifdef NAUT_CONFIG_ARCH_RISCV
-COMMON_FLAGS += -mcmodel=large \
-		--target=riscv64 \
+COMMON_FLAGS += --target=riscv64 \
                 -mno-relax
+LDFLAGS += -m elf64lriscv
 endif
 
 ifdef NAUT_CONFIG_ARCH_ARM64
 COMMON_FLAGS += -mcmodel=large \
-		--target=aarch64
+		        --target=aarch64
+LDFLAGS += -m aarch64elf
 endif

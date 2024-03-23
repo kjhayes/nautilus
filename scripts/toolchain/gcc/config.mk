@@ -1,14 +1,17 @@
 
 ifdef NAUT_CONFIG_ARCH_X86
 GCC_CROSS_COMPILE ?= 
+LDFLAGS += -m elf_x86_64
 endif
 
 ifdef NAUT_CONFIG_ARCH_ARM64
 GCC_CROSS_COMPILE ?= ~/opt/toolchain/aarch64/bin/aarch64-linux-gnu-
+LDFLAGS += -m aarch64elf
 endif
 
 ifdef NAUT_CONFIG_ARCH_RISCV
 GCC_CROSS_COMPILE ?= ~/opt/toolchain/riscv64/bin/riscv64-linux-gnu-
+LDFLAGS += -m elf64lriscv_lp64f
 endif
 
 CC = $(GCC_CROSS_COMPILE)gcc
