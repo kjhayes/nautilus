@@ -135,7 +135,7 @@ $(NAUT_BIN): $(LD_SCRIPT) $(root-builtin) FORCE
 # Linker Script Generation
 $(LD_SCRIPT): $(LD_SCRIPT_SRC) $(AUTOCONF)
 	$(call quiet-cmd,CPP,$@)
-	$(Q)$(CPP) -P $(CPPFLAGS) $< -o $@
+	$(Q)$(CPP) -CC -P $(CPPFLAGS) $< -o $@
 
 #
 # Utility Rules
