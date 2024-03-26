@@ -1,7 +1,6 @@
 
 ifdef NAUT_CONFIG_ARCH_X86
 GCC_CROSS_COMPILE ?= 
-LDFLAGS += -m elf_x86_64
 endif
 
 ifdef NAUT_CONFIG_ARCH_ARM64

@@ -79,7 +79,10 @@ NAUT_INCLUDE += -D__NAUTILUS__ -I$(INCLUDE_DIR) \
 		     -include $(AUTOCONF)
 
 NAUT_BIN_NAME := nautilus.bin
+NAUT_ASM_NAME := nautilus.asm
+
 NAUT_BIN := $(OUTPUT_DIR)/$(NAUT_BIN_NAME)
+NAUT_ASM := $(OUTPUT_DIR)/$(NAUT_ASM_NAME)
 
 CPPFLAGS += $(NAUT_INCLUDE)
 
@@ -144,6 +147,13 @@ $(LD_SCRIPT): $(LD_SCRIPT_SRC) $(AUTOCONF)
 -include $(ARCH_SCRIPTS_DIR)/rules.mk
 -include $(TOOLCHAIN_SCRIPTS_DIR)/rules.mk
 
+ifdef OBJDUMP
+asm: $(NAUT_ASM)
+$(NAUT_ASM): $(NAUT_BIN)
+	$(call quiet-cmd,OBJDUMP,$@)
+	$(Q)$(OBJDUMP) -S $(NAUT_BIN) > $@
+endif
+
 DEFAULT_RULES ?= $(NAUT_BIN)
 default: $(DEFAULT_RULES)
 
@@ -156,6 +166,8 @@ clean: $(CLEAN_RULES)
 	$(Q)find $(SCRIPTS_DIR) -name "*.o" -delete
 	$(Q)find $(SCRIPTS_DIR) -name "*.cmd" -delete
 	$(Q)rm -f $(LD_SCRIPT)
+	$(Q)rm -f $(NAUT_BIN)
+	$(Q)rm -f $(NAUT_ASM)
 	$(Q)rm -f $(AUTOCONF)
 
 FORCE:
