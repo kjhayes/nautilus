@@ -60,7 +60,7 @@ idle (void * in, void ** out)
 
     while (1) {
 #ifndef NAUT_CONFIG_BEANDIP
-	if (!irqs_enabled()) { 
+	if (!arch_ints_enabled()) { 
 	    panic("Idle running with interrupts off!");
 	    return;
 	}
@@ -107,8 +107,9 @@ idle (void * in, void ** out)
         idle_delay(100);
 #endif
 
-#ifdef NAUT_CONFIG_HALT_WHILE_IDLE
         arch_enable_ints();
+
+#ifdef NAUT_CONFIG_HALT_WHILE_IDLE
         halt();
 #endif
     }

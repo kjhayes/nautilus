@@ -89,11 +89,10 @@ struct uart_8250_ops
   int(*xmit_push)(struct uart_8250_port *port, uint8_t);
   int(*recv_pull)(struct uart_8250_port *port, uint8_t*);
 
-  int(*kick_output)(struct uart_8250_port *port);
-  int(*kick_input)(struct uart_8250_port *port);
-
   int(*handle_irq)(struct uart_8250_port *port, unsigned int iir);
 };
+
+#define UART_8250_BUFFER_SIZE 512
 
 struct uart_8250_port
 {
@@ -109,8 +108,23 @@ struct uart_8250_port
   spinlock_t input_lock;
   spinlock_t output_lock;
 
+  uint32_t input_buf_head, input_buf_tail;
+  uint32_t output_buf_head, output_buf_tail;
+  uint8_t input_buf[UART_8250_BUFFER_SIZE];
+  uint8_t output_buf[UART_8250_BUFFER_SIZE];
+
   struct uart_8250_ops ops;
 };
+
+int uart_8250_input_buffer_empty(struct uart_8250_port *s);
+int uart_8250_output_buffer_empty(struct uart_8250_port *s);
+int uart_8250_input_buffer_full(struct uart_8250_port *s);
+int uart_8250_output_buffer_full(struct uart_8250_port *s); 
+
+void uart_8250_input_buffer_push(struct uart_8250_port *s, uint8_t data);
+uint8_t uart_8250_input_buffer_pull(struct uart_8250_port *s);
+void uart_8250_output_buffer_push(struct uart_8250_port *s, uint8_t data);
+uint8_t uart_8250_output_buffer_pull(struct uart_8250_port *s);
 
 // Initialized the struct with default values but doesn't init the device
 int uart_8250_struct_init(struct uart_8250_port *port);
@@ -150,16 +164,6 @@ inline static
 int uart_8250_recv_pull(struct uart_8250_port *port, uint8_t *dest) 
 {
   return port->ops.recv_pull(port,dest);
-}
-inline static
-int uart_8250_kick_output(struct uart_8250_port *port) 
-{
-  return port->ops.kick_output(port);
-}
-inline static
-int uart_8250_kick_input(struct uart_8250_port *port) 
-{
-  return port->ops.kick_input(port);
 }
 inline static
 int uart_8250_handle_irq(struct uart_8250_port *port, unsigned int iir)

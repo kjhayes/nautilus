@@ -355,7 +355,7 @@ void apic_bcast_deinit_iipi(struct apic_dev * apic);
 void apic_bcast_sipi(struct apic_dev * apic, uint8_t target);
 
 struct cpu;
-void apic_init(struct cpu * core);
+void apic_percpu_init(struct cpu * core);
 
 int apic_get_maxlvt(struct apic_dev * apic);
 int apic_read_timer(struct apic_dev * apic);

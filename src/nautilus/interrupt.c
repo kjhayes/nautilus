@@ -168,7 +168,7 @@ int nk_assign_irq_desc(nk_irq_t irq, struct nk_irq_desc *desc)
   return 0;
 }
 
-int nk_assign_irq_descs(int num, nk_irq_t base_irq, struct nk_irq_desc *descs) 
+int nk_assign_irq_descs(int num, nk_irq_t base_irq, struct nk_irq_desc descs[num]) 
 {
   IRQ_DEBUG("Assigning IRQ's [%u - %u] descriptors\n", base_irq, base_irq + (num-1));
   for(int i = 0; i < num; i++) {
@@ -187,19 +187,18 @@ int nk_set_irq_dev_percpu(cpu_id_t cpuid, nk_irq_t irq, struct nk_irq_dev *dev)
   if(desc == NULL) {
     return -1;
   }
-  if(!(desc->flags & NK_IRQ_DESC_FLAG_PERCPU)) {
-    return -1;
-  }
 
   if(desc->per_cpu_irq_devs == NULL) {
     desc->per_cpu_irq_devs = malloc(sizeof(struct nk_irq_dev*) * nk_get_num_cpus());
     if(desc->per_cpu_irq_devs == NULL) {
       return -1;
     }
+    memset(desc->per_cpu_irq_devs, 0, sizeof(struct nk_irq_dev*) * nk_get_num_cpus());
   }
 
+  desc->flags |= NK_IRQ_DESC_FLAG_PERCPU;
   desc->per_cpu_irq_devs[cpuid] = dev;
-  return -1;
+  return 0;
 }
 
 int nk_set_irq_devs_percpu(int n, cpu_id_t cpuid, nk_irq_t irq, struct nk_irq_dev *dev) 
@@ -219,9 +218,9 @@ int nk_set_all_irq_dev_percpu(nk_irq_t irq, struct nk_irq_dev **devs)
   if(desc == NULL) {
     return -1;
   }
-  if(!(desc->flags & NK_IRQ_DESC_FLAG_PERCPU)) {
-    return -1; 
-  }
+
+  desc->flags |= NK_IRQ_DESC_FLAG_PERCPU;
+
   if(desc->per_cpu_irq_devs == NULL) {
     desc->per_cpu_irq_devs = devs;
     return 0;
@@ -542,6 +541,17 @@ INTERRUPT int nk_handle_interrupt_generic(struct nk_irq_action *action, struct n
   return 0;
 }
 
+INTERRUPT int nk_handle_interrupt_generic_no_ack(struct nk_irq_action *action, struct nk_regs *regs, struct nk_irq_desc *desc) 
+{
+  struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
+  nk_hwirq_t hwirq = desc->hwirq;
+
+  nk_handle_irq_actions(desc, regs);
+
+  nk_irq_dev_eoi(irq_dev, hwirq);
+  return 0;
+}
+
 int nk_dump_irq(nk_irq_t i) 
 {
   struct nk_irq_desc *desc = nk_irq_to_desc(i);
@@ -570,6 +580,8 @@ int nk_dump_irq(nk_irq_t i)
       struct nk_irq_dev *percpu_dev = NULL;
       if(desc->per_cpu_irq_devs) {
         percpu_dev = desc->per_cpu_irq_devs[cpuid];
+      } else {
+        percpu_dev = desc->irq_dev;
       }
 
       int status = 0;
@@ -580,8 +592,7 @@ int nk_dump_irq(nk_irq_t i)
       }
 
       const char * name = "NULL";
-      if(desc->per_cpu_irq_devs &&
-         desc->per_cpu_irq_devs[cpuid]) 
+      if(percpu_dev != NULL) 
       {
         name = desc->per_cpu_irq_devs[cpuid]->dev.name;
       }
@@ -641,15 +652,19 @@ int nk_dump_irq(nk_irq_t i)
   return 0;
 }
 
-static int handle_shell_interrupt(char * buf, void * priv) 
-{
+int nk_dump_all_irq(void) {
   IRQ_PRINT("--- Interrupt Descriptors: (total = %u) ---\n", nk_max_irq()+1);
+  int res = 0;
   for(nk_irq_t i = 0; i < nk_max_irq()+1; i++) 
   {
-    nk_dump_irq(i);
+    res |= nk_dump_irq(i);
   }
+  return res;
+}
 
-  return 0;
+static int handle_shell_interrupt(char * buf, void * priv) 
+{
+  return nk_dump_all_irq();
 }
 
 static struct shell_cmd_impl interrupt_impl = {

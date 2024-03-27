@@ -153,7 +153,7 @@ int pc_8250_init(void)
     char name_buf[DEV_NAME_LEN];
     snprintf(name_buf,DEV_NAME_LEN,"serial%u",nk_dev_get_serial_device_number());
 
-    struct nk_char_dev *dev = nk_char_dev_register(name_buf,NK_DEV_FLAG_NO_WAIT,&generic_8250_char_dev_int,(void*)com_ports[i]);
+    struct nk_char_dev *dev = nk_char_dev_register(name_buf,0,&generic_8250_char_dev_int,(void*)com_ports[i]);
 
     if(dev == NULL) {
       num_failed += 1;
@@ -174,6 +174,8 @@ int pc_8250_init(void)
       nk_char_dev_unregister(dev);
       num_failed += 1;
       continue;
+    } else {
+      DEBUG("Added IRQ handler for COM Port %u to nk_irq_t %u\n", i + 1, com_ports[i]->irq);
     }
 
     generic_8250_enable_fifos(com_ports[i]);

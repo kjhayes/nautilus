@@ -448,7 +448,8 @@ init (unsigned long mbd,
     printk("5\n");
     nk_timer_init();
 
-    apic_init(naut->sys.cpus[0]);
+    //apic_init();
+    apic_percpu_init(naut->sys.cpus[0]);
 
     nk_rand_init(naut->sys.cpus[0]);
 
@@ -554,6 +555,8 @@ init (unsigned long mbd,
 #endif
     
     arch_enable_ints();
+
+    //nk_dump_all_irq();
 
     /* interrupts are now on */
 

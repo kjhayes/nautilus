@@ -108,6 +108,7 @@ struct nk_irq_desc {
 };
 
 int nk_dump_irq(nk_irq_t i);
+int nk_dump_all_irq(void);
 
 // Returns base IRQ number or NK_NULL_IRQ if an error occurred
 int nk_request_irq_range(int n, nk_irq_t *out_base);
@@ -125,12 +126,19 @@ int nk_setup_irq_descs_devless(int n, struct nk_irq_desc *descs, nk_hwirq_t hwir
 
 // Associates an IRQ descriptor with an IRQ number
 int nk_assign_irq_desc(nk_irq_t irq, struct nk_irq_desc *desc);
-int nk_assign_irq_descs(int n, nk_irq_t irq, struct nk_irq_desc *desc);
+// Same as nk_assign_irq_desc but acts on a range of IRQ's from [irq, irq+n) at once,
+int nk_assign_irq_descs(int n, nk_irq_t irq, struct nk_irq_desc desc[n]);
 
 // Makes the IRQ PERCPU and sets the irq_dev for a particular CPUID
 int nk_set_irq_dev_percpu(cpu_id_t cpuid, nk_irq_t irq, struct nk_irq_dev *dev);
+// Same as nk_set_irq_dev_percpu but acts on a range of IRQ's from [irq, irq+n) at once.
 int nk_set_irq_devs_percpu(int n, cpu_id_t cpuid, nk_irq_t irq, struct nk_irq_dev *dev);
+
+// Marks "irq" as percpu.
+// Sets every CPUID's irq_dev for the irq at once using an array of devices.
+// (Note: Gives ownership of the array "devs" to the IRQ descriptor)
 int nk_set_all_irq_dev_percpu(nk_irq_t irq, struct nk_irq_dev **devs);
+// Same as nk_set_all_irq_dev_percpu but acts on a range of IRQ's from [irq, irq+n) at once.
 int nk_set_all_irq_devs_percpu(int n, nk_irq_t irq, struct nk_irq_dev **devs);
 
 struct nk_irq_desc * nk_irq_to_desc(nk_irq_t irq);
@@ -183,6 +191,9 @@ int nk_unmask_irq(nk_irq_t);
 
 int nk_send_ipi(nk_irq_t, cpu_id_t);
 
+// Flow which utilizes nk_irq_dev_ack to get the hwirq number and signals EOI after handling all actions
 int nk_handle_interrupt_generic(struct nk_irq_action *null, struct nk_regs *regs, struct nk_irq_dev *dev);
+// Flow which does not require nk_irq_dev_ack (instead being handed the irq_desc directly) to get the hwirq number and signals EOI after handling all actions
+int nk_handle_interrupt_generic_no_ack(struct nk_irq_action *action, struct nk_regs *regs, struct nk_irq_desc *desc);
 
 #endif

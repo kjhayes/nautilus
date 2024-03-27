@@ -48,6 +48,10 @@ endif
 ARCH_SCRIPTS_DIR:=$(SCRIPTS_DIR)/arch/$(ARCH)
 -include $(ARCH_SCRIPTS_DIR)/config.mk
 
+ifdef NAUT_CONFIG_DEBUG_INFO
+CFLAGS		+= -g
+endif
+
 # Toolchain Specific Build Configurations
 ifdef NAUT_CONFIG_USE_CLANG
 TOOLCHAIN ?= clang
@@ -122,7 +126,6 @@ $(foreach root-builtin-dir, $(root-builtin-dirs), $(eval $(call root-builtin-dir
 
 # The builtin.o files which will be linked together into the kernel
 root-builtin := $(addsuffix /builtin.o, $(root-builtin-dirs))
-
 
 # Kernel Link Rule
 $(NAUT_BIN_NAME): $(NAUT_BIN)

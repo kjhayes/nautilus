@@ -33,13 +33,7 @@ extern "C" {
 #include <nautilus/cpu_state.h>
 #include <nautilus/list.h>
 
-extern void apic_do_eoi();
-
-#ifdef NAUT_CONFIG_ARCH_X86
-#define IRQ_HANDLER_END() apic_do_eoi()
-# else
-#define IRQ_HANDLER_END() 
-#endif
+#define IRQ_HANDLER_END()
 
 extern nk_irq_t x86_irq_vector_base;
 

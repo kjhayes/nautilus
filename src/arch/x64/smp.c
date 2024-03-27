@@ -1079,7 +1079,7 @@ smp_ap_setup (struct cpu * core)
     }
 #endif
     
-    apic_init(core);
+    apic_percpu_init(core);
 
     if (smp_xcall_init_queue(core) != 0) {
         ERROR_PRINT("Could not setup xcall for core %u\n", core->id);

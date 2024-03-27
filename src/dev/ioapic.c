@@ -70,7 +70,7 @@ void
 ioapic_mask_irq (struct ioapic * ioapic, uint8_t irq)
 {
     uint32_t val;
-    IOAPIC_PRINT("ioapic_mask_irq(): irq = %u, ioapic->num_entries = %u\n", irq, ioapic->num_entries);    
+    //IOAPIC_PRINT("ioapic_mask_irq(): irq = %u, ioapic->num_entries = %u\n", irq, ioapic->num_entries);    
     ASSERT(irq < ioapic->num_entries);
     val = ioapic_read_reg(ioapic, IOAPIC_IRQ_ENTRY_LO(irq));
     ioapic_write_reg(ioapic, IOAPIC_IRQ_ENTRY_LO(irq), val | IOAPIC_MASK_IRQ);
@@ -113,7 +113,7 @@ void
 ioapic_unmask_irq (struct ioapic * ioapic, uint8_t irq)
 {
     uint32_t val;
-    IOAPIC_PRINT("ioapic_unmask_irq(): irq = %u, ioapic->num_entries = %u\n", irq, ioapic->num_entries);    
+    //IOAPIC_PRINT("ioapic_unmask_irq(): irq = %u, ioapic->num_entries = %u\n", irq, ioapic->num_entries);    
     ASSERT(irq < ioapic->num_entries);
     val = ioapic_read_reg(ioapic, IOAPIC_IRQ_ENTRY_LO(irq));
     ioapic_write_reg(ioapic, IOAPIC_IRQ_ENTRY_LO(irq), val & ~IOAPIC_MASK_IRQ);

@@ -361,13 +361,23 @@ int route_interrupt_vector(struct nk_regs *regs, nk_hwirq_t vec)
   if(desc == NULL) {
     return vec;
   }
-  int ret = nk_handle_irq_actions(desc, regs); 
+
+  int ret = 1;
+  if(vec >= 32) {
+      // It's an LAPIC interrupt (we need to signal EOI)
+      ret = nk_handle_interrupt_generic_no_ack(NULL, regs, desc); 
+  } else {
+      // It's an exception, so no IRQ device
+      ret = nk_handle_irq_actions(desc, regs);
+  }
+
   if(ret) {
     return vec;
   } else {
     return 0;
   }
 }
+
 /*
 int idt_find_and_reserve_range(ulong_t numentries, int aligned, ulong_t *first)
 {

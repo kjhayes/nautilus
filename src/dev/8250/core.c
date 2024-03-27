@@ -24,6 +24,11 @@ int uart_8250_struct_init(struct uart_8250_port *port)
   spinlock_init(&port->input_lock);
   spinlock_init(&port->output_lock);
 
+  port->input_buf_head = 0;
+  port->input_buf_tail= 0;
+  port->output_buf_head = 0;
+  port->output_buf_tail = 0;
+
   // Assign default ops where no ops were assigned
   if(port->ops.read_reg == NULL) {
     port->ops.read_reg = uart_8250_default_uart_8250_ops.read_reg;
@@ -42,12 +47,6 @@ int uart_8250_struct_init(struct uart_8250_port *port)
   }
   if(port->ops.recv_pull == NULL) {
     port->ops.recv_pull = uart_8250_default_uart_8250_ops.recv_pull;
-  }
-  if(port->ops.kick_output == NULL) {
-    port->ops.kick_output = uart_8250_default_uart_8250_ops.kick_output;
-  }
-  if(port->ops.kick_input == NULL) {
-    port->ops.kick_input = uart_8250_default_uart_8250_ops.kick_input;
   }
   if(port->ops.handle_irq == NULL) {
     port->ops.handle_irq = uart_8250_default_uart_8250_ops.handle_irq;
@@ -69,11 +68,62 @@ int uart_8250_struct_init(struct uart_8250_port *port)
   return 0;
 }
 
+int uart_8250_input_buffer_empty(struct uart_8250_port *s)
+{
+    return s->input_buf_head == s->input_buf_tail;
+}
+int uart_8250_output_buffer_empty(struct uart_8250_port *s)
+{
+    return s->output_buf_head == s->output_buf_tail;
+}
+int uart_8250_input_buffer_full(struct uart_8250_port *s)
+{
+    return ((s->input_buf_tail + 1) % UART_8250_BUFFER_SIZE) == s->input_buf_head;
+}
+int uart_8250_output_buffer_full(struct uart_8250_port *s) 
+{
+    return ((s->output_buf_tail + 1) % UART_8250_BUFFER_SIZE) == s->output_buf_head;
+}
+void uart_8250_input_buffer_push(struct uart_8250_port *s, uint8_t data) {
+    s->input_buf[s->input_buf_tail] = data;
+    s->input_buf_tail = (s->input_buf_tail + 1) % UART_8250_BUFFER_SIZE;
+}
+uint8_t uart_8250_input_buffer_pull(struct uart_8250_port *s) {
+    uint8_t temp = s->input_buf[s->input_buf_head];
+    s->input_buf_head = (s->input_buf_head + 1) % UART_8250_BUFFER_SIZE;
+    return temp;
+}
+void uart_8250_output_buffer_push(struct uart_8250_port *s, uint8_t data) {
+    s->output_buf[s->output_buf_tail] = data;
+    s->output_buf_tail = (s->output_buf_tail + 1) % UART_8250_BUFFER_SIZE;
+}
+uint8_t uart_8250_output_buffer_pull(struct uart_8250_port *s) {
+    uint8_t temp = s->output_buf[s->output_buf_head];
+    s->output_buf_head = (s->output_buf_head + 1) % UART_8250_BUFFER_SIZE;
+    return temp;
+}
+
 int uart_8250_interrupt_handler(struct nk_irq_action *action, struct nk_regs *regs, void *state) 
 {
   struct uart_8250_port *port = (struct uart_8250_port *)state;
-  unsigned int iir = uart_8250_read_reg(port,UART_8250_IIR);
-  return uart_8250_handle_irq(port,iir);
+
+  unsigned int iir;
+  int res;
+
+  do {
+      iir = uart_8250_read_reg(port,UART_8250_IIR);
+      res = uart_8250_handle_irq(port,iir);
+  } while(((iir & 0x1) != 1) && res == 0);
+
+  if(res != 0) {
+      // Shouldn't print from an interrupt handler,
+      // but this shouldn't ever occur, so we want to see the error
+      // (even if it means deadlock)
+      ERROR("uart_8250_handle_irq returned a non-zero exit code! (res = %d)\n", res);
+      return res;
+  }
+  
+  return 0;
 }
 
 
@@ -249,19 +299,80 @@ int generic_8250_xmit_push(struct uart_8250_port *port, uint8_t src)
   uart_8250_write_reg(port, UART_8250_THR, (unsigned int)src);
   return 0;
 }
-int generic_8250_kick_output(struct uart_8250_port *port) 
+
+int uart_8250_kick_output(struct uart_8250_port *port) 
 {
-  if(port->dev) {
-    nk_dev_signal(port->dev);
-  }
-  return 0;
+    uint64_t count=0;
+
+    while (!uart_8250_output_buffer_empty(port)) { 
+	  uint8_t ls =  uart_8250_read_reg(port,UART_8250_LSR);
+	  if (ls & 0x20) { 
+	      // transmit holding register is empty
+	      // drive a byte to the device
+	      uint8_t data = uart_8250_output_buffer_pull(port);
+	      uart_8250_xmit_push(port,data);
+	      count++;
+	  } else {
+	      // chip is full, stop sending to it
+	      // but since we have more data, have it
+	      // interrupt us when it has room
+	      uint8_t ier = uart_8250_read_reg(port,UART_8250_IER);
+	      ier |= 0x2;
+	      uart_8250_write_reg(port,UART_8250_IER,ier);
+	      goto out;
+	  }
+    }
+    
+    // the chip has room, but we have no data for it, so
+    // disable the transmit interrupt for now
+    uint8_t ier = uart_8250_read_reg(port,UART_8250_IER);
+    ier &= ~0x2;
+    uart_8250_write_reg(port,UART_8250_IER,ier);
+
+ out:
+    if (count>0) { 
+	    nk_dev_signal((struct nk_dev*)(port->dev));
+    }
+
+    return 0;
 }
-int generic_8250_kick_input(struct uart_8250_port *port) 
+int uart_8250_kick_input(struct uart_8250_port *port) 
 {
-  if(port->dev) {
-    nk_dev_signal(port->dev);
-  }
-  return 0;
+    uint64_t count=0;
+    
+    while (!uart_8250_input_buffer_full(port)) { 
+	  uint8_t ls =  uart_8250_read_reg(port,UART_8250_LSR);
+	  if (ls & 0x04) {
+	      // parity error, skip this byte
+	      continue;
+	  }
+	  if (ls & 0x08) { 
+	      // framing error, skip this byte
+	      continue;
+	  }
+	  if (ls & 0x10) { 
+	      // break interrupt, but we do want this byte
+	  }
+	  if (ls & 0x02) { 
+	      // overrun error - we have lost a byte
+	      // but we do want this next one
+	  }
+	  if (ls & 0x01) { 
+	      // data ready
+	      // grab a byte from the device if there is room
+	      uint8_t data;
+          uart_8250_recv_pull(port,&data);
+	      uart_8250_input_buffer_push(port,data);
+	      count++;
+	  } else {
+	      // chip is empty, stop receiving from it
+	      break;
+	  }
+    }
+    if (count>0) {
+	    nk_dev_signal((struct nk_dev *)port->dev);
+    }
+    return 0;
 }
 
 int generic_8250_handle_irq(struct uart_8250_port *port, unsigned int iir) 
@@ -303,8 +414,6 @@ struct uart_8250_ops uart_8250_default_uart_8250_ops = {
   .recv_empty = generic_8250_recv_empty,
   .xmit_push = generic_8250_xmit_push,
   .recv_pull = generic_8250_recv_pull,
-  .kick_output = generic_8250_kick_output,
-  .kick_input = generic_8250_kick_input,
   .handle_irq = generic_8250_handle_irq
 };
 
@@ -402,17 +511,12 @@ int generic_8250_char_dev_read(void *state, uint8_t *dest)
 
   flags = spin_lock_irq_save(&uart->input_lock);
 
-  if(uart_8250_recv_empty(uart)) {
+  if(uart_8250_input_buffer_empty(uart)) {
     //generic_8250_direct_putchar(uart,'E');
     rc = 0;
   } else {
-    if(uart_8250_recv_pull(uart, dest)) {
-      //generic_8250_direct_putchar(uart,'$');
-      rc = 0;
-    } else {
-      //generic_8250_direct_putchar(uart,'#');
-      rc = 1;
-    }
+    *dest = uart_8250_input_buffer_pull(uart);
+    rc = 1;
   }
 
   spin_unlock_irq_restore(&uart->input_lock, flags);
@@ -430,14 +534,12 @@ int generic_8250_char_dev_write(void *state, uint8_t *src)
 
   flags = spin_lock_irq_save(&uart->output_lock);
 
-  if(uart_8250_xmit_full(uart)) {
+  if(uart_8250_output_buffer_full(uart)) {
     wc = 0;
   } else {
-    if(uart_8250_xmit_push(uart, *src)) {
-      wc = 0;
-    } else {
-      wc = 1;
-    }
+    uart_8250_output_buffer_push(uart, *src);
+    uart_8250_kick_output(uart);
+    wc = 1;
   }
 
   spin_unlock_irq_restore(&uart->output_lock, flags);
@@ -452,13 +554,13 @@ int generic_8250_char_dev_status(void *state)
   int flags;
 
   flags = spin_lock_irq_save(&uart->input_lock);
-  if(!uart->ops.recv_empty(uart)) {
+  if(!uart_8250_input_buffer_empty(uart)) {
     status |= NK_CHARDEV_READABLE;
   } 
   spin_unlock_irq_restore(&uart->input_lock, flags);
 
   flags = spin_lock_irq_save(&uart->output_lock);
-  if(!uart->ops.xmit_full(uart)) {
+  if(!uart_8250_output_buffer_full(uart)) {
     status |= NK_CHARDEV_WRITEABLE;
   } 
   spin_unlock_irq_restore(&uart->output_lock, flags);

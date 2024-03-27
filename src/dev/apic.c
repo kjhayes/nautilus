@@ -154,7 +154,6 @@ spur_int_handler (struct nk_irq_action * action, struct nk_regs *regs, void *sta
     struct apic_dev * a = per_cpu_get(apic);
     a->spur_int_cnt++;
 
-    /* we don't need to EOI here */
     return 0;
 }
 
@@ -772,10 +771,24 @@ static int apic_dev_get_characteristics(void *state, struct nk_irq_dev_character
   return 0;
 }
 
+static int apic_dev_eoi_irq(void *state, nk_hwirq_t irq) {
+    struct apic_dev *apic = (struct apic_dev*)state;
 
+    if(irq != APIC_SPUR_INT_VEC) {
+        apic_write(apic, APIC_REG_EOR, 0);
+    }
+
+    return 0;
+}
+
+static int apic_dev_irq_status(void *state, nk_hwirq_t hwirq) {
+    return IRQ_STATUS_ENABLED;
+}
 
 static struct nk_irq_dev_int apic_ops = {
-  .get_characteristics = apic_dev_get_characteristics
+  .get_characteristics = apic_dev_get_characteristics,
+  .eoi_irq = apic_dev_eoi_irq,
+  .irq_status = apic_dev_irq_status,
   // Leave the rest as NULL
 };
 
@@ -785,7 +798,7 @@ static struct nk_dev_int timer_ops = {
 };
 
 void
-apic_init (struct cpu * core)
+apic_percpu_init (struct cpu * core)
 {
     struct apic_dev * apic = NULL;
     ulong_t base_addr;
@@ -904,6 +917,10 @@ apic_init (struct cpu * core)
     char n[32];
     snprintf(n,32,"apic%u",core->id);
     struct nk_irq_dev *dev = nk_irq_dev_register(n,0,&apic_ops,(void*)apic);
+
+    if(nk_set_irq_devs_percpu(256-32, core->id, x86_vector_to_irq(32), dev)) {
+        panic("Failed to set APIC percpu irq_dev for core %u!\n", core->id);
+    }
 
     // assign interrupt handlers
     // all cores share the same IDT/etc, so only the BSP needs to do this
