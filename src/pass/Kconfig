@@ -1,4 +1,5 @@
 menu "Compiler Passes"
+  depends on USE_WLLVM
 
 config BEANDIP
   bool "BEANDIP"
