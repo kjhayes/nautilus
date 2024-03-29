@@ -84,6 +84,8 @@ typedef uint32_t nk_gpio_t;
 
 typedef uint32_t cpu_id_t;
 
+#define NK_NULL_CPU_ID (cpu_id_t)(-1)
+
 // Declare these so pointers can be passed to irq handlers without needing to include the full <nautilus/interrupts.h>
 struct nk_irq_action;
 struct nk_regs;

@@ -4,22 +4,28 @@
 #include <nautilus/endian.h>
 
 void arch_enable_ints(void)  {
-    //printk("ENABLED INTS\n");
-
     set_csr(sstatus, SSTATUS_SIE);
 }
-void arch_disable_ints(void) { clear_csr(sstatus, SSTATUS_SIE); }
-int  arch_ints_enabled(void) { return read_csr(sstatus) & SSTATUS_SIE; };
-
-#include <arch/riscv/plic.h>
-
-/*
-void arch_irq_enable(int irq) { plic_enable(irq, 1); }
-void arch_irq_disable(int irq) { 
-    printk("im disabling irq=%d\n", irq);
-    plic_disable(irq); 
+void arch_disable_ints(void) {
+    clear_csr(sstatus, SSTATUS_SIE); 
 }
-*/
+int  arch_ints_enabled(void) {
+    return read_csr(sstatus) & SSTATUS_SIE; 
+};
+
+cpu_id_t riscv_hartid_to_cpu_id(uint32_t hartid) {
+    struct naut_info *info = nk_get_nautilus_info();
+    for(int i = 0; i < info->sys.num_cpus; i++) {
+        struct cpu *cpu = info->sys.cpus[i];
+        if(cpu != NULL) {
+            if(cpu->hartid == hartid) {
+                return cpu->id;
+            }
+        }
+    }
+
+    return NK_NULL_CPU_ID;
+}
 
 uint32_t arch_cycles_to_ticks(uint64_t cycles) { /* TODO */ return cycles; }
 uint32_t arch_realtime_to_ticks(uint64_t ns) { return ((ns*RISCV_CLOCKS_PER_SECOND)/1000000000ULL); }
