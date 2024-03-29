@@ -1,7 +1,7 @@
 
 export
 
-include $(SCRIPTS_DIR)/Makefile.include
+include $(SCRIPTS_DIR)/include.mk
 include $(ROOT_DIR)/.config
 
 # Default rule which will be invoked
@@ -39,7 +39,7 @@ $(eval $(call builtin_rule,obj-y,builtin.o))
 # Always recurse into subdirs
 %/builtin.o: FORCE
 	$(call quiet-cmd,MAKE,$(call rel-dir, $@, $(ROOT_DIR)))
-	$(Q)$(MAKE) -C $(@D) -f $(SCRIPTS_DIR)/Makefile.build build
+	$(Q)$(MAKE) -C $(@D) -f $(SCRIPTS_DIR)/build.mk build
 
 %.o: %.c $(AUTOCONF)
 	$(call quiet-cmd,CC,$@)

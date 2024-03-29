@@ -18,8 +18,8 @@ LINK_DIR:=$(ROOT_DIR)/link
 # Config dependency
 PYTHON=python3
 
-include $(SCRIPTS_DIR)/Makefile.include
-include $(SCRIPTS_DIR)/Makefile.kconfig
+include $(SCRIPTS_DIR)/include.mk
+include $(SCRIPTS_DIR)/kconfig.mk
 
 # This checks to make sure that the .config file exists and has been loaded
 ifndef NAUT_CONFIG_CONFIG
@@ -120,7 +120,7 @@ root-builtin-dirs := $(SOURCE_DIR) $(LIBRARY_DIR)
 define root-builtin-dir-rule =
 $1/builtin.o: $$(AUTOCONF) FORCE
 	$$(call quiet-cmd,MAKE,$$(call rel-dir, $$@, $(ROOT_DIR)))
-	$$(Q)$$(MAKE) -C $1 -f $$(SCRIPTS_DIR)/Makefile.build builtin.o
+	$$(Q)$$(MAKE) -C $1 -f $$(SCRIPTS_DIR)/build.mk builtin.o
 endef
 $(foreach root-builtin-dir, $(root-builtin-dirs), $(eval $(call root-builtin-dir-rule,$(root-builtin-dir))))
 

@@ -2,7 +2,7 @@
 # Build system
 # ==========================================================================
 
-include $(SCRIPTS_DIR)/Makefile.include
+include $(SCRIPTS_DIR)/include.mk
 
 # -mpreferred-stack-boundary=2 is essential in preventing gcc 4.2.x
 # from aligning stack to 16 bytes. (Which is gcc's way of supporting SSE).

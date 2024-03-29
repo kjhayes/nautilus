@@ -2,7 +2,7 @@
 # Build system
 # ==========================================================================
 
-include $(SCRIPTS_DIR)/Makefile.include
+include $(SCRIPTS_DIR)/include.mk
 
 GRUBMKRESCUE := grub-mkrescue
 GENSYMS := $(ARCH_SCRIPTS_DIR)/gen_sym_file.sh
