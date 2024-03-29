@@ -683,7 +683,7 @@ static int gicv3_init_dev_info(struct nk_dev_info *info)
   {
     int num_register_blocks = gicd->num_redist_regions + 4;
     void *reg_bases[num_register_blocks];
-    int reg_sizes[num_register_blocks];
+    size_t reg_sizes[num_register_blocks];
 
     if(nk_dev_info_read_register_blocks(info, reg_bases, reg_sizes, &num_register_blocks)) {
       goto err_exit;

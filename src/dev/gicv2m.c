@@ -47,7 +47,7 @@ int gicv2m_of_init_frame(struct nk_dev_info *msi_info)
   int num_hwirq = 0;
 
   void *mmio_base = NULL;
-  int mmio_size = 0;
+  size_t mmio_size = 0;
 
   nk_dev_info_read_register_block(msi_info, &mmio_base, &mmio_size);
   mmio_base = nk_io_map(mmio_base, mmio_size, 0);

@@ -321,7 +321,7 @@ static int gicv2_init_dev_info(struct nk_dev_info *info)
   global_gicv2_ptr = gic;
 
   void * bases[2];
-  int sizes[2];
+  size_t sizes[2];
 
   if(nk_dev_info_read_register_blocks_exact(info, bases, sizes, 2)) {
     GIC_ERROR("Failed to read register mmio bases!\n");

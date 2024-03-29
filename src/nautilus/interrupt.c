@@ -594,7 +594,7 @@ int nk_dump_irq(nk_irq_t i)
       const char * name = "NULL";
       if(percpu_dev != NULL) 
       {
-        name = desc->per_cpu_irq_devs[cpuid]->dev.name;
+        name = percpu_dev->dev.name;
       }
 
       IRQ_PRINT("\tCPU[%u]: dev=\"%s\" %s%s%s\n", 

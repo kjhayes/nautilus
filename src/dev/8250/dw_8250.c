@@ -213,8 +213,8 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
   uart_8250_struct_init(&dw->port);
 #endif
 
-  uint64_t reg_base;
-  int reg_size;
+  void *reg_base;
+  size_t reg_size;
   if(nk_dev_info_read_register_block(info, &reg_base, &reg_size)) {
     ERROR("Failed to read register block for DW UART!\n");
     goto err_exit;

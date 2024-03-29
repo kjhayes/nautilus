@@ -118,8 +118,8 @@ static int sifive_init_one(struct nk_dev_info *info)
   did_alloc = 1;
 #endif
 
-  uint64_t mmio_base;
-  int mmio_size;
+  void *mmio_base;
+  size_t mmio_size;
   if(nk_dev_info_read_register_block(info, &mmio_base, &mmio_size)) {
     ERROR("init_one: Failed to read register block!\n");
     goto err_exit;

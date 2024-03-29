@@ -15,26 +15,18 @@
 #define PLIC_WARN(fmt, args...)    WARN_PRINT("[PLIC] " fmt, ##args)
 #define PLIC_ERROR(fmt, args...)    ERROR_PRINT("[PLIC] " fmt, ##args)
 
-#define MREG(plic_ptr, x) *((uint32_t *)((plic_ptr)->mmio_base + (uint64_t)(x)))
-#define READ_REG(x) *((uint32_t *)((x)))
-
 #define PLIC_PRIORITY_OFFSET 0x000000U
 #define PLIC_PENDING_OFFSET 0x1000U
-#define PLIC_ENABLE_OFFSET 0x002000U
-#define PLIC_ENABLE_STRIDE 0x80U
-
-#define IRQ_ENABLE 1
-#define IRQ_DISABLE 0
+#define PLIC_PENDING_STRIDE 0x80U
+#define PLIC_ENABLED_OFFSET 0x002000U
+#define PLIC_ENABLED_STRIDE 0x80U
 
 #define PLIC_CONTEXT_OFFSET 0x200000U
 #define PLIC_CONTEXT_STRIDE 0x1000U
-#define PLIC_CONTEXT_THRESHOLD 0x0U
-#define PLIC_CONTEXT_CLAIM 0x4U
+#define PLIC_CONTEXT_THRESHOLD_REGISTER_OFFSET 0x0U
+#define PLIC_CONTEXT_CLAIM_REGISTER_OFFSET 0x4U
 
 #define PLIC_PRIORITY(plic_ptr, n) (PLIC_PRIORITY_OFFSET + (n) * sizeof(uint32_t))
-#define PLIC_ENABLE(ctx_ptr, irq) ((ctx_ptr)->enable_offset + ((irq) / 32) * sizeof(uint32_t))
-#define PLIC_THRESHOLD(plic_ptr, h) ((uint64_t)(plic_ptr)->contexts[h].context_offset + PLIC_CONTEXT_THRESHOLD)
-#define PLIC_CLAIM(plic_ptr, h) ((uint64_t)(plic_ptr)->contexts[h].context_offset + PLIC_CONTEXT_CLAIM)
 
 #define PLIC_BASE_HWIRQ 1
 
@@ -46,15 +38,17 @@ struct sifive_plic *global_plic_array[MAX_NUM_PLICS];
 
 struct sifive_plic_context 
 {
-  nk_irq_t irq;
-  void *enable_offset;
-  void *context_offset;
+  struct sifive_plic *plic;
+  int ctx_num;
+
+  uint32_t hartid;
+  nk_irq_t hwirq;
 };
 
 struct sifive_plic 
 {
   void *mmio_base;
-  int mmio_size;
+  size_t mmio_size;
 
   int num_contexts;
   struct sifive_plic_context *contexts;
@@ -66,16 +60,81 @@ struct sifive_plic
 
 static int plic_context_is_supervisor(struct sifive_plic_context *ctx) 
 {
-  if(ctx->irq == PLIC_SMODE_HLIC_HWIRQ) {
+  if(ctx->hwirq == PLIC_SMODE_HLIC_HWIRQ) {
     return 1;
   } else {
     return 0;
   }
 }
 
+struct sifive_plic_context * plic_cpu_supervisor_context(struct sifive_plic *plic, cpu_id_t cpuid) {
+    uint32_t hartid = nk_get_cpu(cpuid)->hartid;
+    for(int i = 0; i < plic->num_contexts; i++) {
+        struct sifive_plic_context *ctx = &plic->contexts[i];
+        if(ctx->hartid != hartid) {
+            continue;
+        }
+        if(!plic_context_is_supervisor(ctx)) {
+            continue;
+        }
+        return ctx;
+    }
+    return NULL;
+}
+
+static int plic_context_irq_pending(struct sifive_plic_context *ctx, nk_hwirq_t hwirq) {
+    volatile uint32_t *bitmap = (uint32_t*)(ctx->plic->mmio_base + PLIC_PENDING_OFFSET + (PLIC_PENDING_STRIDE * ctx->ctx_num));
+    size_t bitmap_index = hwirq / 32;
+    size_t bitmap_bit = hwirq % 32;
+
+    return !!(bitmap[bitmap_index] & (1ULL << bitmap_bit));
+}
+
+static int plic_context_irq_enabled(struct sifive_plic_context *ctx, nk_hwirq_t hwirq) {
+    volatile uint32_t *bitmap = (uint32_t*)(ctx->plic->mmio_base + PLIC_ENABLED_OFFSET + (PLIC_ENABLED_STRIDE * ctx->ctx_num));
+    size_t bitmap_index = hwirq / 32;
+    size_t bitmap_bit = hwirq % 32;
+
+    return !!(bitmap[bitmap_index] & (1ULL << bitmap_bit));
+}
+
+static void * plic_context_register_block(struct sifive_plic_context *ctx) {
+    return ctx->plic->mmio_base + PLIC_CONTEXT_OFFSET + (ctx->ctx_num * PLIC_CONTEXT_STRIDE);
+}
+
+static uint32_t plic_context_threshold(struct sifive_plic_context *ctx) {
+    volatile uint32_t *threshold_reg = plic_context_register_block(ctx) + PLIC_CONTEXT_THRESHOLD_REGISTER_OFFSET;
+    return *threshold_reg;
+}
+
+static void plic_context_set_threshold(struct sifive_plic_context *ctx, uint32_t threshold) {
+    volatile uint32_t *threshold_reg = plic_context_register_block(ctx) + PLIC_CONTEXT_THRESHOLD_REGISTER_OFFSET;
+    *threshold_reg = threshold;
+}
+
+static uint32_t plic_priority(struct sifive_plic *plic, nk_hwirq_t hwirq) {
+    volatile uint32_t *priority_array = (volatile uint32_t*)plic->mmio_base;
+    return priority_array[hwirq];
+}
+
+static void plic_set_priority(struct sifive_plic *plic, nk_hwirq_t hwirq, uint32_t priority) {
+    volatile uint32_t *priority_array = (volatile uint32_t*)plic->mmio_base;
+    priority_array[hwirq] = priority;
+}
+
+static uint32_t plic_context_claim(struct sifive_plic_context *ctx) {
+    volatile uint32_t *claim_reg = plic_context_register_block(ctx) + PLIC_CONTEXT_CLAIM_REGISTER_OFFSET;
+    return *claim_reg;
+}
+
+static void plic_context_complete(struct sifive_plic_context *ctx, uint32_t claimed) {
+    volatile uint32_t *claim_reg = plic_context_register_block(ctx) + PLIC_CONTEXT_CLAIM_REGISTER_OFFSET;
+    *claim_reg = claimed;
+}
+
 static int plic_dev_get_characteristics(void *state, struct nk_irq_dev_characteristics *c)
 {
-  memset(c, 0, sizeof(c));
+  memset(c, 0, sizeof(struct nk_irq_dev_characteristics));
   return 0;
 }
 
@@ -84,7 +143,8 @@ int plic_percpu_init(void)
   for(int i = 0; i < MAX_NUM_PLICS; i++) {
     struct sifive_plic *plic = (struct sifive_plic*)global_plic_array[i];
     if(plic != NULL) {
-      MREG(plic, PLIC_THRESHOLD(plic,my_cpu_id())) = 0;
+        struct sifive_plic_context *ctx = plic_cpu_supervisor_context(plic, my_cpu_id());
+        plic_context_set_threshold(ctx, 0);
     }
   }
   return 0;
@@ -96,11 +156,11 @@ static int plic_dev_revmap(void *state, nk_hwirq_t hwirq, nk_irq_t *irq)
   if(hwirq < PLIC_BASE_HWIRQ || hwirq >= PLIC_BASE_HWIRQ + plic->num_irqs) {
     return -1;
   }
-  *irq = plic->irq_base + hwirq;
+  *irq = plic->irq_base + (hwirq-1);
   return 0;
 }
 
-static int plic_dev_translate(void *state, nk_dev_info_type_t type, void *raw, nk_hwirq_t *out) 
+static int plic_dev_translate(void *state, nk_dev_info_type_t type, const void *raw, nk_hwirq_t *out) 
 {
   struct sifive_plic *plic = (struct sifive_plic*)state;
   uint32_t *raw_cells = (uint32_t*)raw;
@@ -117,19 +177,21 @@ static int plic_dev_translate(void *state, nk_dev_info_type_t type, void *raw, n
 static int plic_dev_ack_irq(void *state, nk_hwirq_t *hwirq) 
 {
   struct sifive_plic *plic = (struct sifive_plic*)state;
-  *hwirq = MREG(plic, PLIC_CLAIM(plic,my_cpu_id()));
+  struct sifive_plic_context *ctx = plic_cpu_supervisor_context(plic, my_cpu_id());
+  *hwirq = plic_context_claim(ctx);
   return 0;
 }
 
 static int plic_dev_eoi_irq(void *state, nk_hwirq_t hwirq) 
 {
   struct sifive_plic *plic = (struct sifive_plic*)state;
-  MREG(plic, PLIC_CLAIM(plic,my_cpu_id())) = hwirq;
+  struct sifive_plic_context *ctx = plic_cpu_supervisor_context(plic, my_cpu_id());
+  plic_context_complete(ctx, (uint32_t)hwirq);
   return 0;
 }
 
 // KJH - Why is priority unused?
-static void plic_toggle(struct sifive_plic *plic, int hwirq, bool_t enable) 
+static void plic_set_enabled(struct sifive_plic *plic, int hwirq, bool_t enable) 
 {
     if (hwirq == 0) return;
 
@@ -137,9 +199,10 @@ static void plic_toggle(struct sifive_plic *plic, int hwirq, bool_t enable)
     // alternatively what Nick does is iterate through all the interrupts for each
     // PLIC during init and mask them
     // https://github.com/ChariotOS/chariot/blob/7cf70757091b79cbb102a943a963dce516a8c667/arch/riscv/plic.cpp#L85-L88
-    MREG(plic, 4 * hwirq) = 7;
+    plic_set_priority(plic, hwirq, 7);
 
-    uint32_t mask = (1 << (hwirq % 32));
+    size_t index = hwirq / 32;
+    uint32_t mask = (1ULL << (hwirq % 32));
 
     for(int i = 0; i < plic->num_contexts; i++) 
     {
@@ -149,7 +212,9 @@ static void plic_toggle(struct sifive_plic *plic, int hwirq, bool_t enable)
         continue;
       }
 
-      uint32_t val = MREG(plic, PLIC_ENABLE(ctx, hwirq));
+      volatile uint32_t *bitmap = (uint32_t*)(plic->mmio_base + PLIC_ENABLED_OFFSET + (i * PLIC_ENABLED_STRIDE));
+
+      uint32_t val = bitmap[index];
 
       // printk("Hart: %d, hwirq: %d, v1: %d\n", hart, hwirq, val);
       if (enable)
@@ -158,22 +223,21 @@ static void plic_toggle(struct sifive_plic *plic, int hwirq, bool_t enable)
           val &= ~mask;
 
       //printk("Hart: %d, hwirq: %d, irq: %x, *irq: %x\n", hart, hwirq, &MREG(PLIC_ENABLE(plic, hwirq, hart)), val);
-
-      MREG(plic, PLIC_ENABLE(ctx, hwirq)) = val;
+      bitmap[index] = val;
     }
 }
 
 static int plic_dev_enable_irq(void *state, nk_hwirq_t hwirq) 
 {
   struct sifive_plic *plic = (struct sifive_plic*)state;
-  plic_toggle(plic, hwirq, 1);
+  plic_set_enabled(plic, hwirq, 1);
   return 0;
 }
 
 static int plic_dev_disable_irq(void *state, nk_hwirq_t hwirq) 
 {
   struct sifive_plic *plic = (struct sifive_plic*)state; 
-  plic_toggle(plic, hwirq, 0);
+  plic_set_enabled(plic, hwirq, 0);
   return 0;
 }
 
@@ -196,12 +260,10 @@ static int plic_dev_irq_status(void *state, nk_hwirq_t hwirq)
     return IRQ_STATUS_ERROR;
   }
 
-  uint32_t enable_val = MREG(plic, PLIC_ENABLE(ctx, hwirq));
-
-  status |= enable_val & (1ULL<<(hwirq % 32)) ?
+  status |= plic_context_irq_enabled(ctx, hwirq) ?
     IRQ_STATUS_ENABLED : 0;
 
-  status |= MREG(plic, PLIC_PENDING_OFFSET) & (1ULL<<(hwirq % 64)) ?
+  status |= plic_context_irq_pending(ctx, hwirq) ?
     IRQ_STATUS_PENDING : 0;
 
   // KJH - No idea how to get this right now (Possible we can't)
@@ -252,12 +314,26 @@ static int plic_init_dev_info(struct nk_dev_info *info)
   int did_register = 0;
   int did_context_alloc = 0;
 
+  uint8_t flags = irq_disable_save();
+
   if(info->type != NK_DEV_INFO_OF) {
     PLIC_ERROR("Currently only support device tree initialization!\n");
     goto err_exit;
   }
 
   struct sifive_plic *plic = malloc(sizeof(struct sifive_plic));
+  int found_global_slot = 0;
+  for(int i = 0; i < MAX_NUM_PLICS; i++) {
+      if(global_plic_array[i] == NULL) {
+          global_plic_array[i] = plic;
+          found_global_slot = 1;
+      }
+  }
+
+  if(!found_global_slot) {
+      PLIC_WARN("Found more PLIC's than MAX_NUM_PLICS (%u)!\n", MAX_NUM_PLICS);
+      goto err_exit;
+  }
 
   if(plic == NULL) 
   {
@@ -325,34 +401,51 @@ static int plic_init_dev_info(struct nk_dev_info *info)
   int smode_handler_set = 0;
   
   for(int i = 0; i < plic->num_contexts; i++) {
-    plic->contexts[i].irq = nk_dev_info_read_irq(info, i);
 
-    if(plic->contexts[i].irq == NK_NULL_IRQ) {
+    plic->contexts[i].plic = plic;
+    plic->contexts[i].ctx_num = i;
+
+    struct nk_dev_info *hlic_node = nk_dev_info_read_irq_parent(info, i);
+    struct nk_dev_info *cpu_node = nk_dev_info_get_parent(hlic_node);
+    uint32_t hartid = -1;
+    if(nk_dev_info_read_int(info, "reg", 4, &hartid)) {
+        PLIC_ERROR("Could not get Hart ID from parent node of Context's interrupt parent!\n");
+        continue;
+    }
+
+    nk_irq_t ctx_irq = nk_dev_info_read_irq(info, i);
+
+    if(ctx_irq == NK_NULL_IRQ) {
       PLIC_ERROR("Context (%u) does not exist\n", i);
       continue;
     }
 
+    struct nk_irq_desc *desc = nk_irq_to_desc(ctx_irq);
+    if(desc == NULL) {
+        PLIC_ERROR("Could not get irq descriptor for Context (%u) HLIC IRQ!\n", i);
+        continue;
+    }
+    plic->contexts[i].hwirq = desc->hwirq;
+    plic->contexts[i].hartid = hartid;
+
     if(!smode_handler_set) {
-      struct nk_irq_desc *desc = nk_irq_to_desc(plic->contexts[i].irq);
       if(desc != NULL) {
         if(desc->hwirq == PLIC_SMODE_HLIC_HWIRQ) {
   
           // Register the supervisor interrupt handler
-          if(nk_irq_add_handler_dev(plic->contexts[i].irq, plic_interrupt_handler, (void*)plic, (struct nk_dev*)dev)) {
+          if(nk_irq_add_handler_dev(ctx_irq, plic_interrupt_handler, (void*)plic, (struct nk_dev*)dev)) {
             PLIC_ERROR("Failed to assign IRQ handler to context (%u)!\n");
             goto err_exit;
           }
-          nk_unmask_irq(plic->contexts[i].irq);
+          nk_unmask_irq(ctx_irq);
 
           smode_handler_set = 1; 
         }
       } else {
         // Weird
-        PLIC_WARN("PLIC read IRQ without interrupt descriptor (irq=%u)!\n", plic->contexts[i].irq);
+        PLIC_WARN("PLIC read IRQ without interrupt descriptor (irq=%u)!\n", ctx_irq);
       }
     }
-    plic->contexts[i].enable_offset = (void*)(uint64_t)(PLIC_ENABLE_OFFSET + (i * PLIC_ENABLE_STRIDE)); 
-    plic->contexts[i].context_offset = (void*)(uint64_t)(PLIC_CONTEXT_OFFSET + (i * PLIC_CONTEXT_STRIDE));
   }
 
   if(!smode_handler_set) {
@@ -360,8 +453,13 @@ static int plic_init_dev_info(struct nk_dev_info *info)
     goto err_exit;
   }
 
-  PLIC_DEBUG("initialized globally!\n");
+  for(int i = 0; i < plic->num_irqs; i++) {
+      nk_irq_t irq = plic->irq_base + i;
+      nk_mask_irq(irq);
+  }
 
+  PLIC_DEBUG("initialized globally!\n");
+  irq_enable_restore(flags);
   return 0;
 
 err_exit:
@@ -374,6 +472,7 @@ err_exit:
   if(did_register) {
     nk_irq_dev_unregister(dev);
   }
+  irq_enable_restore(flags);
   return -1;
 }
 
@@ -400,6 +499,9 @@ static const struct of_dev_match plic_of_dev_match = {
 int plic_init(void) 
 { 
   PLIC_DEBUG("init\n");
+  for(int i = 0; i < MAX_NUM_PLICS; i++) {
+      global_plic_array[i] = NULL;
+  }
   return of_for_each_match(&plic_of_dev_match, plic_init_dev_info);
 }
 

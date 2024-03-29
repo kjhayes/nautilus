@@ -98,7 +98,7 @@ struct uart_8250_port
 {
   struct uart_port port;
 
-  uint64_t reg_base;
+  void * reg_base;
   int reg_shift;
 
   nk_irq_t irq;

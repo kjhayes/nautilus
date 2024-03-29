@@ -100,8 +100,9 @@ struct nk_dev_info_int {
   int(*read_int_array)(void *state, const char *prop_name, int elem_size, void *buf, int *buf_cnt);
   int(*read_string_array)(void *state, const char *prop_name, const char **buf, int *buf_cnt);
 
-  int(*read_register_blocks)(void *state, void **bases, int *sizes, int *count);
+  int(*read_register_blocks)(void *state, void **bases, size_t *sizes, int *count);
   nk_irq_t(*read_irq)(void *state, int index);
+  struct nk_dev_info*(*read_irq_parent)(void *state, int index);
   int(*num_irq)(void *state);
 
   struct nk_dev_info *(*get_parent)(void *state);
@@ -236,6 +237,15 @@ inline static nk_irq_t nk_dev_info_read_irq(const struct nk_dev_info *info, int 
   }
 }
 
+inline static struct nk_dev_info * nk_dev_info_read_irq_parent(const struct nk_dev_info *info, int index) 
+{
+  if(info && info->interface && info->interface->read_irq_parent) {
+    return info->interface->read_irq_parent(info->state, index);
+  } else {
+    return NULL;
+  }
+}
+
 inline static int nk_dev_info_num_irq(const struct nk_dev_info *info) 
 {
   if(info && info->interface && info->interface->num_irq) {
@@ -245,7 +255,7 @@ inline static int nk_dev_info_num_irq(const struct nk_dev_info *info)
   }
 }
 
-inline static int nk_dev_info_read_register_blocks(const struct nk_dev_info *info, void** bases, int *sizes, int *block_count) 
+inline static int nk_dev_info_read_register_blocks(const struct nk_dev_info *info, void** bases, size_t *sizes, int *block_count) 
 {
   if(info && info->interface && info->interface->read_register_blocks) {
     return info->interface->read_register_blocks(info->state, bases, sizes, block_count);
@@ -253,7 +263,7 @@ inline static int nk_dev_info_read_register_blocks(const struct nk_dev_info *inf
     return -1;
   }
 }
-inline static int nk_dev_info_read_register_blocks_exact(const struct nk_dev_info *info, void** bases, int *sizes, int block_count) 
+inline static int nk_dev_info_read_register_blocks_exact(const struct nk_dev_info *info, void** bases, size_t *sizes, int block_count) 
 {
   int mod_count = block_count;
   int ret = nk_dev_info_read_register_blocks(info, bases, sizes, &mod_count);
@@ -262,7 +272,7 @@ inline static int nk_dev_info_read_register_blocks_exact(const struct nk_dev_inf
   }
   return ret;
 }
-inline static int nk_dev_info_read_register_block(const struct nk_dev_info *info, void **base, int *size) {
+inline static int nk_dev_info_read_register_block(const struct nk_dev_info *info, void **base, size_t *size) {
   return nk_dev_info_read_register_blocks_exact(info, base, size, 1);
 }
 

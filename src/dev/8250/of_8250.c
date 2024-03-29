@@ -27,11 +27,6 @@ static int of_8250_fdt_init(void * dtb, uint64_t offset, struct uart_8250_port *
       return -1;
     }
 
-    port->reg_base = nk_io_map(reg.address, reg.size, 0);
-    if((void*)port->reg_base == NULL) {
-      return -1;
-    }
-
     // Set default ops
     port->ops = uart_8250_default_uart_8250_ops;
     uart_8250_struct_init(port);
@@ -42,6 +37,15 @@ static int of_8250_fdt_init(void * dtb, uint64_t offset, struct uart_8250_port *
     if(reg_shift_ptr != NULL) {
       port->reg_shift = be32toh(*reg_shift_ptr);
     }
+
+    const uint32_t *reg_offset_ptr = fdt_getprop((void*)dtb, offset, "reg-offset", &lenp);
+    uint32_t reg_offset = 0;
+    if(reg_offset_ptr != NULL) {
+        uint32_t offset = *reg_offset_ptr;
+        DEBUG("Shifted I/O Region by %u bytes\n", offset);
+        reg.address += offset;
+        reg.size -= offset;
+    }
     
     const uint32_t *reg_width_ptr = fdt_getprop((void*)dtb, offset, "reg-io-width", &lenp);
     if(reg_width_ptr != NULL) {
@@ -49,15 +53,24 @@ static int of_8250_fdt_init(void * dtb, uint64_t offset, struct uart_8250_port *
       switch(reg_width) {
         case 1:
           port->ops.write_reg = generic_8250_write_reg_mem8;
+          port->ops.read_reg = generic_8250_read_reg_mem8;
           break;
         case 4:
           port->ops.write_reg = generic_8250_write_reg_mem32;
+          port->ops.read_reg = generic_8250_read_reg_mem32;
           break;
         default:
-          ERROR("Could not assign uart_8250_ops.write_reg for UART, using default!\n");
+          ERROR("Could not assign uart_8250_ops.read_reg/write_reg for UART, using default!\n");
           break;
       }
     }
+
+    // Map the I/O Region
+    port->reg_base = nk_io_map(reg.address, reg.size, 0);
+    if((void*)port->reg_base == NULL) {
+      return -1;
+    }
+
 
     return 0;
 }
@@ -149,18 +162,46 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
   uart_8250_struct_init(port);
 #endif
 
-  void * reg_base;
-  int reg_size;
-  if(nk_dev_info_read_register_block(info, &reg_base, &reg_size)) {
-    ERROR("Failed to read register block for UART!\n");
-    goto err_exit;
-  }
-
 #ifdef NAUT_CONFIG_OF_8250_UART_EARLY_OUTPUT
   if(did_alloc == 0) {
     DEBUG("Skipping mapping I/O registers for early inited UART\n");
   } else {
 #endif
+
+    void * reg_base;
+    size_t reg_size;
+    if(nk_dev_info_read_register_block(info, &reg_base, &reg_size)) {
+      ERROR("Failed to read register block for UART!\n");
+      goto err_exit;
+    }
+
+    uint32_t reg_width;
+    if(!nk_dev_info_read_u32(info, "reg-io-width", &reg_width)) {
+      switch(reg_width) {
+        case 1:
+          port->ops.write_reg = generic_8250_write_reg_mem8;
+          port->ops.read_reg = generic_8250_read_reg_mem8;
+          break;
+        case 4:
+          port->ops.write_reg = generic_8250_write_reg_mem32;
+          port->ops.read_reg = generic_8250_read_reg_mem32;
+          break;
+        default:
+          ERROR("Could not assign uart_8250_ops.read_reg/write_reg for UART, using default!\n");
+          break;
+      }
+    }
+
+    uint32_t reg_offset;
+    if(nk_dev_info_read_u32(info, "reg-offset", &reg_offset)) {
+        DEBUG("Applying reg-offset: %u bytes\n", reg_offset);
+        reg_base += reg_offset;
+        reg_size -= reg_offset;
+    }
+    if(nk_dev_info_read_u32(info, "reg-shift", &port->reg_shift)) {
+      port->reg_shift = 0;
+    }
+
     DEBUG("Mapping I/O registers for UART\n");
     port->reg_base = nk_io_map(reg_base, reg_size, 0);
     if((void*)port->reg_base == NULL) {
@@ -170,28 +211,10 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
       DEBUG("Mapped I/O registers for UART\n");
     }
     did_map = 1;
+
 #ifdef NAUT_CONFIG_OF_8250_UART_EARLY_OUTPUT
   }
 #endif
-
-  uint32_t reg_width;
-  if(!nk_dev_info_read_u32(info, "reg-io-width", &reg_width)) {
-    switch(reg_width) {
-      case 1:
-        port->ops.write_reg = generic_8250_write_reg_mem8;
-        break;
-      case 4:
-        port->ops.write_reg = generic_8250_write_reg_mem32;
-        break;
-      default:
-        ERROR("Could not assign uart_8250_ops.write_reg for UART, using default!\n");
-        break;
-    }
-  }
-
-  if(nk_dev_info_read_u32(info, "reg-shift", &port->reg_shift)) {
-    port->reg_shift = 0;
-  }
 
   port->irq = nk_dev_info_read_irq(info, 0);
 
@@ -203,7 +226,7 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
   char name_buf[DEV_NAME_LEN];
   snprintf(name_buf,DEV_NAME_LEN,"serial%u",nk_dev_get_serial_device_number());
 
-  struct nk_char_dev *dev = nk_char_dev_register(name_buf,NK_DEV_FLAG_NO_WAIT,&generic_8250_char_dev_int,(void*)port);
+  struct nk_char_dev *dev = nk_char_dev_register(name_buf,0/*NK_DEV_FLAG_NO_WAIT*/,&generic_8250_char_dev_int,(void*)port);
   port->dev = (struct nk_dev*)dev;
 
   if(dev == NULL) {

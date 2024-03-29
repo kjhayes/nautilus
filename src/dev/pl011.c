@@ -392,7 +392,7 @@ int pl011_uart_init_one(struct nk_dev_info *info)
     goto err_exit;
   }
 
-  int mmio_size;
+  size_t mmio_size;
   int ret;
   ret = nk_dev_info_read_register_block(info, &uart->mmio_base, &mmio_size);
   if(ret) {

@@ -490,6 +490,11 @@ int generic_8250_enable_recv_interrupts(struct uart_8250_port *port)
   return 0;
 }
 
+int generic_8250_recv_interrupts_enabled(struct uart_8250_port *port) {
+    unsigned int ier = uart_8250_read_reg(port, UART_8250_IER);
+    return ier & (UART_8250_IER_RECV_DATA_AVAIL | UART_8250_IER_RECV_LINE_STATUS);
+}
+
 /*
  * Implementations of the 8250 nk_char_dev_int ops
  */
