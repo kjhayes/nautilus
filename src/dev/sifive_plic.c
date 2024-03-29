@@ -144,7 +144,11 @@ int plic_percpu_init(void)
     struct sifive_plic *plic = (struct sifive_plic*)global_plic_array[i];
     if(plic != NULL) {
         struct sifive_plic_context *ctx = plic_cpu_supervisor_context(plic, my_cpu_id());
-        plic_context_set_threshold(ctx, 0);
+        if(ctx != NULL) {
+          plic_context_set_threshold(ctx, 0);
+        } else {
+            PLIC_WARN("Could not find supervisor context for CPU (%u)!\n", my_cpu_id());
+        }
     }
   }
   return 0;
@@ -408,9 +412,12 @@ static int plic_init_dev_info(struct nk_dev_info *info)
     struct nk_dev_info *hlic_node = nk_dev_info_read_irq_parent(info, i);
     struct nk_dev_info *cpu_node = nk_dev_info_get_parent(hlic_node);
     uint32_t hartid = -1;
-    if(nk_dev_info_read_int(info, "reg", 4, &hartid)) {
+    if(nk_dev_info_read_u32(cpu_node, "reg", &hartid)) {
         PLIC_ERROR("Could not get Hart ID from parent node of Context's interrupt parent!\n");
         continue;
+    } else {
+        PLIC_DEBUG("IRQ Parent = %s\n", nk_dev_info_get_name(hlic_node));
+        PLIC_DEBUG("IRQ Parent Parent = %s\n", nk_dev_info_get_name(cpu_node));
     }
 
     nk_irq_t ctx_irq = nk_dev_info_read_irq(info, i);
@@ -427,6 +434,8 @@ static int plic_init_dev_info(struct nk_dev_info *info)
     }
     plic->contexts[i].hwirq = desc->hwirq;
     plic->contexts[i].hartid = hartid;
+
+    PLIC_DEBUG("Context (%u): hwirq = %u, hartid = %u\n", i, desc->hwirq, hartid);
 
     if(!smode_handler_set) {
       if(desc != NULL) {

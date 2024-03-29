@@ -46,6 +46,8 @@ configure_cpu (unsigned long fdt, int offset) {
     new_cpu->id = sys->num_cpus;
     new_cpu->hartid     = reg_addr;
 
+    SMP_PRINT("CPU(%u) -> HARTID(%u)\n", new_cpu->id, new_cpu->hartid);
+
     new_cpu->enabled    = enabled;
     new_cpu->is_bsp     = (new_cpu->hartid == sys->bsp_id ? 1 : 0);
     new_cpu->cpu_sig    = 0;

@@ -8,7 +8,6 @@ menu "Platform"
                         select HAS_MSI
                         select HAS_PCI
 			select HAS_PORT_IO
-                        select HAS_CONTIGUOUS_CPU_ID
                         select USE_PCI_CAM
                         select USE_MULTIBOOT
                         select XCALL_SUPPORT
@@ -91,6 +90,16 @@ menu "Platform"
         help 
           Specifies the maximum number of hardware CPUs supported by Nautilus 
           For uniprocessor environments, set this to 1
+
+    config MIN_CPUS
+        int "Minimum Number of CPUs"
+        range 1 2048
+        default "1"
+        help
+          Specifies the minimum number of hardware CPUs supported by Nautilus
+          For multiprocessor evironments, set this to greater than 1
+          This exists to avoid configuration options which will cause bugs in a uniprocessor
+          system (ex. Work Stealing will cause an infinite loop if there is only a single processor)
 
     config MAX_IOAPICS
         depends on X86_64_HOST
@@ -438,6 +447,7 @@ config VIRTUAL_CONSOLE_SERIAL_MIRROR_ALL
     config WORK_STEALING
        bool "Work stealing"
        default n
+       depends on MIN_CPUS > 1
        help
         If enabled an idle cpu will attempt to steal
         runnable threads from other cpus.  
@@ -1868,11 +1878,6 @@ config HAS_MSI
       Does the current configuration have support for MSI interrupts? (set by the architecture or irq device)
 
 # Multi Processing
-
-config HAS_CONTIGUOUS_CPU_ID
-    def_bool n
-    help
-      cpu_id_t values are all contiguous for this architecture
 
 config XCALL_SUPPORT
     def_bool n

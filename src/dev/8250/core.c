@@ -391,6 +391,8 @@ int generic_8250_handle_irq(struct uart_8250_port *port, unsigned int iir)
       break;
     case UART_8250_IIR_RECV_TIMEOUT:
 //      generic_8250_direct_putchar(port,'T');
+      uart_8250_kick_input(port);
+      break;
     case UART_8250_IIR_RECV_DATA_AVAIL:
 //      generic_8250_direct_putchar(port,'R');
       uart_8250_kick_input(port);
