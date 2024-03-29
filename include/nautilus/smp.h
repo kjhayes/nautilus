@@ -32,6 +32,7 @@ extern "C" {
 /******* EXTERNAL INTERFACE *********/
 
 uint32_t nk_get_num_cpus (void);
+struct cpu *nk_get_cpu(cpu_id_t);
 
 /******* !EXTERNAL INTERFACE! *********/
 
@@ -107,6 +108,10 @@ struct cpu {
     uint8_t aff1;
     uint8_t aff2;
     uint8_t aff3;
+#endif
+
+#ifdef NAUT_CONFIG_ARCH_RISCV
+    uint32_t hartid;
 #endif
 
 #if defined(NAUT_CONFIG_ARCH_RISCV) || defined(NAUT_CONFIG_ARCH_ARM64)

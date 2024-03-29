@@ -108,7 +108,6 @@ static int hlic_dev_disable_irq(void *state, nk_hwirq_t hwirq)
 
 static int hlic_dev_irq_status(void *state, nk_hwirq_t hwirq) 
 {
-  printk("hlic_status!\n");
   struct hlic *hlic = (struct hlic*)state;
 
   int status = 0;

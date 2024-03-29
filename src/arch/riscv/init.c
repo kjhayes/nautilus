@@ -376,14 +376,8 @@ void init(unsigned long hartid, unsigned long fdt) {
   start_secondary(&(naut->sys));
 
   nk_sched_start();
-/*
-  nk_vc_init();
 
-#ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE
-  nk_vc_start_chardev_console(chardev_name);
-#endif 
-*/
-
+  nk_dump_all_irq();
 
   nk_fs_init();
 
@@ -423,9 +417,10 @@ void init(unsigned long hartid, unsigned long fdt) {
   nk_vc_start_chardev_console(chardev_name);
   printk("chardev console inited!\n");
 #endif 
+
   /*
   const char ** script = {
-    "threadtest",
+    "interrupts",
     "\0",
     0
   };

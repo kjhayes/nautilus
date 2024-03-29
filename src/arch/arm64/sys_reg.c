@@ -18,7 +18,7 @@ cpu_id_t mpidr_el1_to_cpu_id(mpidr_el1_t *mpid) {
     }
   }
 
-  return (cpu_id_t)-1;
+  return NK_NULL_CPU_ID;
 }
 
 int ttbr0_el1_set_base_addr(ttbr0_el1_t *reg, void *addr) 

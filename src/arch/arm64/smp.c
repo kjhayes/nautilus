@@ -106,10 +106,7 @@ static int fdt_handle_cpu_node (unsigned long fdt, int offset, int cpu_addr_cell
       goto err_free;
     }
 
-    new_cpu->is_bsp     = (new_cpu->aff0 |
-                          new_cpu->aff1 |
-                          new_cpu->aff2 |
-                          new_cpu->aff3) == 0;
+    new_cpu->is_bsp     = new_cpu->aff0 == sys->bsp_id;
 
     // Other fields
     new_cpu->cpu_sig    = 0;

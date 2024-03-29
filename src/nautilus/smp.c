@@ -34,7 +34,13 @@
 uint32_t
 nk_get_num_cpus (void)
 {
-    struct sys_info * sys = per_cpu_get(system);
+    struct sys_info * sys = &nk_get_nautilus_info()->sys;
     return sys->num_cpus;
+}
+
+struct cpu *
+nk_get_cpu(cpu_id_t cpuid) {
+    struct sys_info * sys = &nk_get_nautilus_info()->sys;
+    return sys->cpus[cpuid];
 }
 

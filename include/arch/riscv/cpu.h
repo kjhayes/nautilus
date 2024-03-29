@@ -46,6 +46,7 @@ struct nk_regs {
 
 };
 
+
 #define pause()       asm volatile("nop");
 
 #define PAUSE_WHILE(x) \
