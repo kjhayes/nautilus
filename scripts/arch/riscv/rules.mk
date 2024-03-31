@@ -8,25 +8,6 @@ uImage: $(NAUT_BIN)
 		-d Image uImage
 	$(Q)rm Image
 
-QEMU_CMD = qemu-system-riscv64 \
-            -bios default \
-		    -smp cpus=1 \
-            -m 2G \
-            -M virt \
-            -kernel uImage \
-            -serial stdio
-
-qemu: uImage
-	$(QEMU_CMD)
-
-qemu-gdb: uImage
-	$(QEMU_CMD) -gdb tcp\:\:5261 -S
-
-device-tree:
-	$(QEMU_CMD) -machine dumpdtb=qemu.dtb
-	dtc qemu.dtb -o qemu.dts
-
-
 riscv-clean:
 	$(Q)rm -f uImage
 	$(Q)rm -f Image

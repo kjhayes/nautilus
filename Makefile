@@ -157,6 +157,41 @@ $(NAUT_ASM): $(NAUT_BIN)
 	$(Q)$(OBJDUMP) -S $(NAUT_BIN) > $@
 endif
 
+ifdef QEMU
+
+QEMU_FLAGS += -smp cpus=2
+QEMU_FLAGS += -serial stdio
+QEMU_FLAGS += -m 2G
+
+qemu: $(QEMU_DEPS)
+	$(QEMU) $(QEMU_FLAGS)
+qemu-gdb: $(QEMU_DEPS)
+	$(QEMU) $(QEMU_FLAGS) -gdb tcp::1234 -S
+qemu-gdb-%: $(QEMU_DEPS)
+	$(QEMU) $(QEMU_FLAGS) -gdb tcp::$* -S
+
+ifdef NAUT_CONFIG_USE_FDT
+
+QEMU_DTB := $(OUTPUT_DIR)/qemu.dtb
+QEMU_DTS := $(OUTPUT_DIR)/qemu.dts
+
+$(QEMU_DTB): $(QEMU_DEPS) FORCE
+	$(Q)$(QEMU) $(QEMU_FLAGS) -machine dumpdtb=$(QEMU_DTB)	
+
+DTC := dtc
+%.dts: %.dtb
+	$(Q)$(DTC) $< -o $@
+
+qemu-dts: $(QEMU_DTS)
+
+device-tree-clean: FORCE
+	$(Q)rm -f $(QEMU_DTB)
+	$(Q)rm -f $(QEMU_DTS)
+CLEAN_RULES += device-tree-clean
+
+endif
+endif
+
 DEFAULT_RULES ?= $(NAUT_BIN)
 default: $(DEFAULT_RULES)
 

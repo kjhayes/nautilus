@@ -16,3 +16,7 @@ endif
 
 COMMON_FLAGS += -mcmodel=large -mno-red-zone
 
+QEMU := qemu-system-x86_64
+QEMU_DEPS += $(NAUT_ISO)
+QEMU_FLAGS += -cdrom $(NAUT_ISO)
+

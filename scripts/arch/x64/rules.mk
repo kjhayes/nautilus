@@ -55,9 +55,6 @@ $(NAUT_ISO): $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC)
 
 DEFAULT_RULES += $(NAUT_ISO)
 
-qemu: $(NAUT_ISO)
-	qemu-system-x86_64 -cdrom $(NAUT_ISO) -serial stdio
-
 CLEAN_RULES += x64-clean-isoimage
 
 x64-clean-isoimage:
