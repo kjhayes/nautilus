@@ -782,13 +782,44 @@ static int apic_dev_eoi_irq(void *state, nk_hwirq_t irq) {
 }
 
 static int apic_dev_irq_status(void *state, nk_hwirq_t hwirq) {
+    // "APIC" hwirq's are x86 vectors (always enabled)
     return IRQ_STATUS_ENABLED;
 }
 
+static int apic_dev_send_ipi(void *state, nk_hwirq_t hwirq, cpu_id_t cpuid) {
+    struct apic_dev *apic = (struct apic_dev*)state;
+    if(hwirq < 0 || hwirq >= 256) {
+        return IRQ_IPI_ERROR_IRQ_NO;
+    }
+    if(cpuid < 0 || cpuid >= nk_get_num_cpus()) {
+        return IRQ_IPI_ERROR_CPUID;
+    }
+    struct cpu *other_cpu = nk_get_nautilus_info()->sys.cpus[cpuid];
+    if(other_cpu == NULL) {
+        return IRQ_IPI_ERROR_CPUID;
+    }
+    struct apic_dev *other_apic = nk_get_nautilus_info()->sys.cpus[cpuid]->apic;
+    if(other_apic == NULL) {
+        return IRQ_IPI_ERROR_CPUID;
+    }
+    apic_ipi(apic, apic_get_id(other_apic), hwirq);
+    return 0;
+}
+
+static int apic_dev_broadcast_ipi(void *state, nk_hwirq_t hwirq) {
+    struct apic_dev *apic = (struct apic_dev*)state;
+    if(hwirq < 0 || hwirq >= 256) {
+        return IRQ_IPI_ERROR_IRQ_NO;
+    }
+    apic_bcast_ipi(apic, hwirq);
+    return 0;
+}
 static struct nk_irq_dev_int apic_ops = {
   .get_characteristics = apic_dev_get_characteristics,
   .eoi_irq = apic_dev_eoi_irq,
   .irq_status = apic_dev_irq_status,
+  .send_ipi = apic_dev_send_ipi,
+  .broadcast_ipi = apic_dev_broadcast_ipi,
   // Leave the rest as NULL
 };
 
@@ -920,6 +951,13 @@ apic_percpu_init (struct cpu * core)
 
     if(nk_set_irq_devs_percpu(256-32, core->id, x86_vector_to_irq(32), dev)) {
         panic("Failed to set APIC percpu irq_dev for core %u!\n", core->id);
+    }
+
+    // The APIC can send IPI's to any vector afaik -KJH 
+    // (Someone who understands the apic better might want to check me on that one).
+    for(int i = 0; i < 256; i++) {
+        struct nk_irq_desc *desc = nk_irq_to_desc(x86_vector_to_irq(i));
+        desc->flags |= NK_IRQ_DESC_FLAG_IPI;
     }
 
     // assign interrupt handlers
