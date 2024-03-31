@@ -206,3 +206,21 @@ int nk_irq_dev_send_ipi(struct nk_irq_dev *dev, nk_hwirq_t hwirq, cpu_id_t cpu)
 #endif 
 }
 
+int nk_irq_dev_broadcast_ipi(struct nk_irq_dev *dev, nk_hwirq_t hwirq) 
+{
+  struct nk_dev *d = (struct nk_dev *)(&(dev->dev));
+  struct nk_irq_dev_int *di = (struct nk_irq_dev_int *)(d->interface);
+
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+  if(di && di->broadcast_ipi) {
+    return di->broadcast_ipi(d->state, hwirq);
+  } else {
+    // This device doesn't have broadcast IPI support!
+    ERROR("NULL broadcast_ipi in interface of device %s\n", d->name);
+    return -1;
+  }
+#else
+  return di->broadcast_ipi(d->state, hwirq);
+#endif 
+}
+

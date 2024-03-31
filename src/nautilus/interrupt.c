@@ -524,6 +524,21 @@ int nk_send_ipi(nk_irq_t irq, cpu_id_t cpu) {
   return nk_irq_dev_send_ipi(irq_dev, desc->hwirq, cpu);
 }
 
+int nk_broadcast_ipi(nk_irq_t irq) {
+    struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+    if(desc == NULL) {
+        return 1;
+    }
+    if(!(desc->flags & NK_IRQ_DESC_FLAG_IPI)) {
+        return 1;
+    }
+    struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
+    if(irq_dev == NULL) {
+        return 1;
+    }
+    return nk_irq_dev_broadcast_ipi(irq_dev, desc->hwirq);
+}
+
 INTERRUPT int nk_handle_interrupt_generic(struct nk_irq_action *action, struct nk_regs *regs, struct nk_irq_dev *irq_dev) 
 {
   nk_hwirq_t hwirq;
@@ -662,14 +677,14 @@ int nk_dump_all_irq(void) {
   return res;
 }
 
-static int handle_shell_interrupt(char * buf, void * priv) 
+static int handle_shell_lsirq(char * buf, void * priv) 
 {
   return nk_dump_all_irq();
 }
 
-static struct shell_cmd_impl interrupt_impl = {
-  .cmd = "interrupts",
-  .help_str = "interrupts",
-  .handler = handle_shell_interrupt,
+static struct shell_cmd_impl lsirq_impl = {
+  .cmd = "lsirq",
+  .help_str = "lsirq",
+  .handler = handle_shell_lsirq,
 };
-nk_register_shell_cmd(interrupt_impl);
+nk_register_shell_cmd(lsirq_impl);

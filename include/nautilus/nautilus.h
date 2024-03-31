@@ -206,7 +206,14 @@ struct sys_info {
 
     struct nk_mem_info mem;
 
-    uint32_t bsp_id;
+#ifdef NAUT_CONFIG_ARCH_ARM64
+    uint8_t bsp_aff0;
+    uint8_t bsp_aff1;
+    uint8_t bsp_aff2;
+    uint8_t bsp_aff3;
+#endif
+
+    cpu_id_t bsp_id;
 
     uint8_t pic_mode_enabled;
 

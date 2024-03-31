@@ -371,7 +371,10 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
 
   mpidr_el1_t mpidr_el1;
   LOAD_SYS_REG(MPIDR_EL1, mpidr_el1.raw);
-  nautilus_info.sys.bsp_id = mpidr_el1.raw; 
+  nautilus_info.sys.bsp_aff0 = mpidr_el1.aff0;
+  nautilus_info.sys.bsp_aff1 = mpidr_el1.aff1;
+  nautilus_info.sys.bsp_aff2 = mpidr_el1.aff2;
+  nautilus_info.sys.bsp_aff3 = mpidr_el1.aff3;
 
   // Initialize pre vc output
 #ifdef NAUT_CONFIG_PL011_UART_EARLY_OUTPUT

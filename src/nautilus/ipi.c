@@ -213,8 +213,28 @@ static int handle_send_ipi(char * buf, void * priv)
 
   int res = nk_send_ipi(ipi, cpu);
 
-  if(res != 0) {
+  if(res) {
     printk("ERROR: Failed to Send IPI (%u) to CPU (%u)\n", ipi, cpu);
+    return 0;
+  }
+
+  return 0;
+}
+
+static int handle_broadcast_ipi(char * buf, void * priv)
+{
+  int ipi_n, cpu_n;
+  if(sscanf(buf, "broadcastipi %d", &ipi_n) != 1) {
+    printk("broadcastipi [IPI]\n");
+    return 0;
+  }
+
+  nk_irq_t ipi = (nk_irq_t)ipi_n;
+
+  int res = nk_broadcast_ipi(ipi);
+
+  if(res) {
+    printk("ERROR: Failed to Broadcast IPI (%u)\n", ipi);
     return 0;
   }
 
@@ -234,6 +254,13 @@ static struct shell_cmd_impl send_ipi_impl = {
     .handler  = handle_send_ipi,
 };
 nk_register_shell_cmd(send_ipi_impl);
+
+static struct shell_cmd_impl broadcast_ipi_impl = {
+    .cmd      = "broadcastipi",
+    .help_str = "broadcastipi [IPI]",
+    .handler  = handle_broadcast_ipi,
+};
+nk_register_shell_cmd(broadcast_ipi_impl);
 
 #ifdef NAUT_CONFIG_STRESS_IPI
 static struct shell_cmd_impl spam_ipi_impl = {

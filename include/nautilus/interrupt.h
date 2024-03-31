@@ -190,6 +190,7 @@ int nk_mask_irq(nk_irq_t);
 int nk_unmask_irq(nk_irq_t);
 
 int nk_send_ipi(nk_irq_t, cpu_id_t);
+int nk_broadcast_ipi(nk_irq_t);
 
 // Flow which utilizes nk_irq_dev_ack to get the hwirq number and signals EOI after handling all actions
 int nk_handle_interrupt_generic(struct nk_irq_action *null, struct nk_regs *regs, struct nk_irq_dev *dev);

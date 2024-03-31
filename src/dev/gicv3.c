@@ -530,10 +530,42 @@ static int gicd_v3_dev_send_ipi(void *state, nk_hwirq_t hwirq, cpu_id_t cpu_id)
   return 0;
 }
 
+static int gicd_v3_dev_broadcast_ipi(void *state, nk_hwirq_t hwirq) {
+  struct gicd_v3 *gicd = (struct gicd_v3*)state;
+
+  if(hwirq >= 16) {
+    return IRQ_IPI_ERROR_IRQ_NO;
+  }
+
+  uint64_t sgir_val = 0;
+
+  // Set the this to broadcast to all CPU's other than the current cpu
+  sgir_val |= 1ULL<<40;
+
+  // Set the SGI no.
+  sgir_val |= ((uint64_t)hwirq)<<24;
+
+  if(gicd->security) {
+    STORE_SYS_REG(ICC_SGI1R_EL1, sgir_val);
+  }
+  else {
+    // Send it as a Group 0 SGI if no security extensions
+    STORE_SYS_REG(ICC_SGI0R_EL1, sgir_val);
+  }
+
+  return 0;
+}
+
 static int gicr_v3_dev_send_ipi(void *state, nk_hwirq_t hwirq, cpu_id_t cpu) 
 {
   struct gicr_v3 *gicr = (struct gicr_v3*)state;
   return gicd_v3_dev_send_ipi((void*)gicr->gicd, hwirq, cpu);
+}
+
+static int gicr_v3_dev_broadcast_ipi(void *state, nk_hwirq_t hwirq) 
+{
+  struct gicr_v3 *gicr = (struct gicr_v3*)state;
+  return gicd_v3_dev_broadcast_ipi((void*)gicr->gicd, hwirq);
 }
 
 /*
@@ -550,6 +582,7 @@ static struct nk_irq_dev_int gicd_v3_dev_int = {
   .revmap = gicd_v3_dev_revmap,
   .translate = gicd_v3_dev_translate,
   .send_ipi = gicd_v3_dev_send_ipi,
+  .broadcast_ipi = gicd_v3_dev_broadcast_ipi,
 };
 
 static struct nk_irq_dev_int gicr_v3_dev_int = {
@@ -562,6 +595,7 @@ static struct nk_irq_dev_int gicr_v3_dev_int = {
   .revmap = gicr_v3_dev_revmap,
   .translate = gicr_v3_dev_translate,
   .send_ipi = gicr_v3_dev_send_ipi,
+  .broadcast_ipi = gicr_v3_dev_broadcast_ipi,
 };
 
 struct nk_irq_dev **gicr_dev_cpu_map = NULL;

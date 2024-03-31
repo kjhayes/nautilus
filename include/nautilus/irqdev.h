@@ -28,6 +28,7 @@ struct nk_irq_dev_int {
   int(*translate)(void *state, nk_dev_info_type_t type, const void *raw_irq, nk_hwirq_t *out_hwirq);
 
   int(*send_ipi)(void *state, nk_hwirq_t hwirq, cpu_id_t cpu);
+  int(*broadcast_ipi)(void *state, nk_hwirq_t hwirq);
 };
 
 struct nk_irq_dev {
@@ -79,6 +80,8 @@ int nk_irq_dev_irq_status(struct nk_irq_dev *d, nk_hwirq_t hwirq);
 #define IRQ_IPI_ERROR_IRQ_NO (1<<1) // Error with the nk_hwirq_t being requested
 #define IRQ_IPI_ERROR_CPUID  (1<<2) // Error with the cpu_id_t being requested
 int nk_irq_dev_send_ipi(struct nk_irq_dev *d, nk_hwirq_t hwirq, cpu_id_t cpu);
+// Sends the IPI to all processors other than the current processor
+int nk_irq_dev_broadcast_ipi(struct nk_irq_dev *d, nk_hwirq_t hwirq);
 
 /*
  * Maps from IRQ device local interrupt numbers to global nk_irq_t
