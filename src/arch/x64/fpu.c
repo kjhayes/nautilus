@@ -537,12 +537,14 @@ fpu_init (struct naut_info * naut, int is_ap)
 
     if (is_ap == 0) {
 
-        if (nk_irq_set_handler_early(x86_vector_to_irq(XM_EXCP), xm_handler, NULL) != 0) {
+        nk_irq_t xm_excp_irq = x86_vector_to_irq(XM_EXCP);
+        if (xm_excp_irq == NK_NULL_IRQ || nk_irq_set_handler_early(xm_excp_irq, xm_handler, NULL) != 0) {
             ERROR_PRINT("Could not register excp handler for XM\n");
             return;
         }
 
-        if (nk_irq_set_handler_early(x86_vector_to_irq(MF_EXCP), mf_handler, NULL) != 0) {
+        nk_irq_t mf_excp_irq = x86_vector_to_irq(MF_EXCP);
+        if (mf_excp_irq == NK_NULL_IRQ || nk_irq_set_handler_early(mf_excp_irq, mf_handler, NULL) != 0) {
             ERROR_PRINT("Could not register excp handler for MF\n");
             return;
         }

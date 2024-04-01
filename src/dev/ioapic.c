@@ -172,12 +172,14 @@ ioapic_assign_irq (struct ioapic * ioapic,
 
     // Link the Vector to the IOAPIC IRQ
     if(create_link) {
-      if(nk_irq_add_link_dev(
-            x86_vector_to_irq(vector), 
+      nk_irq_t vec_irq = x86_vector_to_irq(vector);
+      if(vec_irq == NK_NULL_IRQ || 
+         nk_irq_add_link_dev(
+            vec_irq, 
             nk_irq,
             (struct nk_dev*)ioapic->dev)) 
       {
-        ERROR_PRINT("ioapic_assign_irq: IRQ link from irq=%u to irq=%u failed!\n", x86_vector_to_irq(vector), nk_irq);
+        ERROR_PRINT("ioapic_assign_irq: IRQ link from irq=%u to irq=%u failed!\n", vec_irq, nk_irq);
         return -1;
       }
     }

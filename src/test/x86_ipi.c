@@ -160,17 +160,20 @@ ipi_exp_setup (ipi_exp_data_t * data)
 {
     nk_fs_fd_t fd;
 
-    if (nk_irq_add_handler(x86_vector_to_irq(PING_VEC), ping, NULL) != 0) {
+    nk_irq_t ping_irq = x86_vector_to_irq(PING_VEC);
+    if (ping_irq == NK_NULL_IRQ || nk_irq_add_handler(ping_irq, ping, NULL) != 0) {
         ERROR("Could not register int handler");
         return -1;
     }
 
-    if (nk_irq_add_handler(x86_vector_to_irq(PONG_VEC), pong, NULL) != 0) {
+    nk_irq_t pong_irq = x86_vector_to_irq(PONG_VEC);
+    if (pong_irq == NK_NULL_IRQ || nk_irq_add_handler(pong_irq, pong, NULL) != 0) {
         ERROR("Could not register int handler");
         return -1;
     }
 
-    if (nk_irq_add_handler(x86_vector_to_irq(PONG_BCAST_VEC), pong_bcast, NULL) != 0) {
+    nk_irq_t pong_bcast_irq = x86_vector_to_irq(PONG_BCAST_VEC);
+    if (pong_bcast_irq == NK_NULL_IRQ || nk_irq_add_handler(pong_bcast_irq, pong_bcast, NULL) != 0) {
         ERROR("Could not register int handler");
         return -1;
     }

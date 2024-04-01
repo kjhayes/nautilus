@@ -483,7 +483,9 @@ apic_timer_setup (struct apic_dev * apic, uint32_t quantum_ms, struct nk_dev *de
 	       x2apic, tscdeadline, arat);
 
     // Note that no state is used here since APICs are per-CPU
-    if (nk_irq_add_handler_dev(x86_vector_to_irq(APIC_TIMER_INT_VEC),
+    nk_irq_t timer_irq = x86_vector_to_irq(APIC_TIMER_INT_VEC);
+    if (timer_irq == NK_NULL_IRQ || 
+        nk_irq_add_handler_dev(timer_irq,
 			     apic_timer_handler,
 			     NULL, (struct nk_dev*)dev) != 0) {
         panic("Could not register APIC timer handler\n");
@@ -949,7 +951,8 @@ apic_percpu_init (struct cpu * core)
     snprintf(n,32,"apic%u",core->id);
     struct nk_irq_dev *dev = nk_irq_dev_register(n,0,&apic_ops,(void*)apic);
 
-    if(nk_set_irq_devs_percpu(256-32, core->id, x86_vector_to_irq(32), dev)) {
+    nk_irq_t irq_range_start = x86_vector_to_irq(32);
+    if(irq_range_start == NK_NULL_IRQ || nk_set_irq_devs_percpu(256-32, core->id, irq_range_start, dev)) {
         panic("Failed to set APIC percpu irq_dev for core %u!\n", core->id);
     }
 
@@ -966,31 +969,37 @@ apic_percpu_init (struct cpu * core)
 
 	// Note that no state is used here since APICs are per-CPU
 
-        if (nk_irq_add_handler_dev(x86_vector_to_irq(APIC_NULL_KICK_VEC), null_kick, NULL, (struct nk_dev*)dev) != 0) {
+        nk_irq_t null_kick_irq = x86_vector_to_irq(APIC_NULL_KICK_VEC);
+        if (null_kick_irq == NK_NULL_IRQ || nk_irq_add_handler_dev(null_kick_irq, null_kick, NULL, (struct nk_dev*)dev) != 0) {
             panic("Could not register null kick interrupt handler\n");
         }
 
-        if (nk_irq_add_handler_dev(x86_vector_to_irq(APIC_SPUR_INT_VEC), spur_int_handler, NULL, (struct nk_dev*)dev) != 0) {
+        nk_irq_t apic_spur_irq = x86_vector_to_irq(APIC_SPUR_INT_VEC);
+        if (apic_spur_irq == NK_NULL_IRQ || nk_irq_add_handler_dev(apic_spur_irq, spur_int_handler, NULL, (struct nk_dev*)dev) != 0) {
             panic("Could not register spurious interrupt handler\n");
         }
 
-        if (nk_irq_add_handler_dev(x86_vector_to_irq(APIC_ERROR_INT_VEC), error_int_handler, NULL, (struct nk_dev*)dev) != 0) {
+        nk_irq_t apic_err_irq = x86_vector_to_irq(APIC_ERROR_INT_VEC);
+        if (apic_err_irq == NK_NULL_IRQ || nk_irq_add_handler_dev(apic_err_irq, error_int_handler, NULL, (struct nk_dev*)dev) != 0) {
             panic("Could not register spurious interrupt handler\n");
             return;
         }
 
         /* we shouldn't ever get these, but just in case */
-        if (nk_irq_add_handler_dev(x86_vector_to_irq(APIC_PC_INT_VEC), pc_int_handler, NULL, (struct nk_dev*)dev) != 0) {
+        nk_irq_t apic_pc_irq = x86_vector_to_irq(APIC_PC_INT_VEC);
+        if (apic_pc_irq == NK_NULL_IRQ || nk_irq_add_handler_dev(apic_pc_irq, pc_int_handler, NULL, (struct nk_dev*)dev) != 0) {
             panic("Could not register perf counter interrupt handler\n");
             return;
         }
 
-        if (nk_irq_add_handler_dev(x86_vector_to_irq(APIC_THRML_INT_VEC), thermal_int_handler, NULL, (struct nk_dev*)dev) != 0) {
+        nk_irq_t apic_thrml_irq = x86_vector_to_irq(APIC_THRML_INT_VEC);
+        if (apic_thrml_irq == NK_NULL_IRQ || nk_irq_add_handler_dev(apic_thrml_irq, thermal_int_handler, NULL, (struct nk_dev*)dev) != 0) {
             panic("Could not register thermal interrupt handler\n");
             return;
         }
 
-        if (nk_irq_add_handler_dev(x86_vector_to_irq(APIC_EXT_LVT_DUMMY_VEC), dummy_int_handler, NULL, (struct nk_dev*)dev) != 0) {
+        nk_irq_t apic_ext_lvt_dummy_irq = x86_vector_to_irq(APIC_EXT_LVT_DUMMY_VEC);
+        if (apic_ext_lvt_dummy_irq == NK_NULL_IRQ || nk_irq_add_handler_dev(apic_ext_lvt_dummy_irq, dummy_int_handler, NULL, (struct nk_dev*)dev) != 0) {
             panic("Could not register dummy ext lvt handler\n");
             return;
         }

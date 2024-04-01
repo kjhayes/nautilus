@@ -826,7 +826,8 @@ time_int80 (void)
 {
     int i;
     uint64_t start;
-    if (nk_irq_add_handler(x86_vector_to_irq(0x80), int80_handler, NULL)) {
+    nk_irq_t int80_irq = x86_vector_to_irq(0x80);
+    if (int80_irq == NK_NULL_IRQ || nk_irq_add_handler(int80_irq, int80_handler, NULL)) {
 	PRINT("FAILED TO REGISTER HANDLER FOR INT 0x80\n");
 	return;
     }

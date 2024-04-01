@@ -694,12 +694,13 @@ int virtio_blk_init(struct virtio_pci_dev *dev)
 	DEBUG("setting up interrupts via legacy path at 0x%x\n",HACKED_LEGACY_VECTOR);
 	INFO("THIS HACKED LEGACY INTERRUPT SETUP IS PROBABLY NOT WHAT YOU WANT\n");
 
-        if (nk_irq_add_handler_dev(x86_vector_to_irq(HACKED_LEGACY_VECTOR), handler, d, (struct nk_dev*)d->blk_dev)) {
+    nk_irq_t hacked_irq = x86_vector_to_irq(HACKED_LEGACY_VECTOR);
+        if (hacked_irq == NK_NULL_IRQ || nk_irq_add_handler_dev(hacked_irq, handler, d, (struct nk_dev*)d->blk_dev)) {
             ERROR("Failed to register int handler\n");
             return -1;
         }
 	
-	nk_unmask_irq(x86_vector_to_irq(HACKED_LEGACY_VECTOR));
+	nk_unmask_irq(hacked_irq);
 	
 	// for (i=0; i<256; i++) { nk_umask_irq(i); }
 	

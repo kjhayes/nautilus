@@ -181,8 +181,8 @@ nemo_event_await (void)
 int
 nemo_init (void)
 {
-
-	if (nk_irq_add_handler(x86_vector_to_irq(NEMO_INT_VEC), nemo_ipi_event_recv, NULL) != 0) {
+    nk_irq_t nemo_irq = x86_vector_to_irq(NEMO_INT_VEC);
+	if (nemo_irq == NK_NULL_IRQ || nk_irq_add_handler(nemo_irq, nemo_ipi_event_recv, NULL) != 0) {
 		NEMO_ERR("Could not register Nemo interrupt handler\n");
 		return -1;
 	}

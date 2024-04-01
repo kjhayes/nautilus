@@ -4,7 +4,6 @@ ifdef QEMU
 QEMU_FLAGS += -smp cpus=4
 QEMU_FLAGS += -serial stdio
 QEMU_FLAGS += -m 2G
-QEMU_FLAGS += -display none
 
 qemu: $(QEMU_DEPS)
 	$(call quiet-cmd,QEMU,)

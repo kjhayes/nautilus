@@ -403,8 +403,11 @@ int syscall_setup() {
   return 0;
 }
 
-void nk_syscall_init() {
-  nk_irq_add_handler_early(x86_vector_to_irq(0x80), int80_handler, 0);
+void nk_syscall_init() { 
+  nk_irq_t int80_irq = x86_vector_to_irq(0x80);
+  if(int80_irq == NK_NULL_IRQ || nk_irq_add_handler_early(, int80_handler, 0)) {
+      panic("Failed to add handler to int 0x80 for syscalls!\n");
+  }
   syscall_setup();
 }
 
