@@ -50,7 +50,8 @@ obj-y += \
 	lru_cache.o \
 	ipi.o \
 	iomap.o \
-	topo.o
+	topo.o \
+	xcall.o
 
 obj-$(NAUT_CONFIG_ARCH_X86) += \
 	mb_utils.o \
@@ -96,6 +97,4 @@ obj-$(NAUT_CONFIG_PROCESSES) += process.o \
 obj-$(NAUT_CONFIG_LINUX_SYSCALLS) += syscalls/
 
 obj-$(NAUT_CONFIG_USE_IST) += gdt.o
-
-obj-$(NAUT_CONFIG_XCALL_SUPPORT) += xcall.o
 

@@ -34,9 +34,7 @@
 #include <nautilus/shell.h>
 #include <nautilus/atomic.h>
 
-#ifdef NAUT_CONFIG_XCALL_SUPPORT
 #include <nautilus/xcall.h>
-#endif
 
 #include <stddef.h>
 
@@ -357,10 +355,11 @@ int nk_delay(uint64_t ns) { return _sleep(ns,1); }
 uint64_t nk_timer_handler (void)
 {
     uint32_t my_cpu = my_cpu_id();
+    // Why is this necessary for RISCV? -KJH
 #if defined(NAUT_CONFIG_ARCH_X86) || defined(NAUT_CONFIG_ARCH_ARM64)
     if (my_cpu!=0) {
-	DEBUG("update: cpu %d - ignored/infinity\n",my_cpu);
-	return -1;  // infinitely far in the future
+	  DEBUG("update: cpu %d - ignored/infinity\n",my_cpu);
+	  return -1;  // infinitely far in the future
     }
 #endif
     ACTIVE_LOCK_CONF;
@@ -419,14 +418,12 @@ uint64_t nk_timer_handler (void)
 		  if ((cur_cpu == my_cpu) && (cur->flags & NK_TIMER_CALLBACK_LOCAL_SYNC)) {
 		    cur->callback(cur->priv);
 		  } else {
-#ifdef NAUT_CONFIG_XCALL_SUPPORT
-		    smp_xcall(cur_cpu,
+		    if(smp_xcall(cur_cpu,
 			      cur->callback,
 			      cur->priv,
-			      wait);
-#else
-            ERROR("Cannot place xcall during NK_TIMER_CALLBACK_ALL_CPUS handling without NAUT_CONFIG_XCALL_SUPPORT set!\n");
-#endif
+			      wait)) {
+                ERROR("Failed to send sync xcall!\n");
+            }
 		  }
 	    }
 	} else {

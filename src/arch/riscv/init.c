@@ -151,13 +151,18 @@ void secondary_entry(int hartid)
   printk("RISCV: hart %d started!\n", hartid);
 
   struct naut_info *naut = &nautilus_info;
+  cpu_id_t cpuid = riscv_hartid_to_cpu_id(hartid);
 
   write_csr(sscratch, r_tp());
 
-  w_tp((uint64_t)naut->sys.cpus[hartid]);
+  w_tp((uint64_t)naut->sys.cpus[cpuid]);
 
   // Write supervisor trap vector location
   trap_init();
+
+  if(smp_xcall_init_queue(naut->sys.cpus[cpuid])) {
+    WARN_PRINT("Failed to initialize xcall queue on hart %u!\n", hartid);
+  }
 
   if(hlic_percpu_init()) {
     panic("Failed to initialize the HLIC locally for CPU %u!\n", my_cpu_id());
@@ -170,7 +175,7 @@ void secondary_entry(int hartid)
   }
 #endif
 
-  nk_rand_init(naut->sys.cpus[hartid]);
+  nk_rand_init(naut->sys.cpus[cpuid]);
 
   nk_sched_init_ap(&sched_cfg);
 
@@ -365,6 +370,10 @@ void init(unsigned long hartid, unsigned long fdt) {
     panic("Failed to initialize the PLIC locally for the BSP!\n"); 
   }
 #endif
+
+  if(smp_setup_xcall_bsp(naut->sys.cpus[riscv_hartid_to_cpu_id(hartid)])) {
+    WARN_PRINT("Failed to setup xcall's on bsp!\n");
+  }
 
   arch_enable_ints();
 

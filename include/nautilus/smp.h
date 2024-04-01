@@ -40,10 +40,7 @@ struct cpu *nk_get_cpu(cpu_id_t);
 #include <nautilus/spinlock.h>
 #include <nautilus/mm.h>
 #include <nautilus/queue.h>
-
-#ifdef NAUT_CONFIG_XCALL_SUPPORT
 #include <nautilus/xcall.h>
-#endif
 
 #ifdef NAUT_CONFIG_ARCH_X86
 #include <dev/apic.h>
@@ -148,10 +145,8 @@ struct cpu {
 
     struct nk_sched_percpu_state *sched_state;
 
-#ifdef NAUT_CONFIG_XCALL_SUPPORT
     nk_queue_t * xcall_q;
     struct nk_xcall xcall_nowait_info;
-#endif
 
     ulong_t cpu_khz; 
     
@@ -219,9 +214,7 @@ static inline void dump_cpu(struct cpu *cpu) {
   PF(system, "%p");
   PF(lock, "%u");
   PF(sched_state, "%p");
-#ifdef NAUT_CONFIG_XCALL_SUPPORT
   PF(xcall_q, "%p");
-#endif
   PF(cpu_khz, "0x%u");
   PF(tp, "%p");
   PF(coord, "%p");

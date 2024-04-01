@@ -182,6 +182,10 @@ void secondary_init(void) {
 
   INIT_PRINT("Initialized the IRQ chip!\n", my_cpu_id());
 
+  if(smp_xcall_init_queue(nautilus_info.sys.cpus[my_cpu_id()])) {
+      INIT_WARN("Failed to initialize XCALL queue on cpu %u!\n", my_cpu_id());
+  }
+
   nk_rand_init(nautilus_info.sys.cpus[my_cpu_id()]);
 
   nk_sched_init_ap(&sched_cfg);
@@ -500,6 +504,10 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
 #endif
 
   INIT_DEBUG("Initialized the Interrupt Controller\n");
+
+  if(smp_setup_xcall_bsp(nautilus_info.sys.cpus[my_cpu_id()])) {
+      INIT_WARN("Failed to initialize XCALL on bsp!\n");
+  }
 
   // Now we should be able to install irq handlers
 #ifdef NAUT_CONFIG_PL011_UART

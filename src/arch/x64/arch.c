@@ -1,6 +1,7 @@
 #include <nautilus/arch.h>
 
 #include<nautilus/interrupt.h>
+#include<arch/x64/irq.h>
 
 void arch_enable_ints(void)  { asm volatile ("sti" : : : "memory"); }
 void arch_disable_ints(void) { asm volatile ("cli" : : : "memory"); }
@@ -27,6 +28,10 @@ uint64_t arch_cycles_to_realtime(uint64_t cycles) {
 }
 
 #include <nautilus/scheduler.h>
+
+nk_irq_t arch_xcall_irq(void) {
+    return x86_vector_to_irq(IPI_VEC_XCALL);
+}
 
 void arch_update_timer(uint32_t ticks, nk_timer_condition_t cond) {
     apic_update_oneshot_timer(MY_APIC, ticks, cond);

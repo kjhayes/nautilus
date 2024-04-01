@@ -3,6 +3,7 @@
 #include<nautilus/of/numa.h>
 #include<nautilus/of/mem.h>
 #include<nautilus/atomic.h>
+#include<nautilus/interrupt.h>
 
 #include<arch/arm64/sys_reg.h>
 #include<arch/arm64/unimpl.h>
@@ -43,6 +44,34 @@ int arch_ints_enabled(void) {
   uint_t daif;
   __asm__ __volatile__ ("mrs %0, DAIF; isb" : "=r" (daif));
   return !((daif>>6) & 0xF);
+}
+
+static nk_irq_t __xcall_irq = NK_NULL_IRQ;
+nk_irq_t arch_xcall_irq(void) 
+{
+// On ARM just pick an IPI with the least actions 
+// (this is fine for GICv2 and GICv3 (which is all we support right now)
+// TODO: Edit this if a new IRQ Chip is ever supported -KJH
+
+    if(__xcall_irq == NK_NULL_IRQ) {
+      nk_irq_t max = nk_max_irq();
+
+      nk_irq_t min_action_irq = NK_NULL_IRQ;
+      unsigned int min_actions = (unsigned int)(-1);
+
+      for(nk_irq_t irq = 0; irq < max+1; irq++) {
+          struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+          if(desc->flags & NK_IRQ_DESC_FLAG_IPI) {
+              if(desc->num_actions < min_actions) {
+                  min_action_irq = irq;
+                  min_actions = (unsigned int)desc->num_actions;
+              }
+          }
+      }
+
+      __xcall_irq = min_action_irq;
+    }
+    return __xcall_irq;
 }
 
 void arch_print_regs(struct nk_regs *r) {

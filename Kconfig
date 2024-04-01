@@ -10,7 +10,6 @@ menu "Platform"
 			select HAS_PORT_IO
                         select USE_PCI_CAM
                         select USE_MULTIBOOT
-                        select XCALL_SUPPORT
 			bool
 
 		config ARCH_RISCV
@@ -24,7 +23,6 @@ menu "Platform"
                         select USE_FDT
                         select USE_PCI_ECAM
                         select SPARSE_IRQ
-                        select XCALL_SUPPORT
 
     choice
         prompt "Platform Selection"
@@ -1211,6 +1209,13 @@ menu "Debugging"
       help
         Turn on debug prints for SMP code
 
+    config DEBUG_XCALL
+      bool "Debug XCALL"
+      depends on DEBUG_PRINTS
+      default n
+      help
+        Turn on debug prints for cross core calls
+
     config DEBUG_PROVENANCE
       bool "Debug Provenance"
       depends on DEBUG_PRINTS && PROVENANCE
@@ -1878,12 +1883,6 @@ config HAS_MSI
       Does the current configuration have support for MSI interrupts? (set by the architecture or irq device)
 
 # Multi Processing
-
-config XCALL_SUPPORT
-    def_bool n
-    help
-      Just leaving this in for now until RISC-V and ARM64 both nicely wrap the xcall framework,
-      once both support it, this should be removed.
 
 # FDT
 config USE_FDT

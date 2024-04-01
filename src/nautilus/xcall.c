@@ -33,6 +33,8 @@
 #include <nautilus/numa.h>
 #include <nautilus/mm.h>
 #include <nautilus/percpu.h>
+#include <nautilus/interrupt.h>
+#include <nautilus/xcall.h>
 
 #ifdef NAUT_CONFIG_ALLOCS
 #include <nautilus/alloc.h>
@@ -61,13 +63,44 @@
 
 #include <arch/x64/irq.h>
 
-#ifndef NAUT_CONFIG_DEBUG_SMP
+#ifndef NAUT_CONFIG_DEBUG_XCALL
 #undef DEBUG_PRINT
 #define DEBUG_PRINT(fmt, args...)
 #endif
-#define SMP_PRINT(fmt, args...) printk("SMP: " fmt, ##args)
-#define SMP_DEBUG(fmt, args...) DEBUG_PRINT("SMP: " fmt, ##args)
+#define XCALL_PRINT(fmt, args...) printk("XCALL: " fmt, ##args)
+#define XCALL_DEBUG(fmt, args...) DEBUG_PRINT("XCALL: " fmt, ##args)
 
+int
+smp_setup_xcall_bsp (struct cpu * core)
+{
+    XCALL_PRINT("Setting up cross-core IPI event queue\n");
+    smp_xcall_init_queue(core);
+
+    nk_irq_t xcall_irq = arch_xcall_irq();
+    if(xcall_irq == NK_NULL_IRQ) {
+        ERROR_PRINT("arch_xcall_irq returned NK_NULL_IRQ during xcall initialization!\n");
+        return -1;
+    }
+
+    if (nk_irq_add_handler(xcall_irq, xcall_handler, NULL) != 0) {
+        ERROR_PRINT("Could not assign interrupt handler for XCALL on core %u\n", core->id);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+smp_xcall_init_queue (struct cpu * core)
+{
+    core->xcall_q = nk_queue_create();
+    if (!core->xcall_q) {
+        ERROR_PRINT("Could not allocate xcall queue on cpu %u\n", core->id);
+        return -1;
+    }
+
+    return 0;
+}
 
 static void
 init_xcall (struct nk_xcall * x, void * arg, nk_xcall_func_t fun, int wait)
@@ -118,6 +151,10 @@ xcall_handler (struct nk_irq_action * action, struct nk_regs * regs, void *state
 
         // we ack the IPI before calling the handler funciton,
         // because it may end up blocking (e.g. core barrier)
+        //
+        // TODO: 
+        // This doesn't work anymore, we can still block because EOI is done after returning from this function.
+        // Need to re-add a mechanism to signal EOI early (or turn this into a top half handler) - KJH
         IRQ_HANDLER_END(); 
 
         x->fun(x->data);
@@ -164,7 +201,7 @@ smp_xcall (cpu_id_t cpu_id,
     struct nk_xcall x;
     uint8_t flags;
 
-    SMP_DEBUG("Initiating SMP XCALL from core %u to core %u\n", my_cpu_id(), cpu_id);
+    XCALL_DEBUG("Initiating SMP XCALL from core %u to core %u\n", my_cpu_id(), cpu_id);
 
     if (cpu_id > nk_get_num_cpus()) {
         ERROR_PRINT("Attempt to execute xcall on invalid cpu (%u)\n", cpu_id);
@@ -179,6 +216,11 @@ smp_xcall (cpu_id_t cpu_id,
 
     } else {
         struct nk_xcall * xc = &x;
+        nk_irq_t xcall_irq = arch_xcall_irq();
+        if(xcall_irq == NK_NULL_IRQ) {
+            ERROR_PRINT("Attempt by cpu %u to initiate xcall but arch_xcall_irq() == NK_NULL_IRQ!\n", my_cpu_id());
+            return -1;
+        }
 
         if (!wait) {
             xc = &(sys->cpus[cpu_id]->xcall_nowait_info);
@@ -210,6 +252,10 @@ smp_xcall (cpu_id_t cpu_id,
         struct apic_dev * apic = per_cpu_get(apic);
         apic_ipi(apic, sys->cpus[cpu_id]->apic->id, IPI_VEC_XCALL);
         */
+        if(nk_send_ipi(xcall_irq, cpu_id)) {
+            ERROR_PRINT("Failed to send IPI from cpu %u to cpu %u during xcall!\n", my_cpu_id(), cpu_id);
+            return -1;
+        }
 
         if (wait) {
             wait_xcall(xc);

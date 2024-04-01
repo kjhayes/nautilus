@@ -1,6 +1,7 @@
 #include <nautilus/arch.h>
 #include <nautilus/cpu_state.h>
 #include <nautilus/of/numa.h>
+#include <nautilus/irqdev.h>
 #include <nautilus/endian.h>
 
 void arch_enable_ints(void)  {
@@ -25,6 +26,22 @@ cpu_id_t riscv_hartid_to_cpu_id(uint32_t hartid) {
     }
 
     return NK_NULL_CPU_ID;
+}
+
+static nk_irq_t __xcall_irq = NK_NULL_IRQ;
+nk_irq_t arch_xcall_irq(void) {
+    if(__xcall_irq == NK_NULL_IRQ) {
+      struct nk_irq_dev *hlic = nk_irq_dev_find("hlic");
+      if(hlic == NULL) {
+        return NK_NULL_IRQ;
+      }
+      nk_irq_t irq;
+      if(nk_irq_dev_revmap(hlic, 1, &irq)) {
+        return NK_NULL_IRQ;
+      }
+      __xcall_irq = irq;
+    }
+    return __xcall_irq;
 }
 
 uint32_t arch_cycles_to_ticks(uint64_t cycles) { /* TODO */ return cycles; }

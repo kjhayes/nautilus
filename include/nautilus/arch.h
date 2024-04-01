@@ -18,6 +18,8 @@ int arch_ints_enabled(void);
 int arch_smp_early_init(struct naut_info *naut);
 int arch_numa_init(struct sys_info *sys);
 
+nk_irq_t arch_xcall_irq(void);
+
 void arch_detect_mem_map(mmap_info_t *mm_info, mem_map_entry_t *memory_map,
                          unsigned long mbd);
 void arch_reserve_boot_regions(unsigned long mbd);

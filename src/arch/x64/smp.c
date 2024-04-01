@@ -1005,33 +1005,6 @@ out_ok:
 }
 
 static int
-smp_xcall_init_queue (struct cpu * core)
-{
-    core->xcall_q = nk_queue_create();
-    if (!core->xcall_q) {
-        ERROR_PRINT("Could not allocate xcall queue on cpu %u\n", core->id);
-        return -1;
-    }
-
-    return 0;
-}
-
-
-int
-smp_setup_xcall_bsp (struct cpu * core)
-{
-    SMP_PRINT("Setting up cross-core IPI event queue\n");
-    smp_xcall_init_queue(core);
-
-    if (nk_irq_add_handler(x86_vector_to_irq(IPI_VEC_XCALL), xcall_handler, NULL) != 0) {
-        ERROR_PRINT("Could not assign interrupt handler for XCALL on core %u\n", core->id);
-        return -1;
-    }
-
-    return 0;
-}
-
-static int
 smp_ap_setup (struct cpu * core)
 {
     // Note that any use of SSE/AVX, for example produced by
