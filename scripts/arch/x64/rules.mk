@@ -50,7 +50,7 @@ $(NAUT_ISO): $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC)
 	$(Q)mkdir -p .iso/boot/grub
 	$(Q)cp configs/grub.cfg .iso/boot/grub
 	$(Q)cp $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC) .iso/boot
-	$(Q)$(GRUBMKRESCUE) -o $(NAUT_ISO) .iso >/dev/null 2>&1
+	$(Q)$(GRUBMKRESCUE) -o $(NAUT_ISO) .iso $(QPIPE) 
 	$(Q)rm -rf .iso
 
 DEFAULT_RULES += $(NAUT_ISO)

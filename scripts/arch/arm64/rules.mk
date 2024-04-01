@@ -6,7 +6,7 @@ uImage: $(NAUT_BIN)
 	$(call quiet-cmd,MKIMAGE,$@)
 	$(Q)mkimage -A arm64 -O linux -T kernel -C none \
 		-a $(NAUT_CONFIG_KERNEL_LINK_ADDR) -e $(NAUT_CONFIG_KERNEL_LINK_ADDR) -n "Nautilus" \
-		-d Image uImage
+		-d Image uImage $(QPIPE)
 
 qemu-flash: $(QEMU_FLASH)
 $(QEMU_FLASH):

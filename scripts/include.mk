@@ -4,11 +4,14 @@ unexport __NAUT_MAKEFILE_INCLUDE__
 
 ifdef V
 Q ?= 
+QPIPE ?=
 else
 Q ?= @
+QPIPE ?= >/dev/null 2>&1
 endif
 
 ifdef Q
+
 MAKEFLAGS += -s
 define quiet-cmd =
 	@printf "\t%s\t%s\n" "$(1)" "$(2)"

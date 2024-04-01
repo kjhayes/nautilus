@@ -378,7 +378,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   nk_sched_start();
 
-  nk_dump_all_irq();
+  //nk_dump_all_irq();
 
   nk_fs_init();
 
