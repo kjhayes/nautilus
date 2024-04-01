@@ -8,12 +8,5 @@ uImage: $(NAUT_BIN)
 		-d Image uImage $(QPIPE)
 	$(Q)rm Image
 
-riscv-clean:
-	$(Q)rm -f uImage
-	$(Q)rm -f Image
-	$(Q)rm -f qemu.dtb
-	$(Q)rm -f qemu.dts
-
 DEFAULT_RULES += uImage
-CLEAN_RULES += riscv-clean
 

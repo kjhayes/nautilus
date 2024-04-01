@@ -143,60 +143,25 @@ $(LD_SCRIPT): $(LD_SCRIPT_SRC) $(AUTOCONF)
 	$(call quiet-cmd,CPP,$@)
 	$(Q)$(CPP) -CC -P $(CPPFLAGS) $< -o $@
 
+# Architecture specific rules
+-include $(ARCH_SCRIPTS_DIR)/rules.mk
+# Toolchain specific rules
+-include $(TOOLCHAIN_SCRIPTS_DIR)/rules.mk
+
 #
 # Utility Rules
 #
 
--include $(ARCH_SCRIPTS_DIR)/rules.mk
--include $(TOOLCHAIN_SCRIPTS_DIR)/rules.mk
+# Extra rules for generating disassembly
+-include $(SCRIPTS_DIR)/extra/objdump.mk
+# Extra rules for running QEMU
+-include $(SCRIPTS_DIR)/extra/qemu.mk
 
-ifdef OBJDUMP
-asm: $(NAUT_ASM)
-$(NAUT_ASM): $(NAUT_BIN)
-	$(call quiet-cmd,OBJDUMP,$@)
-	$(Q)$(OBJDUMP) -S $(NAUT_BIN) > $@
-endif
-
-ifdef QEMU
-
-QEMU_FLAGS += -smp cpus=4
-QEMU_FLAGS += -serial stdio
-QEMU_FLAGS += -m 2G
-QEMU_FLAGS += -display none
-
-qemu: $(QEMU_DEPS)
-	$(call quiet-cmd,QEMU,)
-	$(QEMU) $(QEMU_FLAGS)
-qemu-gdb: $(QEMU_DEPS)
-	$(call quiet-cmd,QEMU,)
-	$(QEMU) $(QEMU_FLAGS) -gdb tcp::1234 -S
-qemu-gdb-%: $(QEMU_DEPS)
-	$(call quiet-cmd,QEMU,)
-	$(QEMU) $(QEMU_FLAGS) -gdb tcp::$* -S
-
-ifdef NAUT_CONFIG_USE_FDT
-
-QEMU_DTB := $(OUTPUT_DIR)/qemu.dtb
-QEMU_DTS := $(OUTPUT_DIR)/qemu.dts
-
-$(QEMU_DTB): $(QEMU_DEPS) FORCE
-	$(call quiet-cmd,QEMU-DTB,)
-	$(Q)$(QEMU) $(QEMU_FLAGS) -machine dumpdtb=$(QEMU_DTB)	
-
-DTC := dtc
-%.dts: %.dtb
-	$(call quiet-cmd,DTC,)
-	$(Q)$(DTC) $< -o $@
-
-qemu-dts: $(QEMU_DTS)
-
-device-tree-clean: FORCE
-	$(Q)rm -f $(QEMU_DTB)
-	$(Q)rm -f $(QEMU_DTS)
-CLEAN_RULES += device-tree-clean
-
-endif
-endif
+# Include clean.mk files found recursively in the scripts dir
+# (Regardless of the Kconfig, we want to clean everything we can on make clean,
+#  e.g. clean isoimage even without ARCH_X86)
+CLEAN_FILES := $(shell find $(SCRIPTS_DIR) -name "clean.mk")
+$(foreach CLEAN_FILE,$(CLEAN_FILES), $(eval -include $(CLEAN_FILE)))
 
 DEFAULT_RULES ?= $(NAUT_BIN)
 default: $(DEFAULT_RULES)

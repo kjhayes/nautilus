@@ -28,11 +28,6 @@ $(QEMU_FLASH):
 #		-object memory-backend-ram,id=m1,size=2G \
 #		-m 4G
 
-clean-arm64:
-	$(Q)rm -f Image
-	$(Q)rm -f uImage
-
 DEFAULT_RULES += uImage
-CLEAN_RULES += clean-arm64
 
 .PHONY: qemu-flash

@@ -21,10 +21,3 @@ without-passes: bitcode
 	$(Q)$(LD) $(LDFLAGS) -o $(NAUT_BIN) -T $(LD_SCRIPT) .nautilus.o `scripts/findasm.pl`
 	$(Q)rm .nautilus.o
 
-wllvm-clean:
-	rm -f $(NAUT_BC)
-	rm -f $(NAUT_LL)
-	$(Q)find $(OUTPUT_DIR) -name "*.bc" -delete
-
-CLEAN_RULES += wllvm-clean
-

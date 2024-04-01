@@ -55,15 +55,5 @@ $(NAUT_ISO): $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC)
 
 DEFAULT_RULES += $(NAUT_ISO)
 
-CLEAN_RULES += x64-clean-isoimage
-
-x64-clean-isoimage:
-	$(Q)rm -rf .iso
-	$(Q)rm -f tmp.sym
-	$(Q)rm -f tmp.sec
-	$(Q)rm -f $(NAUT_ISO)
-	$(Q)rm -f $(NAUT_SYM)
-	$(Q)rm -f $(NAUT_SEC)
-
 FORCE:
 
