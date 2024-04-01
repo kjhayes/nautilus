@@ -77,8 +77,9 @@ int nk_irq_dev_disable_irq(struct nk_irq_dev *d, nk_hwirq_t irq);
 #define IRQ_STATUS_ACTIVE  (1<<4) // Interrupt is active (between ack and eoi)
 int nk_irq_dev_irq_status(struct nk_irq_dev *d, nk_hwirq_t hwirq);
 
-#define IRQ_IPI_ERROR_IRQ_NO (1<<1) // Error with the nk_hwirq_t being requested
-#define IRQ_IPI_ERROR_CPUID  (1<<2) // Error with the cpu_id_t being requested
+#define IRQ_IPI_ERROR_IRQ_NO  (1<<1) // Error with the nk_hwirq_t being requested
+#define IRQ_IPI_ERROR_CPUID   (1<<2) // Error with the cpu_id_t being requested
+#define IRQ_IPI_ERROR_UNKNOWN (1<<3) // Unknown Cause 
 int nk_irq_dev_send_ipi(struct nk_irq_dev *d, nk_hwirq_t hwirq, cpu_id_t cpu);
 // Sends the IPI to all processors other than the current processor
 int nk_irq_dev_broadcast_ipi(struct nk_irq_dev *d, nk_hwirq_t hwirq);

@@ -42,6 +42,7 @@
 #include <nautilus/group.h>
 #include <nautilus/group_sched.h>
 #include <nautilus/idle.h>
+#include <nautilus/interrupt.h>
 #include <nautilus/libccompat.h>
 #include <nautilus/linker.h>
 #include <nautilus/mb_utils.h>
@@ -174,8 +175,8 @@ void secondary_entry(int hartid)
   nk_sched_init_ap(&sched_cfg);
 
   /* set the timer with sbi :) */
-  // sbi_set_timer(rv::get_time() + TICK_INTERVAL);
-  sbi_set_timer(read_csr(time) + TICK_INTERVAL);
+  // sbi_legacy_set_timer(rv::get_time() + TICK_INTERVAL);
+  sbi_legacy_set_timer(read_csr(time) + TICK_INTERVAL);
 
   second_done = true;
 

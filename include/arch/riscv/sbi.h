@@ -115,9 +115,10 @@ struct sbiret {
 void sbi_early_init(void);
 void sbi_init(void);
 
-void sbi_set_timer(uint64_t stime_value);
-void sbi_send_ipis(const unsigned long *hart_mask);
-void sbi_clear_ipi(void);
+
+long sbi_legacy_set_timer(uint64_t stime_value);
+long sbi_legacy_send_ipis(const unsigned long *hart_mask);
+long sbi_legacy_clear_ipi(void);
 // status_t sbi_boot_hart(uint hartid, paddr_t start_addr, ulong arg);
 
 bool_t sbi_probe_extension(unsigned long extension);

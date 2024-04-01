@@ -680,9 +680,7 @@ static int execute_plic_bench(char command[]) {
 
 static int execute_time_test(char command[]) {
   
-  sbi_set_timer(read_csr(time) + 10000000);
-
-  return 0;
+  return sbi_legacy_set_timer(read_csr(time) + 10000000);
 }
 
 extern int execute_threading(char command[]);

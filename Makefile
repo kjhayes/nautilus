@@ -129,14 +129,14 @@ root-builtin := $(addsuffix /builtin.o, $(root-builtin-dirs))
 
 # Kernel Link Rule
 $(NAUT_BIN_NAME): $(NAUT_BIN)
-$(NAUT_BIN): $(LD_SCRIPT) $(root-builtin) FORCE
+$(NAUT_BIN): $(LD_SCRIPT) $(root-builtin)
 	$(call quiet-cmd,LD,$(NAUT_BIN_NAME))
 	$(Q)$(LD) $(LDFLAGS) -T$(LD_SCRIPT) \
 		$(sort \
 		$(wildcard $(SOURCE_DIR)/builtin.o)\
 		$(wildcard $(LIBRARY_DIR)/builtin.o)\
 		)\
-		/dev/null -o $(NAUT_BIN)
+	    -o $(NAUT_BIN)
 
 # Linker Script Generation
 $(LD_SCRIPT): $(LD_SCRIPT_SRC) $(AUTOCONF)
@@ -159,15 +159,18 @@ endif
 
 ifdef QEMU
 
-QEMU_FLAGS += -smp cpus=2
+QEMU_FLAGS += -smp cpus=4
 QEMU_FLAGS += -serial stdio
 QEMU_FLAGS += -m 2G
 
 qemu: $(QEMU_DEPS)
+	$(call quiet-cmd,QEMU,)
 	$(QEMU) $(QEMU_FLAGS)
 qemu-gdb: $(QEMU_DEPS)
+	$(call quiet-cmd,QEMU,)
 	$(QEMU) $(QEMU_FLAGS) -gdb tcp::1234 -S
 qemu-gdb-%: $(QEMU_DEPS)
+	$(call quiet-cmd,QEMU,)
 	$(QEMU) $(QEMU_FLAGS) -gdb tcp::$* -S
 
 ifdef NAUT_CONFIG_USE_FDT
@@ -176,10 +179,12 @@ QEMU_DTB := $(OUTPUT_DIR)/qemu.dtb
 QEMU_DTS := $(OUTPUT_DIR)/qemu.dts
 
 $(QEMU_DTB): $(QEMU_DEPS) FORCE
+	$(call quiet-cmd,QEMU-DTB,)
 	$(Q)$(QEMU) $(QEMU_FLAGS) -machine dumpdtb=$(QEMU_DTB)	
 
 DTC := dtc
 %.dts: %.dtb
+	$(call quiet-cmd,DTC,)
 	$(Q)$(DTC) $< -o $@
 
 qemu-dts: $(QEMU_DTS)

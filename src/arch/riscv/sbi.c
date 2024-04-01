@@ -26,9 +26,9 @@ struct sbiret sbi_generic_call_2(unsigned long extension, unsigned long function
 
 bool_t sbi_probe_extension(unsigned long extension) { return sbi_call(SBI_PROBE_EXTENSION, extension).value != 0; }
 
-void sbi_set_timer(uint64_t stime_value) { sbi_call(SBI_SET_TIMER, stime_value); }
-void sbi_send_ipis(const unsigned long *hart_mask) { sbi_call(SBI_SEND_IPI, hart_mask); }
-void sbi_clear_ipi(void) { panic("TODO: clear sip.SSIP here!\n"); }
+long sbi_legacy_set_timer(uint64_t stime_value) { return sbi_call(SBI_SET_TIMER, stime_value).error; }
+long sbi_legacy_send_ipis(const unsigned long *hart_mask) { return sbi_call(SBI_SEND_IPI, hart_mask).error; }
+long sbi_legacy_clear_ipi(void) { panic("TODO: clear sip.SSIP here!\n"); return -1; }
 
 /*
 status_t sbi_boot_hart(uint hartid, paddr_t start_addr, ulong arg) {

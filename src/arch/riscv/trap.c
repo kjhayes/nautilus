@@ -1,5 +1,6 @@
 #include <nautilus/arch.h>
 #include <nautilus/printk.h>
+#include <nautilus/interrupt.h>
 #include <arch/riscv/plic.h>
 #include <arch/riscv/trap.h>
 #include <arch/riscv/riscv_idt.h>
@@ -86,8 +87,6 @@ void * kernel_trap(struct nk_regs *regs, struct trap_regs *tregs) {
   {
     //printk("int!, nr = %d, sie=%p, pending=%p\n", nr, read_csr(sie), read_csr(sip)); 
 
-    // supervisor external interrupt
-    // first, we claim the irq from the PLIC
     struct nk_irq_dev *irq_dev = riscv_root_irq_dev;
     if(nk_handle_interrupt_generic(NULL, regs, irq_dev)) {
       // Nothing we can do

@@ -6,6 +6,7 @@
 #include <nautilus/of/dt.h>
 
 #include <arch/riscv/trap.h>
+#include <arch/riscv/sbi.h>
 
 #ifndef NAUT_CONFIG_DEBUG_PRINTS
 #undef DEBUG_PRINT
@@ -79,7 +80,12 @@ static int hlic_dev_ack_irq(void *state, nk_hwirq_t *hwirq)
 static int hlic_dev_eoi_irq(void *state, nk_hwirq_t hwirq) 
 {
   struct hlic *hlic = (struct hlic*)state;
-  // Do nothing
+  
+  // We need to manually de-assert IPI pending state
+  if(hwirq == 1) {
+      clear_csr(sip, 1ULL << 1);
+  }
+
   return 0;
 }
 
@@ -129,6 +135,85 @@ static int hlic_dev_irq_status(void *state, nk_hwirq_t hwirq)
   return status;
 }
 
+static int hlic_dev_send_ipi(void *state, nk_hwirq_t hwirq, cpu_id_t cpu) {
+    if(hwirq != 1) {
+      return IRQ_IPI_ERROR_IRQ_NO;
+    }
+    if(cpu < 0 || cpu > nk_get_num_cpus()) {
+        return IRQ_IPI_ERROR_CPUID;
+    }
+ 
+    size_t bitmask_size = (nk_get_num_cpus() / sizeof(unsigned long)) + 1;
+    unsigned long bitmask[bitmask_size];
+
+    for(size_t i = 0; i < bitmask_size; i++) {
+        bitmask[i] = 0;
+    }
+
+    // Set the target CPU in the bitmask
+    uint32_t hartid = nk_get_nautilus_info()->sys.cpus[cpu]->hartid;
+    size_t target_cpu_index = hartid / sizeof(unsigned long);
+    size_t target_cpu_bit = 1UL << (hartid % sizeof(unsigned long));
+    bitmask[target_cpu_index] |= target_cpu_bit;
+
+    long ret = sbi_legacy_send_ipis(bitmask);
+    if(ret) {
+        // Implementation specific error codes from sbi call
+        switch(ret) {
+            case -1: HLIC_INFO("FAILED\n"); break;
+            case -2: HLIC_INFO("NOT_SUPPORTED\n"); break;
+            case -3: HLIC_INFO("INVALID_PARAM\n"); break;
+            case -4: HLIC_INFO("DENIED\n"); break;
+            case -5: HLIC_INFO("INVALID_ADDRESS\n"); break;
+            case -6: HLIC_INFO("ALREADY_AVAILABLE\n"); break;
+            case -7: HLIC_INFO("ALREADY_STARTED\n"); break;
+            case -8: HLIC_INFO("ALREADY_STOPPED\n"); break;
+            default: HLIC_INFO("N/A\n"); break;
+        }
+        return IRQ_IPI_ERROR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static int hlic_dev_broadcast_ipi(void *state, nk_hwirq_t hwirq) {
+    if(hwirq != 1) {
+      return IRQ_IPI_ERROR_IRQ_NO;
+    }
+
+    /*
+     * This SBI Call is a little bit strange to me,
+     * Hart ID's don't need to be contiguous, but the SBI
+     * spec seems to indicate this map is only "number of harts"
+     * bits long, so it would seem that bit N doesn't necessarily
+     * correspond to hart N if they are discontiguous.
+     * (I'm guessing this is fine because most systems seem to have
+     *  contiguous hart ID's without being required to).
+     *
+     *  TODO: Make this function (and hlic_dev_send_ipi) handle discontiguous hart ID's.
+     *
+     *  -KJH
+     */
+    
+    size_t bitmask_size = (nk_get_num_cpus() / sizeof(unsigned long)) + 1;
+    unsigned long bitmask[bitmask_size];
+
+    for(size_t i = 0; i < bitmask_size; i++) {
+        bitmask[i] = ~(unsigned long)(0);
+    }
+
+    // Clear the current CPU from the bitmask
+    size_t curr_cpu_index = my_cpu_id() / sizeof(unsigned long);
+    size_t curr_cpu_bit = 1UL << (my_cpu_id() % sizeof(unsigned long));
+    bitmask[curr_cpu_index] &= ~curr_cpu_bit;
+
+    if(sbi_legacy_send_ipis(bitmask)) {
+        return IRQ_IPI_ERROR_UNKNOWN;
+    }
+
+    return 0;
+}
+
 static struct nk_irq_dev_int hlic_dev_int = {
   .get_characteristics = hlic_dev_get_characteristics,
   .ack_irq = hlic_dev_ack_irq,
@@ -137,7 +222,9 @@ static struct nk_irq_dev_int hlic_dev_int = {
   .disable_irq = hlic_dev_disable_irq,
   .irq_status = hlic_dev_irq_status,
   .revmap = hlic_dev_revmap,
-  .translate = hlic_dev_translate
+  .translate = hlic_dev_translate,
+  .send_ipi = hlic_dev_send_ipi,
+  .broadcast_ipi = hlic_dev_broadcast_ipi,
 };
 
 static struct nk_dev *hlic_init_dev_info_dev_ptr;
@@ -224,6 +311,9 @@ int hlic_init(void)
     HLIC_ERROR("Failed to allocate IRQ descriptors!\n");
     goto err_exit;
   }
+
+  // Mark the Supervisor Software Interrupt Descriptor as an IPI
+  hlic->irq_descs[1].flags |= NK_IRQ_DESC_FLAG_IPI;
 
   if(nk_assign_irq_descs(HLIC_NUM_IRQ, hlic->irq_base, hlic->irq_descs)) {
     HLIC_ERROR("Failed to assign IRQ descriptors for interrupts!\n");

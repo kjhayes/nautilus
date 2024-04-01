@@ -63,7 +63,11 @@ void arch_update_timer(uint32_t ticks, nk_timer_condition_t cond) {
 void arch_set_timer(uint32_t ticks) {
     uint64_t time_to_set = !ticks ? read_csr(time) + 1 :
            (ticks != -1 || current_ticks == -1) ? read_csr(time) + ticks : -1;
-    sbi_set_timer(time_to_set);
+    if(sbi_legacy_set_timer(time_to_set)) {
+        ERROR_PRINT("RISCV SBI Failed to set timer!\n");
+        return;
+    }
+
     timer_set = 1;
     current_ticks = ticks;
 }
