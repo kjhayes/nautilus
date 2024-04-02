@@ -53,7 +53,5 @@ $(NAUT_ISO): $(NAUT_BIN) $(NAUT_SYM) $(NAUT_SEC)
 	$(Q)$(GRUBMKRESCUE) -o $(NAUT_ISO) .iso $(QPIPE) 
 	$(Q)rm -rf .iso
 
-DEFAULT_RULES += $(NAUT_ISO)
-
 FORCE:
 

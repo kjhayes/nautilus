@@ -1,6 +1,13 @@
 
 export
 
+ifneq ($(MAKELEVEL),0)
+
+# Root Directories to generate a builtin.o from
+obj-y += $(SOURCE_DIR)/ $(LIBRARY_DIR)/
+
+else
+
 default:
 	@:
 
@@ -47,10 +54,6 @@ endif
 
 ARCH_SCRIPTS_DIR:=$(SCRIPTS_DIR)/arch/$(ARCH)
 -include $(ARCH_SCRIPTS_DIR)/config.mk
-
-ifdef NAUT_CONFIG_DEBUG_INFO
-CFLAGS		+= -g
-endif
 
 # Toolchain Specific Build Configurations
 ifdef NAUT_CONFIG_USE_CLANG
@@ -110,33 +113,37 @@ AFLAGS += $(COMMON_FLAGS) \
 LDFLAGS += 
 MAKEFLAGS += --no-print-directory
 
+ifdef NAUT_CONFIG_DEBUG_INFO
+CFLAGS		+= -g
+endif
+
+ifdef NAUT_CONFIG_CXX_SUPPORT
+
+CXXFLAGS += $(COMMON_FLAGS) \
+			$(NAUT_INCLUDE) \
+			-fno-exceptions \
+			-fno-rtti
+
+#TODO: Theoretically we need to provide libstdc++ here
+#      but for now I'm just not going to worry about it -KJH
+
+endif
+
 #
 # Build Rules
 #
 
-# Root Directories to generate a builtin.o from
-root-builtin-dirs := $(SOURCE_DIR) $(LIBRARY_DIR)
-
-define root-builtin-dir-rule =
-$1/builtin.o: $$(AUTOCONF) FORCE
-	$$(call quiet-cmd,MAKE,$$(call rel-dir, $$@, $(ROOT_DIR)))
-	$$(Q)$$(MAKE) -C $1 -f $$(SCRIPTS_DIR)/build.mk builtin.o
-endef
-$(foreach root-builtin-dir, $(root-builtin-dirs), $(eval $(call root-builtin-dir-rule,$(root-builtin-dir))))
-
-# The builtin.o files which will be linked together into the kernel
-root-builtin := $(addsuffix /builtin.o, $(root-builtin-dirs))
+# Generates the root builtin.o using build.mk
+builtin.o: $(AUTOCONF) FORCE
+	#$(call quiet-cmd,MAKE,$(call rel-dir, $@, $(ROOT_DIR)))
+	$(Q)$(MAKE) -C $(ROOT_DIR) -f $(SCRIPTS_DIR)/build.mk builtin.o
 
 # Kernel Link Rule
 $(NAUT_BIN_NAME): $(NAUT_BIN)
-$(NAUT_BIN): $(LD_SCRIPT) $(root-builtin)
+$(NAUT_BIN): $(LD_SCRIPT) builtin.o
 	$(call quiet-cmd,LD,$(NAUT_BIN_NAME))
 	$(Q)$(LD) $(LDFLAGS) -T$(LD_SCRIPT) \
-		$(sort \
-		$(wildcard $(SOURCE_DIR)/builtin.o)\
-		$(wildcard $(LIBRARY_DIR)/builtin.o)\
-		)\
-	    -o $(NAUT_BIN)
+		builtin.o -o $(NAUT_BIN)
 
 # Linker Script Generation
 $(LD_SCRIPT): $(LD_SCRIPT_SRC) $(AUTOCONF)
@@ -167,21 +174,10 @@ DEFAULT_RULES ?= $(NAUT_BIN)
 default: $(DEFAULT_RULES)
 
 clean: $(CLEAN_RULES)
-	$(Q)find $(SOURCE_DIR) -name "*.o" -delete
-	$(Q)find $(SOURCE_DIR) -name "*.cmd" -delete
-	$(Q)find $(LIBRARY_DIR) -name "*.o" -delete
-	$(Q)find $(LIBRARY_DIR) -name "*.cmd" -delete
-	$(Q)find $(OUTPUT_DIR) -name "*.bin" -delete
-	$(Q)find $(SCRIPTS_DIR) -name "*.o" -delete
-	$(Q)find $(SCRIPTS_DIR) -name "*.cmd" -delete
-	$(Q)rm -f $(LD_SCRIPT)
-	$(Q)rm -f $(NAUT_BIN)
-	$(Q)rm -f $(NAUT_ASM)
-	$(Q)rm -f $(AUTOCONF)
 
 FORCE:
 
 .PHONY: default clean $(CLEAN_RULES)
 
 endif
-
+endif

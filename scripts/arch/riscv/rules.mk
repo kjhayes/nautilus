@@ -8,5 +8,3 @@ uImage: $(NAUT_BIN)
 		-d Image uImage $(QPIPE)
 	$(Q)rm Image
 
-DEFAULT_RULES += uImage
-

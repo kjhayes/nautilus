@@ -28,6 +28,4 @@ $(QEMU_FLASH):
 #		-object memory-backend-ram,id=m1,size=2G \
 #		-m 4G
 
-DEFAULT_RULES += uImage
-
 .PHONY: qemu-flash
