@@ -95,6 +95,7 @@
 #define TRIGGER_MODE_LEVEL 1
 
 #define IOAPIC_MASK_IRQ    (1 << 16)
+#define IOAPIC_DELIVERY_STATUS (1 << 12)
 
 struct nk_int_entry;
 

@@ -109,6 +109,14 @@ int ioapic_irq_enabled(struct ioapic *ioapic, uint8_t irq)
   return ioapic->entries[irq].enabled;
 }
 
+static
+int ioapic_delivery_status(struct ioapic *ioapic, uint8_t irq) {
+    uint32_t val;
+    ASSERT(irq < ioapic->num_entries);
+    val = ioapic_read_reg(ioapic, IOAPIC_IRQ_ENTRY_LO(irq));
+    return val & IOAPIC_DELIVERY_STATUS;
+}
+
 void 
 ioapic_unmask_irq (struct ioapic * ioapic, uint8_t irq)
 {
@@ -129,12 +137,18 @@ ioapic_dev_unmask_irq(void *state, nk_irq_t hwirq) {
 static int
 ioapic_dev_irq_status(void *state, nk_irq_t hwirq) {
 
+  struct ioapic *ioapic = (struct ioapic*)state;
   int status = 0;
 
-  status |= ioapic_irq_enabled((struct ioapic*)state, (uint8_t)hwirq) ?
+  status |= ioapic_irq_enabled(ioapic, (uint8_t)hwirq) ?
     IRQ_STATUS_ENABLED : 0;
 
-  // No info on PENDING or ACTIVE right now
+  int delivery_status = ioapic_delivery_status(ioapic, (uint8_t)hwirq);
+  if(delivery_status) {
+      status |= IRQ_STATUS_PENDING;
+  }
+
+  // No info on ACTIVE right now (not sure how to get it) -KJH
 
   return status;
 }
