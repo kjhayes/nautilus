@@ -1,6 +1,8 @@
 
+BEANDIP_DIR := $(ROOT_DIR)/dep/beandip-linux
+
 # LLVM Pass
-BEANDIP_SO:=$(ROOT_DIR)/dep/beandip-linux/local/lib/BEANDIP.so
+BEANDIP_SO := $(BEANDIP_DIR)/local/lib/BEANDIP.so
 
 beandip: FORCE
 	$(Q)$(SCRIPTS_DIR)/build_beandip_linux.sh
