@@ -1,12 +1,18 @@
 
-LLVM_PASS_DIR:=$(ROOT_DIR)/llvm
-LLVM_PASS_LIST:=$(LLVM_PASS_DIR)/passes.txt
-LLVM_PASS_PLUGIN_LIST:=$(LLVM_PASS_DIR)/passplugins.txt
+LLVM_PASS_DIR := $(ROOT_DIR)/llvm
+LLVM_PASS_LIST := $(LLVM_PASS_DIR)/passes.txt
+LLVM_PASS_PLUGIN_LIST := $(LLVM_PASS_DIR)/passplugins.txt
+
+PASSES_BIN_NAME := nautilus.passes.bin
+WITHOUT_PASSES_BIN_NAME := nautilus.without_passes.bin
+
+PASSES_BIN := $(TMPBIN_DIR)/$(PASSES_BIN_NAME)
+WITHOUT_PASSES_BIN := $(TMPBIN_DIR)/$(WITHOUT_PASSES_BIN_NAME)
 
 $(shell mkdir -p $(LLVM_PASS_DIR))
-$(shell rm $(LLVM_PASS_LIST))
+$(shell rm -f $(LLVM_PASS_LIST))
 $(shell touch $(LLVM_PASS_LIST))
-$(shell rm $(LLVM_PASS_PLUGIN_LIST))
+$(shell rm -f $(LLVM_PASS_PLUGIN_LIST))
 $(shell touch $(LLVM_PASS_PLUGIN_LIST))
 
 CC := gclang

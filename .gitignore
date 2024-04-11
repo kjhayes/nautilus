@@ -21,8 +21,12 @@ GTAGS
 *.dts
 ./src/llvm/toolchain
 
-# Binary Folder for LLVM Passes
+# Contains LLVM pass information
 llvm
+
+# Temporary Nautilus binaries (Useful for extracting LLVM bitcode
+# from binary then rebuilding)
+tmpbin
 
 # LSP-related tools
 .clangd

@@ -12,6 +12,7 @@ default-clean:
 	$(Q)rm -f $(NAUT_ASM)
 	$(Q)rm -f $(AUTOCONF)
 	$(Q)rm -f $(ROOT_DIR)/builtin.o
+	$(Q)rm -rf $(TMPBIN_DIR)
 
 CLEAN_RULES += default-clean
 
