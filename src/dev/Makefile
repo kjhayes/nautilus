@@ -3,11 +3,11 @@ obj-$(NAUT_CONFIG_ARCH_X86) += apic.o \
 	 ioapic.o \
 	 i8254.o \
 	 ps2.o \
-	 pci.o \
 	 vga.o \
 
-obj-$(NAUT_CONFIG_ARCH_ARM64) += \
-	pci.o
+obj-$(NAUT_CONFIG_HAS_PCI) += \
+	pci.o \
+	pci/
 
 ifndef NAUT_CONFIG_XEON_PHI
 obj-$(NAUT_CONFIG_ARCH_X86) += serial.o

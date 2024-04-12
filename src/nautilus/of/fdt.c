@@ -22,7 +22,7 @@ int fdt_getreg(const void *fdt, int offset, fdt_reg_t *reg) {
 
 	const void *address_cells_p = NULL;
 	const void *size_cells_p = NULL;
-	int parent_iter_offset = offset;
+	int parent_iter_offset = fdt_parent_offset(fdt, offset);
 	while (!address_cells_p || !size_cells_p) {
 		// unclear if we should return here or if we should fall back to the default values
 		// listed above (2, 1)

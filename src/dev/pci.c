@@ -41,138 +41,6 @@
 #define PCI_WARN(fmt, args...)  WARN_PRINT("PCI: " fmt, ##args)
 #define PCI_ERROR(fmt, args...) ERROR_PRINT("PCI: " fmt, ##args)
 
-uint16_t 
-pci_cfg_readw (uint8_t bus, 
-               uint8_t slot,
-               uint8_t fun,
-               uint8_t off)
-{
-    uint32_t addr;
-    uint32_t lbus  = (uint32_t)bus;
-    uint32_t lslot = (uint32_t)slot;
-    uint32_t lfun  = (uint32_t)fun;
-    uint32_t ret;
-    
-    addr = (lbus  << PCI_BUS_SHIFT) | 
-           (lslot << PCI_SLOT_SHIFT) | 
-           (lfun  << PCI_FUN_SHIFT) |
-           PCI_REG_MASK(off) | 
-           PCI_ENABLE_BIT;
-
-
-#ifdef NAUT_CONFIG_USE_PCI_ECAM
-    struct pci_info *pci = nautilus_info.sys.pci;
-    uint16_t read = *(volatile uint16_t*)(pci->ecam_base_addr + (void*)(uint64_t)addr);
-    return read;
-#elif NAUT_CONFIG_USE_PCI_CAM
-    outl(addr, PCI_CFG_ADDR_PORT);
-    ret = inl(PCI_CFG_DATA_PORT);
-    return (ret >> ((off & 0x2) * 8)) & 0xffff;
-#elif NAUT_CONFIG_HAS_PCI
-#error "HAS_PCI has been specified, however no way to access configuration space has been given!"
-#else
-#warn "Compiling "__FILE__" with HAS_PCI undefined!"
-#endif
-}
-
-
-uint32_t 
-pci_cfg_readl (uint8_t bus, 
-               uint8_t slot,
-               uint8_t fun,
-               uint8_t off)
-{
-    uint32_t addr;
-    uint32_t lbus  = (uint32_t)bus;
-    uint32_t lslot = (uint32_t)slot;
-    uint32_t lfun  = (uint32_t)fun;
-    
-    addr = (lbus  << PCI_BUS_SHIFT) | 
-           (lslot << PCI_SLOT_SHIFT) | 
-           (lfun  << PCI_FUN_SHIFT) |
-           PCI_REG_MASK(off) | 
-           PCI_ENABLE_BIT;
-
-#ifdef NAUT_CONFIG_USE_PCI_ECAM
-    uint32_t read;
-    struct pci_info *pci = nautilus_info.sys.pci;
-    read = *(volatile uint32_t*)(pci->ecam_base_addr + (void*)(uint64_t)addr);
-    return read;
-#elif NAUT_CONFIG_USE_PCI_CAM
-    outl(addr, PCI_CFG_ADDR_PORT);
-    return inl(PCI_CFG_DATA_PORT);
-#elif NAUT_CONFIG_HAS_PCI
-#error "HAS_PCI has been specified, however no way to access configuration space has been given!"
-#else
-#warn "Compiling "__FILE__" with HAS_PCI undefined!"
-#endif
-}
-
-
-void
-pci_cfg_writew (uint8_t bus, 
-		uint8_t slot,
-		uint8_t fun,
-		uint8_t off,
-		uint16_t val)
-{
-    uint32_t addr;
-    uint32_t lbus  = (uint32_t)bus;
-    uint32_t lslot = (uint32_t)slot;
-    uint32_t lfun  = (uint32_t)fun;
-    uint32_t ret;
-    
-    addr = (lbus  << PCI_BUS_SHIFT) | 
-           (lslot << PCI_SLOT_SHIFT) | 
-           (lfun  << PCI_FUN_SHIFT) |
-           PCI_REG_MASK(off) | 
-           PCI_ENABLE_BIT;
-
-#ifdef NAUT_CONFIG_USE_PCI_ECAM
-    struct pci_info *pci = nautilus_info.sys.pci;
-    *(volatile uint16_t*)(pci->ecam_base_addr + (void*)(uint64_t)addr) = val;
-#elif NAUT_CONFIG_USE_PCI_CAM
-    outl(addr, PCI_CFG_ADDR_PORT);
-    outw(val,PCI_CFG_DATA_PORT);
-#elif NAUT_CONFIG_HAS_PCI
-#error "HAS_PCI has been specified, however no way to access configuration space has been given!"
-#else
-#warn "Compiling "__FILE__" with HAS_PCI undefined!"
-#endif
-}
-
-
-void
-pci_cfg_writel (uint8_t bus, 
-		uint8_t slot,
-		uint8_t fun,
-		uint8_t off,
-		uint32_t val)
-{
-    uint32_t addr;
-    uint32_t lbus  = (uint32_t)bus;
-    uint32_t lslot = (uint32_t)slot;
-    uint32_t lfun  = (uint32_t)fun;
-    
-    addr = (lbus  << PCI_BUS_SHIFT) | 
-           (lslot << PCI_SLOT_SHIFT) | 
-           (lfun  << PCI_FUN_SHIFT) |
-           PCI_REG_MASK(off) | 
-           PCI_ENABLE_BIT;
-
-#ifdef NAUT_CONFIG_USE_PCI_ECAM
-    struct pci_info *pci = nautilus_info.sys.pci;
-    *(volatile uint32_t*)(pci->ecam_base_addr + (void*)(uint64_t)addr) = val;
-#elif NAUT_CONFIG_USE_PCI_CAM
-    outl(addr, PCI_CFG_ADDR_PORT);
-    outl(val, PCI_CFG_DATA_PORT);
-#elif NAUT_CONFIG_HAS_PCI
-#error "HAS_PCI has been specified, however no way to access configuration space has been given!"
-#else
-#warn "Compiling "__FILE__" with HAS_PCI undefined!"
-#endif
-}
-
 static inline void 
 pci_dump_cfg_raw(struct pci_dev *d) {
   int i,j;
@@ -180,86 +48,120 @@ pci_dump_cfg_raw(struct pci_dev *d) {
   for (i=0;i<256;i+=32) {
       PCI_DEBUG("%02x:", i);
       for (j=0;j<8;j++) {
-          v = pci_cfg_readl(d->bus->num,d->num,d->fun,i+j*4);
+          v = pci_cfg_readl(d->bus->pci, d->bus->num,d->num,d->fun,i+j*4);
           printk(" %08x",v);
       } 
       printk("\n");
   }
 }
 
-static inline uint16_t
-pci_dev_valid (uint8_t bus, uint8_t slot, uint8_t fun)
+uint16_t pci_cfg_readw(struct pci_info *info, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off) 
 {
-    return (pci_cfg_readw(bus, slot, fun, 0) != 0xffff);
+    if(info && info->cfg_int && info->cfg_int->readw) {
+        return (*info->cfg_int->readw)(info->cfg_state, bus, slot, fun, off);
+    }
+    PCI_ERROR("Tried to call pci_cfg_readw without readw defined in pci_cfg_int!\n");
+    return 0;
+}
+uint32_t pci_cfg_readl(struct pci_info *info, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off) 
+{
+    if(info && info->cfg_int && info->cfg_int->readl) {
+        return (*info->cfg_int->readl)(info->cfg_state, bus, slot, fun, off);
+    }
+    PCI_ERROR("Tried to call pci_cfg_readl without readl defined in pci_cfg_int!\n");
+    return 0;
+}
+
+void pci_cfg_writew(struct pci_info *info, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off, uint16_t val)
+{
+    if(info && info->cfg_int && info->cfg_int->writew) {
+        (*info->cfg_int->writew)(info->cfg_state, bus, slot, fun, off, val);
+        return;
+    }
+    PCI_ERROR("Tried to call pci_cfg_writew without writew defined in pci_cfg_int!\n");
+}
+void pci_cfg_writel(struct pci_info *info, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off, uint32_t val)
+{
+    if(info && info->cfg_int && info->cfg_int->writel) {
+        (*info->cfg_int->writel)(info->cfg_state, bus, slot, fun, off, val);
+        return;
+    }
+    PCI_ERROR("Tried to call pci_cfg_writel without writel defined in pci_cfg_int!\n");
+}
+
+static inline uint16_t
+pci_dev_valid (struct pci_info *pci, uint8_t bus, uint8_t slot, uint8_t fun)
+{
+    return (pci_cfg_readw(pci, bus, slot, fun, 0) != 0xffff);
 }
 
 
 static inline uint8_t 
-pci_get_base_class (uint8_t bus, uint8_t dev, uint8_t fun)
+pci_get_base_class (struct pci_info *pci, uint8_t bus, uint8_t dev, uint8_t fun)
 {
-    return (pci_cfg_readl(bus, dev, fun, 0x8) >> 24) & 0xff;
+    return (pci_cfg_readl(pci, bus, dev, fun, 0x8) >> 24) & 0xff;
 }
 
 
 static inline uint8_t
-pci_get_sub_class (uint8_t bus, uint8_t dev, uint8_t fun)
+pci_get_sub_class (struct pci_info *pci, uint8_t bus, uint8_t dev, uint8_t fun)
 {
-    return (pci_cfg_readl(bus, dev, fun, 0x8) >> 16) & 0xff;
+    return (pci_cfg_readl(pci, bus, dev, fun, 0x8) >> 16) & 0xff;
 }
 
 
 static inline uint8_t 
-pci_get_rev_id (uint8_t bus, uint8_t dev, uint8_t fun)
+pci_get_rev_id (struct pci_info *pci, uint8_t bus, uint8_t dev, uint8_t fun)
 {
-    return (pci_cfg_readw(bus, dev, fun, 0x8) & 0xff);
+    return (pci_cfg_readw(pci, bus, dev, fun, 0x8) & 0xff);
 }
 
 static inline uint8_t
-pci_get_hdr_type (uint8_t bus, uint8_t dev, uint8_t fun)
+pci_get_hdr_type (struct pci_info *pci, uint8_t bus, uint8_t dev, uint8_t fun)
 {
-    return (pci_cfg_readl(bus, dev, fun, 0xc) >> 16)& 0xff;
+    return (pci_cfg_readl(pci, bus, dev, fun, 0xc) >> 16)& 0xff;
 }
 
 
 static inline uint16_t
-pci_get_vendor_id (uint8_t bus, uint8_t dev, uint8_t fun)
+pci_get_vendor_id (struct pci_info *pci, uint8_t bus, uint8_t dev, uint8_t fun)
 {
-    return pci_cfg_readw(bus, dev, fun, 0x0);
+    return pci_cfg_readw(pci, bus, dev, fun, 0x0);
 }
 
 
 static inline uint16_t
-pci_get_dev_id (uint8_t bus, uint8_t dev, uint8_t fun)
+pci_get_dev_id (struct pci_info *pci, uint8_t bus, uint8_t dev, uint8_t fun)
 {
-    return (pci_cfg_readw(bus, dev, fun, 0x2) & 0xffff);
+    return (pci_cfg_readw(pci, bus, dev, fun, 0x2) & 0xffff);
 }
 
 
 static inline uint8_t 
-pci_get_sec_bus (uint8_t bus, uint8_t dev, uint8_t fun)
+pci_get_sec_bus (struct pci_info *pci, uint8_t bus, uint8_t dev, uint8_t fun)
 {
-    return (pci_cfg_readl(bus, dev, fun, 0x18) >> 0x8) & 0xff;
+    return (pci_cfg_readl(pci, bus, dev, fun, 0x18) >> 0x8) & 0xff;
 }
 
 
 static inline uint16_t
-pci_get_cmd (uint8_t bus, uint8_t dev, uint8_t fun)
+pci_get_cmd (struct pci_info *pci, uint8_t bus, uint8_t dev, uint8_t fun)
 {
-    return (pci_cfg_readw(bus, dev, fun, 0x4) & 0xffff);
+    return (pci_cfg_readw(pci, bus, dev, fun, 0x4) & 0xffff);
 }
 
 
 static inline void
-pci_set_cmd (uint8_t bus, uint8_t dev, uint8_t fun, uint16_t val)
+pci_set_cmd (struct pci_info *pci, uint8_t bus, uint8_t dev, uint8_t fun, uint16_t val)
 {
-	pci_cfg_writew(bus, dev, fun, 0x6, val);
+	pci_cfg_writew(pci, bus, dev, fun, 0x6, val);
 }
 
 
 static inline uint16_t
-pci_get_status (uint8_t bus, uint8_t dev, uint8_t fun)
+pci_get_status (struct pci_info *pci, uint8_t bus, uint8_t dev, uint8_t fun)
 {
-    return (pci_cfg_readw(bus, dev, fun, 0x6) & 0xffff);
+    return (pci_cfg_readw(pci, bus, dev, fun, 0x6) & 0xffff);
 }
 
 
@@ -277,7 +179,7 @@ pci_copy_cfg_space(struct pci_dev *dev, struct pci_bus *bus)
   uint32_t i;
   // 4 bytes at a time
   for (i=0;i<sizeof(dev->cfg);i+=4) {
-    ((uint32_t*)(&dev->cfg))[i/4] = pci_cfg_readl(bus->num,dev->num,dev->fun,i);
+    ((uint32_t*)(&dev->cfg))[i/4] = pci_cfg_readl(bus->pci, bus->num,dev->num,dev->fun,i);
   }
 }
 
@@ -440,7 +342,7 @@ pci_dev_create (struct pci_bus * bus, uint32_t num, uint8_t func )
  
 #ifdef NAUT_CONFIG_ARCH_ARM64
 /*
-    uint8_t hdr_type = pci_get_hdr_type(bus->num, num, func);
+    uint8_t hdr_type = pci_get_hdr_type(bus->pci, bus->num, num, func);
     uint8_t num_bars = hdr_type == 0 ? 6 : hdr_type == 1 ? 2 : 0;
 
     for(uint8_t i = 0; i < num_bars; i++) {
@@ -522,7 +424,7 @@ static void pci_func_probe (struct pci_bus * bus, uint8_t dev, uint8_t fun, int 
 
     PCI_DEBUG("probing %x:%x:%x\n", bus->num, dev, fun);
   
-    vendor_id = pci_get_vendor_id(bus->num, dev, fun);
+    vendor_id = pci_get_vendor_id(bus->pci, bus->num, dev, fun);
 
 
     /* No device present */
@@ -532,8 +434,8 @@ static void pci_func_probe (struct pci_bus * bus, uint8_t dev, uint8_t fun, int 
     }
 
     PCI_PRINT("%04d:%02d:%02d.%d %x:%x (rev %d)\n", 0, bus->num, dev, fun, vendor_id, 
-            pci_get_dev_id(bus->num, dev, fun), 
-            pci_get_rev_id(bus->num, dev, fun));
+            pci_get_dev_id(bus->pci, bus->num, dev, fun), 
+            pci_get_rev_id(bus->pci, bus->num, dev, fun));
 
 
     /* create a logical representation of the device */
@@ -548,7 +450,7 @@ static void pci_func_probe (struct pci_bus * bus, uint8_t dev, uint8_t fun, int 
     // If it's a PCI<->PCI bridge, we need to recurse into the child bus
     pci_pci_bridge_probe(bus->pci, bus->num, dev, fun);
 
-    hdr_type = pci_get_hdr_type(bus->num, dev, fun);
+    hdr_type = pci_get_hdr_type(bus->pci, bus->num, dev, fun);
 
     if ((hdr_type & 0x80) != 0) {
         PCI_PRINT("[%04d:%02d.%d] Multifunction Device detected\n", 
@@ -585,7 +487,6 @@ static int pci_already_have_bus(struct pci_info *pci, uint8_t bus_num)
   return 0;
 }
 
-
 /*
  *
  * This function checks to see if there are devices
@@ -609,7 +510,7 @@ pci_bus_probe (struct pci_info * pci, uint8_t bus)
 
     /* make sure we actually have at least one device on this bus */
     for (dev = 0; dev < PCI_MAX_DEV; dev++) {
-        if (pci_get_vendor_id(bus, dev, 0) != 0xffff) {
+        if (pci_get_vendor_id(pci, bus, dev, 0) != 0xffff) {
             dev_found = 1;
             break;
         }
@@ -631,8 +532,6 @@ pci_bus_probe (struct pci_info * pci, uint8_t bus)
     }
 }
 
-
-
 /* 
  * 
  * This function checks a device's functions to see if it is
@@ -646,13 +545,13 @@ pci_pci_bridge_probe (struct pci_info * pci, uint8_t bus, uint8_t dev, uint8_t f
     uint8_t sub_class; 
     uint8_t sec_bus;
 
-    base_class = pci_get_base_class(bus, dev, fun);
-    sub_class = pci_get_sub_class(bus, dev, fun);
+    base_class = pci_get_base_class(pci, bus, dev, fun);
+    sub_class = pci_get_sub_class(pci, bus, dev, fun);
 
     if (base_class == PCI_CLASS_BRIDGE && sub_class == PCI_SUBCLASS_BRIDGE_PCI) {
         PCI_DEBUG("[%04d.%02d.%02d] PCI-PCI bridge detected, probing secondary bus\n",
                 bus, dev, fun);
-        sec_bus = pci_get_sec_bus(bus, dev, fun);
+        sec_bus = pci_get_sec_bus(pci, bus, dev, fun);
         pci_bus_probe(pci, sec_bus);
     }
 }
@@ -673,7 +572,7 @@ pci_bus_scan (struct pci_info * pci)
     uint8_t hdr_type;
     uint8_t fun;
 
-    hdr_type = pci_get_hdr_type(0, 0, 0);
+    hdr_type = pci_get_hdr_type(pci, 0, 0, 0);
 
     // a multi-function host controller means there are more than one...
     if ((hdr_type & 0x80) == 0) {
@@ -688,7 +587,7 @@ pci_bus_scan (struct pci_info * pci)
          * and devices.
          */
         for (fun = 0; fun < 8; fun++) {
-            if (pci_get_vendor_id(0, 0, fun) != 0xffff) {
+            if (pci_get_vendor_id(pci, 0, 0, fun) != 0xffff) {
                 PCI_DEBUG("Found new PCI host bridge, scanning bus %d\n", fun);
                 pci_bus_probe(pci, fun);
             }
@@ -874,100 +773,97 @@ pci_dev_get_bar_type (struct pci_dev * d, uint8_t barnum)
 void 
 pci_dev_disable_io (struct pci_dev * d)
 {
-	uint16_t cmd = pci_get_cmd(d->bus->num, d->num, d->fun);
+	uint16_t cmd = pci_get_cmd(d->bus->pci, d->bus->num, d->num, d->fun);
     cmd &= 0xfffe;
-    pci_set_cmd(d->bus->num, d->num, d->fun, cmd);
+    pci_set_cmd(d->bus->pci, d->bus->num, d->num, d->fun, cmd);
 }
 
 
 void
 pci_dev_enable_io (struct pci_dev * d)
 {
-	uint16_t cmd = pci_get_cmd(d->bus->num, d->num, d->fun);
+	uint16_t cmd = pci_get_cmd(d->bus->pci, d->bus->num, d->num, d->fun);
 	cmd |= 1;
-	pci_set_cmd(d->bus->num, d->num, d->fun, cmd);
+	pci_set_cmd(d->bus->pci, d->bus->num, d->num, d->fun, cmd);
 }
 
 
 void 
 pci_dev_disable_mmio (struct pci_dev * d)
 {
-    uint16_t cmd = pci_get_cmd(d->bus->num, d->num, d->fun);
+    uint16_t cmd = pci_get_cmd(d->bus->pci, d->bus->num, d->num, d->fun);
     cmd &= 0xfffd;
-    pci_set_cmd(d->bus->num, d->num, d->fun, cmd);
+    pci_set_cmd(d->bus->pci, d->bus->num, d->num, d->fun, cmd);
 }
 
 
 void
 pci_dev_enable_mmio (struct pci_dev * d)
 {
-    uint16_t cmd = pci_get_cmd(d->bus->num, d->num, d->fun);
+    uint16_t cmd = pci_get_cmd(d->bus->pci, d->bus->num, d->num, d->fun);
     cmd |= 0x2;
-    pci_set_cmd(d->bus->num, d->num, d->fun, cmd);
+    pci_set_cmd(d->bus->pci, d->bus->num, d->num, d->fun, cmd);
 }
 
 
 void 
 pci_dev_disable_irq (struct pci_dev * d)
 {
-    uint16_t cmd = pci_get_cmd(d->bus->num, d->num, d->fun);
+    uint16_t cmd = pci_get_cmd(d->bus->pci, d->bus->num, d->num, d->fun);
     cmd |= (1<<10);
-    pci_set_cmd(d->bus->num, d->num, d->fun, cmd);
+    pci_set_cmd(d->bus->pci, d->bus->num, d->num, d->fun, cmd);
 }
 
 
 void
 pci_dev_enable_irq (struct pci_dev * d)
 {
-	uint16_t cmd = pci_get_cmd(d->bus->num, d->num, d->fun);
+	uint16_t cmd = pci_get_cmd(d->bus->pci, d->bus->num, d->num, d->fun);
     cmd &= ~(1<<10);
-    pci_set_cmd(d->bus->num, d->num, d->fun, cmd);
+    pci_set_cmd(d->bus->pci, d->bus->num, d->num, d->fun, cmd);
 }
 
 void 
 pci_dev_enable_mwi (struct pci_dev * d)
 {
-    uint16_t cmd = pci_get_cmd(d->bus->num, d->num, d->fun);
+    uint16_t cmd = pci_get_cmd(d->bus->pci, d->bus->num, d->num, d->fun);
     cmd |= (1<<4);
-    pci_set_cmd(d->bus->num, d->num, d->fun, cmd);
+    pci_set_cmd(d->bus->pci, d->bus->num, d->num, d->fun, cmd);
 }
 
 
 void
 pci_dev_disable_mwi (struct pci_dev * d)
 {
-    uint16_t cmd = pci_get_cmd(d->bus->num, d->num, d->fun);
+    uint16_t cmd = pci_get_cmd(d->bus->pci, d->bus->num, d->num, d->fun);
     cmd &= ~(1<<4);
-    pci_set_cmd(d->bus->num, d->num, d->fun, cmd);
+    pci_set_cmd(d->bus->pci, d->bus->num, d->num, d->fun, cmd);
 }
 
 
 void 
 pci_dev_enable_master (struct pci_dev * d)
 {
-	uint16_t cmd = pci_get_cmd(d->bus->num, d->num, d->fun);
+	uint16_t cmd = pci_get_cmd(d->bus->pci, d->bus->num, d->num, d->fun);
 	cmd |= 0x4;
-	pci_set_cmd(d->bus->num, d->num, d->fun, cmd);
+	pci_set_cmd(d->bus->pci, d->bus->num, d->num, d->fun, cmd);
 }
 
 
 void
 pci_dev_disable_master (struct pci_dev * d)
 {
-    uint16_t cmd = pci_get_cmd(d->bus->num, d->num, d->fun);
+    uint16_t cmd = pci_get_cmd(d->bus->pci, d->bus->num, d->num, d->fun);
     cmd &= 0xfffb;
-    pci_set_cmd(d->bus->num, d->num, d->fun, cmd);
+    pci_set_cmd(d->bus->pci, d->bus->num, d->num, d->fun, cmd);
 }
 
-
 /*
- *
- * This function initializes the PCI subsystem by scanning
- * for devices on the PCI bus.
- *
+ * Create the pci_info structure with a specific access mechanism.
+ * Should be called by a specific PCI bus driver (x86 or OpenFirmware currently)
  */
-int 
-pci_init (struct naut_info * naut)
+struct pci_info *
+pci_info_create(struct pci_cfg_int *cfg_interface, void *cfg_state) 
 {
     struct pci_info * pci = NULL;
 
@@ -978,18 +874,29 @@ pci_init (struct naut_info * naut)
     }
     memset(pci, 0, sizeof(struct pci_info));
 
-#ifdef NAUT_CONFIG_USE_PCI_ECAM
-    pci->ecam_base_addr = 0;
-#endif
-
     INIT_LIST_HEAD(&(pci->bus_list));
 
-    naut->sys.pci = pci;
+    pci->cfg_int = cfg_interface;
+    pci->cfg_state = cfg_state;
+
+    return pci;
+}
+
+/*
+ *
+ * This function initializes the PCI subsystem by scanning
+ * for devices on the PCI bus.
+ *
+ */
+int 
+pci_init (struct naut_info * naut, struct pci_info *pci_info)
+{
+    naut->sys.pci = pci_info;
 
     PCI_PRINT("Probing PCI bus...\n");
     
     // this will miss PCI buses attached to other complexes...
-    pci_bus_scan(pci);
+    pci_bus_scan(pci_info);
 
     nk_dev_register("pci0", NK_DEV_BUS, 0, &ops, 0);
 
@@ -1328,22 +1235,22 @@ int pci_find_matching_devices(uint16_t vendor_id, uint16_t device_id,
 
 uint16_t pci_dev_cfg_readw(struct pci_dev *dev, uint8_t off)
 {
-  return pci_cfg_readw(dev->bus->num, dev->num, dev->fun, off);
+  return pci_cfg_readw(dev->bus->pci, dev->bus->num, dev->num, dev->fun, off);
 }
 
 uint32_t pci_dev_cfg_readl(struct pci_dev *dev, uint8_t off)
 {
-  return pci_cfg_readl(dev->bus->num, dev->num, dev->fun, off);
+  return pci_cfg_readl(dev->bus->pci, dev->bus->num, dev->num, dev->fun, off);
 }
 
 void     pci_dev_cfg_writew(struct pci_dev *dev, uint8_t off, uint16_t val)
 {
-  pci_cfg_writew(dev->bus->num,dev->num,dev->fun,off,val);
+  pci_cfg_writew(dev->bus->pci, dev->bus->num,dev->num,dev->fun,off,val);
 }
 
 void     pci_dev_cfg_writel(struct pci_dev *dev, uint8_t off, uint32_t val)
 {
-  pci_cfg_writel(dev->bus->num,dev->num,dev->fun,off,val);
+  pci_cfg_writel(dev->bus->pci,dev->bus->num,dev->num,dev->fun,off,val);
 }
 
 int      pci_dev_scan_capabilities(struct pci_dev *d,
@@ -1969,6 +1876,8 @@ handle_pci (char * buf, void * priv)
     uint64_t data;
     char bwdq; 
 
+    struct pci_info *pci = nk_get_nautilus_info()->sys.pci;
+
     if (strncmp(buf,"pci l",5)==0) { 
         pci_dump_device_list();
         return 0;
@@ -1980,7 +1889,7 @@ handle_pci (char * buf, void * priv)
         for (i=0;i<256;i+=32) {
             nk_vc_printf("%02x:", i);
             for (j=0;j<8;j++) {
-                v = pci_cfg_readl(bus,slot,func,i+j*4);
+                v = pci_cfg_readl(pci, bus,slot,func,i+j*4);
                 nk_vc_printf(" %08x",v);
             } 
             nk_vc_printf("\n");
@@ -2002,10 +1911,10 @@ handle_pci (char * buf, void * priv)
             ((bwdq='d', sscanf(buf,"pci poke d %x %x %x %x %x", &bus, &slot, &func, &off,&data))==5) ||
             ((bwdq='d', sscanf(buf,"pci poke %x %x %x %x %x", &bus, &slot, &func, &off,&data))==5)) {
         if (bwdq=='w') { 
-            pci_cfg_writew(bus,slot,func,off,(uint16_t)data);
+            pci_cfg_writew(pci,bus,slot,func,off,(uint16_t)data);
             nk_vc_printf("PCI[%x:%x.%x:%x] = 0x%04x\n",bus,slot,func,off,(uint16_t)data);
         } else {
-            pci_cfg_writel(bus,slot,func,off,(uint32_t)data);
+            pci_cfg_writel(pci,bus,slot,func,off,(uint32_t)data);
             nk_vc_printf("PCI[%x:%x.%x:%x] = 0x%08x\n",bus,slot,func,off,(uint32_t)data);
         }
         return 0;
@@ -2015,10 +1924,10 @@ handle_pci (char * buf, void * priv)
             ((bwdq='d', sscanf(buf,"pci peek d %x %x %x %x", &bus, &slot, &func, &off))==4) ||
             ((bwdq='d', sscanf(buf,"pci peek %x %x %x %x", &bus, &slot, &func, &off))==4)) {
         if (bwdq=='w') { 
-            data = pci_cfg_readw(bus,slot,func,off);
+            data = pci_cfg_readw(pci,bus,slot,func,off);
             nk_vc_printf("PCI[%x:%x.%x:%x] = 0x%04x\n",bus,slot,func,off,(uint16_t)data);
         } else {
-            data = pci_cfg_readl(bus,slot,func,off);
+            data = pci_cfg_readl(pci,bus,slot,func,off);
             nk_vc_printf("PCI[%x:%x.%x:%x] = 0x%08x\n",bus,slot,func,off,(uint32_t)data);
         }
         return 0;
@@ -2028,7 +1937,7 @@ handle_pci (char * buf, void * priv)
         int i,j;
         uint8_t data[256];
         for (i=0;i<256;i+=4) {
-            *(uint32_t*)(&data[i]) = pci_cfg_readl(bus,slot,func,i);
+            *(uint32_t*)(&data[i]) = pci_cfg_readl(pci,bus,slot,func,i);
         }
         for (i=0;i<256;i+=16) {
             nk_vc_printf("PCI[%x:%x.%x].cfg[%02x] = ",bus,slot,func,i);

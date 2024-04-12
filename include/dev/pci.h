@@ -25,27 +25,7 @@
 #define __PCI_H__
 
 #include <nautilus/list.h>
-
-#ifndef NAUT_CONFIG_USE_PCI_ECAM
-
-#define PCI_CFG_ADDR_PORT 0xcf8
-#define PCI_CFG_DATA_PORT 0xcfc
-
-#define PCI_SLOT_SHIFT 11
-#define PCI_BUS_SHIFT  16
-#define PCI_FUN_SHIFT  8
-
-#define PCI_ENABLE_BIT 0x80000000UL
-
-#else // PCIe
-
-#define PCI_SLOT_SHIFT 15
-#define PCI_BUS_SHIFT 20
-#define PCI_FUN_SHIFT 12
-
-#define PCI_ENABLE_BIT 0x0UL
-
-#endif
+#include <nautilus/intrinsics.h>
 
 #define PCI_REG_MASK(x) ((x) & 0x3ffc)
 
@@ -104,6 +84,12 @@ struct pci_bus {
     struct pci_info * pci;
 };
 
+struct pci_cfg_int {
+    uint16_t(*readw)(void *state, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off);
+    uint32_t(*readl)(void *state, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off);
+    void(*writew)(void *state, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off, uint16_t val);
+    void(*writel)(void *state, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off, uint32_t val);
+};
 
 struct pci_cfg_space {
     uint16_t vendor_id;
@@ -254,22 +240,23 @@ struct pci_info {
     uint32_t num_buses;
     struct list_head bus_list;
 
-    uint64_t ecam_base_addr;
+    // Abstract interface for accessing config space
+    void *cfg_state;
+    struct pci_cfg_int *cfg_int;
 };
 
 
 
 // these can only touch the "traditional" 256 byte config space
 
-uint16_t pci_cfg_readw(uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off);
-uint32_t pci_cfg_readl(uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off);
+uint16_t pci_cfg_readw(struct pci_info *info, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off);
+uint32_t pci_cfg_readl(struct pci_info *info, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off);
 
-void pci_cfg_writew(uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off, uint16_t val);
-void pci_cfg_writel(uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off, uint32_t val);
+void pci_cfg_writew(struct pci_info *info, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off, uint16_t val);
+void pci_cfg_writel(struct pci_info *info, uint8_t bus, uint8_t slot, uint8_t fun, uint8_t off, uint32_t val);
 
-
-
-int pci_init (struct naut_info * naut);
+struct pci_info *pci_info_create(struct pci_cfg_int *cfg_interface, void *cfg_state);
+int pci_init (struct naut_info * naut, struct pci_info *pci_info);
 
 // vendor or device -1 means match all, otherwise
 // restrict to vendor and/or device given

@@ -111,6 +111,7 @@
 
 #include <dev/apic.h>
 #include <dev/pci.h>
+#include <dev/pci/port.h>
 #include <dev/hpet.h>
 #include <dev/ioapic.h>
 #include <dev/i8254.h>
@@ -459,7 +460,7 @@ init (unsigned long mbd,
 
     ps2_init(naut);
 
-    pci_init(naut);
+    port_pci_init();
 
     nk_sched_init(&sched_cfg);
 

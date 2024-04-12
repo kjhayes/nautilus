@@ -51,6 +51,9 @@
 #endif
 
 #include<dev/pci.h>
+#ifdef NAUT_CONFIG_OF_PCI
+#include<dev/pci/of.h>
+#endif
 
 #if defined(NAUT_CONFIG_GIC_VERSION_2) || defined(NAUT_CONFIG_GIC_VERSION_2M)
 #include<dev/gicv2.h>
@@ -474,10 +477,10 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
 
   nk_thread_name(get_cur_thread(), "init");
 
-  /*
-  pci_init(&nautilus_info);
+#ifdef NAUT_CONFIG_OF_PCI 
+  of_pci_init();
   pci_dump_device_list();
-  */
+#endif
 
 #if defined(NAUT_CONFIG_GIC_VERSION_2) || defined(NAUT_CONFIG_GIC_VERSION_2M)
   if(gicv2_init()) {

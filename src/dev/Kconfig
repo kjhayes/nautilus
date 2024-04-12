@@ -252,6 +252,13 @@ config DEBUG_IOAPIC
     help 
         Turn on debug prints for the IOAPIC driver
 
+config OF_PCI
+    bool "OpenFirmware PCI Bus"
+    depends on USE_FDT && HAS_PCI
+    default y
+    help
+        Allow parsing PCI information from the device tree if available.
+
 config DEBUG_PCI
     bool "Debug PCI"
     depends on HAS_PCI && DEBUG_PRINTS
