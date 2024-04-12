@@ -3,12 +3,6 @@ LLVM_PASS_DIR := $(ROOT_DIR)/llvm
 LLVM_PASS_LIST := $(LLVM_PASS_DIR)/passes.txt
 LLVM_PASS_PLUGIN_LIST := $(LLVM_PASS_DIR)/passplugins.txt
 
-PASSES_BIN_NAME := nautilus.passes.bin
-WITHOUT_PASSES_BIN_NAME := nautilus.without_passes.bin
-
-PASSES_BIN := $(TMPBIN_DIR)/$(PASSES_BIN_NAME)
-WITHOUT_PASSES_BIN := $(TMPBIN_DIR)/$(WITHOUT_PASSES_BIN_NAME)
-
 $(shell mkdir -p $(LLVM_PASS_DIR))
 $(shell rm -f $(LLVM_PASS_LIST))
 $(shell touch $(LLVM_PASS_LIST))
@@ -56,5 +50,5 @@ define add_llvm_pass_plugin =
     $(Q)echo "$$(1)" >> $(LLVM_PASS_PLUGIN_LIST)
 endef
 
-DEFAULT_RULES := passes
+OVERRIDE_LINK_RULE := y
 

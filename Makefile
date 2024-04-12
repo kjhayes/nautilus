@@ -21,9 +21,6 @@ OUTPUT_DIR:=$(ROOT_DIR)
 SCRIPTS_DIR:=$(ROOT_DIR)/scripts
 SETUPS_DIR:=$(ROOT_DIR)/setups
 LINK_DIR:=$(ROOT_DIR)/link
-TMPBIN_DIR:=$(ROOT_DIR)/tmpbin
-
-$(shell mkdir -p $(TMPBIN_DIR))
 
 # Config dependency
 PYTHON=python3
@@ -88,12 +85,12 @@ COMMON_FLAGS += -Wno-int-conversion
 NAUT_INCLUDE += -D__NAUTILUS__ -I$(INCLUDE_DIR) \
 		     -include $(AUTOCONF)
 
+NAUT_OBJ_NAME := builtin.o
 NAUT_BIN_NAME := nautilus.bin
-NAUT_TMP_BIN_NAME := nautilus.tmp.bin
 NAUT_ASM_NAME := nautilus.asm
 
+NAUT_OBJ := $(OUTPUT_DIR)/$(NAUT_OBJ_NAME)
 NAUT_BIN := $(OUTPUT_DIR)/$(NAUT_BIN_NAME)
-NAUT_TMP_BIN := $(TMPBIN_DIR)/$(NAUT_TMP_BIN_NAME)
 NAUT_ASM := $(OUTPUT_DIR)/$(NAUT_ASM_NAME)
 
 CPPFLAGS += $(NAUT_INCLUDE)
@@ -138,24 +135,22 @@ endif
 # Build Rules
 #
 
-# Generates the root builtin.o using build.mk
-builtin.o: $(AUTOCONF) FORCE
+# nautilus.o (Fully compiled but before linker script has been applied)
+$(NAUT_OBJ_NAME): $(NAUT_OBJ)
+$(NAUT_OBJ): $(AUTOCONF) FORCE
 	#$(call quiet-cmd,MAKE,$(call rel-dir, $@, $(ROOT_DIR)))
 	$(Q)$(MAKE) -C $(ROOT_DIR) -f $(SCRIPTS_DIR)/build.mk builtin.o
 
 # Kernel Link Rule
 $(NAUT_BIN_NAME): $(NAUT_BIN)
-$(NAUT_TMP_BIN_NAME): $(NAUT_TMP_BIN)
 
-# Temporary bin is useful for applying LLVM passes that write the
-# Final bin after extracting bitcode from the temporary bin
-$(NAUT_TMP_BIN): $(LD_SCRIPT) builtin.o
-	$(call quiet-cmd,LD,$(NAUT_TMP_BIN_NAME))
+# Allow toolchains to override this value in order to link the final binary differently
+ifeq ($(OVERRIDE_LINK_RULE),)
+$(NAUT_BIN): $(LD_SCRIPT) $(NAUT_OBJ)
+	$(call quiet-cmd,LD,$(NAUT_BIN_NAME))
 	$(Q)$(LD) $(LDFLAGS) -T$(LD_SCRIPT) \
-		builtin.o -o $(NAUT_TMP_BIN)
-
-$(NAUT_BIN): $(NAUT_TMP_BIN)
-	@cp $(NAUT_TMP_BIN) $(NAUT_BIN)
+		$(NAUT_OBJ) -o $(NAUT_BIN)
+endif
 
 # Linker Script Generation
 $(LD_SCRIPT): $(LD_SCRIPT_SRC) $(AUTOCONF)
