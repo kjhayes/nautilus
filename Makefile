@@ -180,6 +180,7 @@ $(foreach CLEAN_FILE,$(CLEAN_FILES), $(eval -include $(CLEAN_FILE)))
 DEFAULT_RULES ?= $(NAUT_BIN)
 default: $(DEFAULT_RULES)
 
+mrproper: clean
 clean: $(CLEAN_RULES)
 
 FORCE:
