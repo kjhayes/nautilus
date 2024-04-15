@@ -28,6 +28,9 @@ llvm
 # from binary then rebuilding)
 tmpbin
 
+# Used by clangd
+.cache
+
 # LSP-related tools
 .clangd
 .ccls-cache
