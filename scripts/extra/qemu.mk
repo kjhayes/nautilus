@@ -3,8 +3,9 @@ ifdef QEMU
 
 QEMU_FLAGS += -smp cpus=4
 QEMU_FLAGS += -serial stdio
-QEMU_FLAGS += -display none
+#QEMU_FLAGS += -display none
 QEMU_FLAGS += -m 2G
+QEMU_FLAGS += -device pci-serial
 
 qemu: $(QEMU_DEPS)
 	$(call quiet-cmd,QEMU,)
@@ -22,12 +23,12 @@ QEMU_DTB := $(OUTPUT_DIR)/qemu.dtb
 QEMU_DTS := $(OUTPUT_DIR)/qemu.dts
 
 $(QEMU_DTB): $(QEMU_DEPS) FORCE
-	$(call quiet-cmd,QEMU-DTB,)
-	$(Q)$(QEMU) $(QEMU_FLAGS) -machine dumpdtb=$(QEMU_DTB)	
+	$(call quiet-cmd,QEMU,$@)
+	$(Q)$(QEMU) $(QEMU_FLAGS) -machine dumpdtb=$(QEMU_DTB) $(QPIPE)
 
 DTC := dtc
 %.dts: %.dtb
-	$(call quiet-cmd,DTC,)
+	$(call quiet-cmd,DTC,$@)
 	$(Q)$(DTC) $< -o $@
 
 qemu-dts: $(QEMU_DTS)
