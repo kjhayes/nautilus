@@ -33,8 +33,6 @@ extern "C" {
 #include <nautilus/cpu_state.h>
 #include <nautilus/list.h>
 
-#define IRQ_HANDLER_END()
-
 extern nk_irq_t x86_irq_vector_base;
 
 int x86_irq_vector_init (struct sys_info * sys);
