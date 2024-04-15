@@ -18,6 +18,8 @@ struct page_table *pt_allocate_table(void)
     case NK_ALLOCATOR_KMEM:
       table = malloc(sizeof(struct page_table));
       break;
+    case NK_ALLOCATOR_BOOT:
+      table = mm_boot_alloc_aligned(sizeof(struct page_table), sizeof(struct page_table));
     default:
       table = NULL;
       break;
@@ -25,12 +27,29 @@ struct page_table *pt_allocate_table(void)
 
   if(table != NULL) {
     memset(table, 0, sizeof(struct page_table));
+    table->allocator = nk_current_allocator;
   }
+
   return table;
 }
 void pt_free_table(struct page_table *table) 
 {
-  free(table); 
+  if(table->allocator != nk_current_allocator) {
+      // Leaked the memory permanently :-(
+      PAGING_WARN("Cannot free page_table allocated on retired allocator (Memory Leaked Permanently!)\n");
+      return;
+  }
+
+  pt_free_level(table->root_ptr, table, table->root_level);
+
+  switch(table->allocator) {
+    case NK_ALLOCATOR_KMEM: 
+      free(table); 
+      break;
+    case NK_ALLOCATOR_BOOT:
+      mm_boot_free(table, sizeof(struct page_table));
+      break;
+  }
 }
 
 union pt_desc * pt_allocate_level(struct page_table *table, int level) 
@@ -38,10 +57,18 @@ union pt_desc * pt_allocate_level(struct page_table *table, int level)
   int num_entries = pt_level_num_entries(table, level);
   int align = pt_level_alignment(table, level);
   union pt_desc *level_ptr;
+
+  if(nk_current_allocator != table->allocator) {
+      PAGING_WARN("Allocating Level in Page Table across allocators! (table was allocated on retired allocator)\n");
+      return NULL;
+  }
+
   switch(nk_current_allocator) {
     case NK_ALLOCATOR_KMEM:
       level_ptr = (union pt_desc*)malloc(sizeof(union pt_desc) * num_entries); 
       break;
+    case NK_ALLOCATOR_BOOT:
+      level_ptr = (union pt_desc*)mm_boot_alloc_aligned(sizeof(union pt_desc) * num_entries, align);
     default:
       level_ptr = NULL;
       break;
@@ -54,7 +81,29 @@ union pt_desc * pt_allocate_level(struct page_table *table, int level)
 
 void pt_free_level(union pt_desc *level_ptr, struct page_table *table, int level) 
 {
-  free(level_ptr);
+  if(table->allocator != nk_current_allocator) {
+      PAGING_WARN("Cannot free page_table level allocated on retired allocator (Memory Leaked Permanently!)\n");
+      return;
+  } else {
+      int count = pt_level_num_entries(table, level);
+      if(level != table->page_level) {
+        for(int i = 0; i < count; i++) {
+            union pt_desc *desc = &level_ptr[i];
+            if(desc->table.is_table) {
+                pt_free_level(desc, table, level+1);
+            }
+        }
+      }
+
+      switch(table->allocator) {
+          case NK_ALLOCATOR_KMEM:
+            free(level_ptr);
+            break;
+          case NK_ALLOCATOR_BOOT:
+            mm_boot_free(level_ptr, count * sizeof(union pt_desc));
+            break;
+      }
+  }
 }
 
 int pt_block_to_table(union pt_desc *desc, int level, struct page_table *table)

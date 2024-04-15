@@ -60,6 +60,7 @@
 
 struct page_table 
 {
+  int allocator;
   uint8_t root_level;
   uint8_t page_level;
   uint8_t granule_size;
