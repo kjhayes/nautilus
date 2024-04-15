@@ -568,6 +568,48 @@ static int gicr_v3_dev_broadcast_ipi(void *state, nk_hwirq_t hwirq)
   return gicd_v3_dev_broadcast_ipi((void*)gicr->gicd, hwirq);
 }
 
+// TODO: MSI Support
+static int gicd_v3_dev_msi_addr(void *state, nk_hwirq_t hwirq, void **addr) 
+{
+    struct gicd_v3 *gicd = (struct gicd_v3*)state;
+    *addr = ((void*)gicd->dist_base) + GICD_SETSPI_NSR_OFFSET;
+    return 0;
+}
+static int gicd_v3_dev_msi_msg(void *state, nk_hwirq_t hwirq, uint16_t *data) 
+{
+    *data = hwirq;
+    return 0;
+}
+static int gicd_v3_dev_msi_x_addr(void *state, nk_hwirq_t hwirq, void **addr) 
+{
+    struct gicd_v3 *gicd = (struct gicd_v3*)state;
+    *addr = ((void*)gicd->dist_base) + GICD_SETSPI_NSR_OFFSET;
+    return 0;
+}
+static int gicd_v3_dev_msi_x_msg(void *state, nk_hwirq_t hwirq, uint32_t *data) 
+{
+    *data = hwirq;
+    return 0;
+}
+static int gicd_v3_dev_msi_block_size(void *state, nk_hwirq_t hwirq, size_t *size) 
+{
+    // TODO
+    // This doesn't handle the end of the SPI range correctly
+
+    size_t ret = __builtin_ctz(hwirq) + 1;
+    if(ret > 32) {
+        ret = 32;
+    }
+
+    *size = ret;
+    return 0;
+}
+static int gicd_v3_dev_msi_index_block(void *state, nk_hwirq_t hwirq, size_t index, nk_hwirq_t *out) 
+{
+    *out = hwirq + index;
+    return 0;
+}
+
 /*
  * Initialization
  */
@@ -583,6 +625,12 @@ static struct nk_irq_dev_int gicd_v3_dev_int = {
   .translate = gicd_v3_dev_translate,
   .send_ipi = gicd_v3_dev_send_ipi,
   .broadcast_ipi = gicd_v3_dev_broadcast_ipi,
+  .msi_addr = gicd_v3_dev_msi_addr,
+  .msi_msg = gicd_v3_dev_msi_msg,
+  .msi_x_addr = gicd_v3_dev_msi_x_addr,
+  .msi_x_msg = gicd_v3_dev_msi_x_msg,
+  .msi_block_size = gicd_v3_dev_msi_block_size,
+  .msi_index_block = gicd_v3_dev_msi_index_block,
 };
 
 static struct nk_irq_dev_int gicr_v3_dev_int = {
@@ -1010,7 +1058,7 @@ static int gicv3_init_dev_info(struct nk_dev_info *info)
 
 #ifdef NAUT_CONFIG_GIC_VERSION_3_ITS
   if(gicv3_its_init(dtb, state)) {
-    GIC_WARN("Failed to initialize MSI Support!\n");
+    GIC_WARN("Failed to initialize GICv3 ITS!\n");
   }
 #endif
 
