@@ -1655,7 +1655,7 @@ static void vc_copy_to_chardev_console(struct chardev_console *c)
       uint16_t vga = c->cur_vc->BUF[x + (y*VC_WIDTH)];
       uint8_t ascii = vga & 0b1111111;
       if(ascii != '\n') {
-	char_dev_write_all(c->dev,1,&ascii,NK_DEV_REQ_BLOCKING);
+	    char_dev_write_all(c->dev,1,&ascii,NK_DEV_REQ_BLOCKING);
       } else {
         break;
       }
@@ -1663,6 +1663,8 @@ static void vc_copy_to_chardev_console(struct chardev_console *c)
     if(y < VC_HEIGHT-1 && y < c->cur_vc->cur_y)
     {
       uint8_t bp = '\r';
+      char_dev_write_all(c->dev,1,&bp,NK_DEV_REQ_BLOCKING);
+      bp = '\n';
       char_dev_write_all(c->dev,1,&bp,NK_DEV_REQ_BLOCKING);
     }
   }
