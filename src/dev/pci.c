@@ -950,16 +950,15 @@ static int dump_dev_base(struct pci_dev *d, void *s)
     if (d->msi.co) { 
       struct pci_msi_info *m = &d->msi;
       
-      nk_vc_printf(" MSI(%s,%s,nn=%d,bv=%d,nv=%d,tc=%d)",
+      nk_vc_printf(" MSI(%s,%s,nn=%d,bv=%d,nv=%d)",
 		   m->enabled ? "on" : "off",
 		   m->type == PCI_MSI_32 ? "MSI32" :
 		   m->type == PCI_MSI_32_PER_VEC ? "MSI32wP" :
 		   m->type == PCI_MSI_64 ? "MSI64" :
 		   m->type == PCI_MSI_64_PER_VEC ? "MSI64wP" : "UNKNOWN",
 		   m->num_vectors_needed,
-		   m->base_vec,
-		   m->num_vecs,
-		   m->target_cpu);
+		   m->base_irq,
+		   m->num_irq);
     } 
     if (d->msix.co) {
       struct pci_msi_x_info *m = &d->msix;
@@ -1298,46 +1297,15 @@ uint8_t  pci_dev_get_capability(struct pci_dev *d, uint8_t cap_id)
   return co;
 }
 
-
-
-/*
-  the structure of an x86 address register is:
-
-  [32 bits - (presumably top half all zeros...) ]
-
-  [12 bits]  [8 bits]  [8 bits] [1] [1] [2 bits]
-   0xfee      dest_id    rsvd   RH  DM   XX 
-
-  dest_id => equivalent to bits 63:56 of ioapic redirectionentry
-             (physical or logical apic id)
-  RH => redirection hint, 1=> send to lowest priority, 0=> send it
-  DM => destination mode, 1=> interpret dest_id as logical
-  XX => ? probably zero
-
-  the structure of an x86 data register is:
-
-  [32 bits reserved => 0}
-  [16 bits]    [1] [1]  [3]   [3]   [8]
-   rsvd        TM  LEV  rsvd  DM    VEC
-
-   TM = trigger mode, 0=> edge, 1=> level
-   LEV = level for trigger mode, 0=> don't care, else 0/1 = deassert/assert
-   DM = delivery mode (fixed, lowest priority, smi, res, nmi, init, res, extint)
-
-   Intel Volvume 3A, 10.11.1, 10.11.2
- */
-
-int pci_dev_enable_msi(struct pci_dev *dev, int base_vec, int num_vecs, int target_cpu)
+int pci_dev_enable_msi(struct pci_dev *dev, nk_irq_t base_irq, int num_irq)
 {
-  uint32_t mar_low;
-  uint16_t mdr;
   uint32_t ctrl;
   uint16_t cmd;
   uint8_t co;
-  int log2_num_vecs;
+  int log2_num_irq;
   
-  PCI_DEBUG("msi enable - base_vec=0x%x, num_vecs=0x%x, target_cpu=0x%x\n", 
-	    base_vec, num_vecs, target_cpu);
+  PCI_DEBUG("msi enable - base_irq=0x%x, num_irq=0x%x\n", 
+	    base_irq, num_irq);
 
   co = pci_dev_get_capability(dev,0x5);
 
@@ -1346,10 +1314,10 @@ int pci_dev_enable_msi(struct pci_dev *dev, int base_vec, int num_vecs, int targ
     return -1;
   }
 
-  if (num_vecs<1 || num_vecs>32 || 
-      num_vecs>dev->msi.num_vectors_needed || 
-      __builtin_popcount(num_vecs)!=1 || 
-      base_vec & (num_vecs - 1)) {
+  if (num_irq<1 || num_irq>32 || 
+      num_irq>dev->msi.num_vectors_needed || 
+      __builtin_popcount(num_irq)!=1 || 
+      base_irq& (num_irq- 1)) {
     PCI_ERROR("Invalid MSI enable request\n");
   }
 
@@ -1362,38 +1330,59 @@ int pci_dev_enable_msi(struct pci_dev *dev, int base_vec, int num_vecs, int targ
 
   PCI_DEBUG("legacy interrupt disabled (cmd=%x)\n",cmd);
 
-  log2_num_vecs = 32-(__builtin_clz(num_vecs)+1);
-  
-  mar_low  = 0xfee00000;
-  mar_low |= (target_cpu & 0xff) << 12;
-  // we use RH=0 because we don't want lowest priority
-  // we use DM=0 because we want physical delivery
+  log2_num_irq= 32-(__builtin_clz(num_irq)+1);
 
-  mdr = (base_vec & 0xff);
-  // We use DM=0 to get fixed delivery
-  // We use LEV=0 because we don't care and are using edge
-  // We use TM=0 to get edge
-  
+  size_t block_size;
+  if(nk_irq_msi_block_size(base_irq, &block_size)) {
+      PCI_ERROR("Could not get MSI block size of base IRQ (%u)!\n", base_irq);
+      return 1;
+  }
+
+  if(block_size < num_irq) {
+      PCI_ERROR("Trying to enable MSI with %u interrupts, however base IRQ (%u) only has a block size of %u!\n", num_irq, base_irq, block_size);
+      return 1;
+  }
+
+  void *mar_addr = NULL;
+  if(nk_irq_msi_addr(base_irq, &mar_addr)) {
+      PCI_ERROR("Could not get MSI address of IRQ (%u)!\n", base_irq);
+      return 1;
+  }
+
+  uint32_t mar_low = ((uint64_t)mar_addr) & 0xFFFFFFFF;
+  uint32_t mar_high = (((uint64_t)mar_addr) >> 32) & 0xFFFFFFFF;
+
+  uint16_t mdr;
+  if(nk_irq_msi_msg(base_irq, &mdr)) {
+      PCI_ERROR("Could not get MSI data of IRQ (%u)!\n", base_irq);
+      return 1;
+  }
+
   // this gets us the type and next ptr as well, but 
   // manipulating ctrl seems to require a 32 bit write...
-
   ctrl = pci_dev_cfg_readl(dev,co);
 
   PCI_DEBUG("initial ctrl: 0x%x\n",ctrl);
 
   ctrl &= 0xff8e0000;  // clear multiple message enable, clear msi-enable
-  ctrl |= (log2_num_vecs & 0x7)<<4;  // set multiple message enable
+  ctrl |= (log2_num_irq & 0x7)<<4;  // set multiple message enable
 
   PCI_DEBUG("updated: mdr=0x%x, mar_low=0x%x, ctrl=0x%x\n",mdr,mar_low,ctrl);
 
   switch (dev->msi.type) { 
   case PCI_MSI_32:
+    if(mar_high) {
+        PCI_WARN("Enabling MSI as MSI_32 however provided MAR address has non-zero upper 32 bits!\n");
+    }
     pci_dev_cfg_writel(dev,co+4,mar_low);
     pci_dev_cfg_writew(dev,co+8,mdr);
     pci_dev_cfg_writel(dev,co,ctrl);
     PCI_DEBUG("enabled as MSI32 (masked)\n");
     break;
   case PCI_MSI_32_PER_VEC:
+    if(mar_high) {
+        PCI_WARN("Enabling MSI as MSI_32_PER_VEC however provided MAR address has non-zero upper 32 bits!\n");
+    }
     pci_dev_cfg_writel(dev,co+4,mar_low);
     pci_dev_cfg_writew(dev,co+8,mdr);
     pci_dev_cfg_writel(dev,co+12,0xffffffff); // mask all
@@ -1401,14 +1390,14 @@ int pci_dev_enable_msi(struct pci_dev *dev, int base_vec, int num_vecs, int targ
     PCI_DEBUG("enabled as MSI32 with per vec mask (all masked)\n");
     break;
   case PCI_MSI_64:
-    pci_dev_cfg_writel(dev,co+8,0x0); // high addr
+    pci_dev_cfg_writel(dev,co+8,mar_high); // high addr
     pci_dev_cfg_writel(dev,co+4,mar_low);
     pci_dev_cfg_writew(dev,co+12,mdr);
     pci_dev_cfg_writel(dev,co,ctrl);
     PCI_DEBUG("enabled as MSI64 (masked)\n");
     break;
   case PCI_MSI_64_PER_VEC:
-    pci_dev_cfg_writel(dev,co+8,0x0); // high addr
+    pci_dev_cfg_writel(dev,co+8,mar_high); // high addr
     pci_dev_cfg_writel(dev,co+4,mar_low);
     pci_dev_cfg_writew(dev,co+12,mdr);
     pci_dev_cfg_writel(dev,co+16,0xffffffff); // mask all
@@ -1422,9 +1411,8 @@ int pci_dev_enable_msi(struct pci_dev *dev, int base_vec, int num_vecs, int targ
   }
 
   dev->msi.co = co;
-  dev->msi.base_vec = base_vec;
-  dev->msi.num_vecs = num_vecs;
-  dev->msi.target_cpu=target_cpu;
+  dev->msi.base_irq = base_irq;
+  dev->msi.num_irq = num_irq;
   dev->msi.enabled=1;
 
   PCI_DEBUG("MSI enabled for device\n");
@@ -1432,7 +1420,30 @@ int pci_dev_enable_msi(struct pci_dev *dev, int base_vec, int num_vecs, int targ
   return 0;
 }
 
-int pci_dev_mask_msi(struct pci_dev *dev, int vec)
+int pci_dev_num_msi_irqs(struct pci_dev *dev) {
+    if(!dev->msi.enabled) {
+        PCI_DEBUG("device does not have msi enabled\n");
+        return 0;
+    }
+    return dev->msi.num_irq;
+}
+
+nk_irq_t pci_dev_msi_irq(struct pci_dev *dev, int msi_num) {
+    int num_msi_irqs = pci_dev_num_msi_irqs(dev);
+    if(msi_num >= num_msi_irqs) {
+        return NK_NULL_IRQ;
+    }
+
+    nk_irq_t irq;
+    // Get the global IRQ number of the n-th IRQ in the assigned block
+    if(nk_irq_msi_index_block(dev->msi.base_irq, msi_num, &irq)) {
+        return NK_NULL_IRQ;
+    }
+
+    return irq;
+}
+
+int pci_dev_mask_msi(struct pci_dev *dev, int msi_num)
 {
   uint32_t mask;
   uint32_t ctrl;
@@ -1459,7 +1470,7 @@ int pci_dev_mask_msi(struct pci_dev *dev, int vec)
     // masking means to enable msi and mask the given vector
     ctrl |= 0x10000;
     mask=pci_dev_cfg_readl(dev,co+12);
-    mask |= 0x1 << (vec-dev->msi.base_vec);
+    mask |= 0x1 << msi_num;
     pci_dev_cfg_writel(dev,co+12,mask);
     pci_dev_cfg_writel(dev,co,ctrl);
     PCI_DEBUG("masked as a 32 bit per-vec-masking device\n");
@@ -1468,7 +1479,7 @@ int pci_dev_mask_msi(struct pci_dev *dev, int vec)
     // masking means to enable msi and mask the given vector
     ctrl |= 0x10000;
     mask=pci_dev_cfg_readl(dev,co+16);
-    mask |= 0x1 << (vec-dev->msi.base_vec);
+    mask |= 0x1 << msi_num;
     pci_dev_cfg_writel(dev,co+16,mask);
     pci_dev_cfg_writel(dev,co,ctrl);
     PCI_DEBUG("masked as a 64 bit per-vec-masking device\n");
@@ -1483,7 +1494,7 @@ int pci_dev_mask_msi(struct pci_dev *dev, int vec)
 }
 
 
-int pci_dev_unmask_msi(struct pci_dev *dev, int vec)
+int pci_dev_unmask_msi(struct pci_dev *dev, int msi_num)
 {
   uint32_t mask;
   uint32_t ctrl;
@@ -1511,7 +1522,7 @@ int pci_dev_unmask_msi(struct pci_dev *dev, int vec)
     // unmasking means to enable msi and unmask the given vector
     ctrl |= 0x10000;
     mask=pci_dev_cfg_readl(dev,co+12);
-    mask &= ~(0x1 << (vec-dev->msi.base_vec));
+    mask &= ~(0x1 << msi_num);
     pci_dev_cfg_writel(dev,co+12,mask);
     pci_dev_cfg_writel(dev,co,ctrl);
     PCI_DEBUG("unmasked as a 32 bit per-vec-masking device\n");
@@ -1520,7 +1531,7 @@ int pci_dev_unmask_msi(struct pci_dev *dev, int vec)
     // unmasking means to enable msi and unmask the given vector
     ctrl |= 0x10000;
     mask=pci_dev_cfg_readl(dev,co+16);
-    mask &= ~(0x1 << (vec-dev->msi.base_vec));
+    mask &= ~(0x1 << msi_num);
     pci_dev_cfg_writel(dev,co+16,mask);
     pci_dev_cfg_writel(dev,co,ctrl);
     PCI_DEBUG("unmasked as a 64 bit per-vec-masking device\n");
@@ -1535,7 +1546,7 @@ int pci_dev_unmask_msi(struct pci_dev *dev, int vec)
 }
 
 
-int pci_dev_is_pending_msi(struct pci_dev *dev, int vec)
+int pci_dev_is_pending_msi(struct pci_dev *dev, int msi_num)
 {
   uint32_t pending;
   uint8_t  co;
@@ -1565,9 +1576,9 @@ int pci_dev_is_pending_msi(struct pci_dev *dev, int vec)
     break;
   }
 
-  pending = (pending >> (vec-dev->msi.base_vec)) & 0x1;
+  pending = (pending >> msi_num) & 0x1;
 
-  PCI_DEBUG("pending of vector %d is %d\n", vec, pending);
+  PCI_DEBUG("pending of MSI vector %d is %d\n", msi_num, pending);
 
   return pending;
 
@@ -1595,40 +1606,44 @@ int pci_dev_is_pending_msi(struct pci_dev *dev, int vec)
 #endif
 #endif
 
-int pci_dev_set_msi_x_entry(struct pci_dev *dev, int num, int vec, int target_cpu)
+int pci_dev_set_msi_x_entry(struct pci_dev *dev, int msi_num, nk_irq_t irq)
 {
   struct pci_msi_x_info *m = &dev->msix;
-  pci_msi_x_table_entry_t *t = m->table + num;
+  pci_msi_x_table_entry_t *t = m->table + msi_num;
 
-  PCI_DEBUG("Setting MSI-X Table Entry at Address %p, Entry %u\n", t, num);
+  PCI_DEBUG("Setting MSI-X Table Entry at Address %p, Entry %u\n", t, msi_num);
 
   if (dev->msix.type!=PCI_MSI_X) {
     PCI_DEBUG("MSI-X not available\n");
     return -1;
   }
 
-  if (num<0 || num >= m->size) {
+  if (msi_num<0 || msi_num >= m->size) {
     PCI_DEBUG("entry %d is out of range\n",num);
     return -1;
   }
 
-  uint32_t mar_low;
+  PCI_DEBUG("msix enable - num = %d irq = %d\n", num, irq);
+
+  // We're currently assuming 64-bit pointers
+  ASSERT(sizeof(void*) == 8);
+
+  void *addr = NULL;
+  if(nk_irq_msi_x_addr(irq, &addr)) {
+      PCI_ERROR("Could not get MSI-X address of IRQ (%u)!\n", irq);
+      return 1;
+  }
+  uint32_t mar_low = (uint32_t)(((uint64_t)addr) & 0xFFFFFFFF);
+  uint32_t mar_high = (uint32_t)((((uint64_t)addr)>>32) & 0xFFFFFFFF);
+
   uint32_t mdr;
-
-  PCI_DEBUG("msix enable - num = %d vec = %d target = %d\n", num, vec, target_cpu);
-
-  mar_low  = 0xfee00000;
-  mar_low |= (target_cpu & 0xff) << 12;
-  // we use RH=0 because we don't want lowest priority
-  // we use DM=0 because we want physical delivery
-
-  mdr = (vec & 0xff);
-  // We use DM=0 to get fixed delivery
-  // We use LEV=0 because we don't care and are using edge
-  // We use TM=0 to get edge
+  if(nk_irq_msi_x_msg(irq, &mdr)) {
+      PCI_ERROR("Could not get MSI-X data of IRQ (%u)!\n", irq);
+      return 1;
+  }
 
   WRITEL(&t->msg_addr_lo, mar_low);
-  WRITEL(&t->msg_addr_hi,0);
+  WRITEL(&t->msg_addr_hi, mar_high);
   WRITEL(&t->msg_data,mdr);
   WRITEL(&t->vector_control,1); // masked
 
@@ -1747,7 +1762,6 @@ int pci_dev_enable_msi_x(struct pci_dev *dev)
   PCI_DEBUG("MSI-X enabled and masked\n");
 
   return 0;
-
 }  
 
 int pci_dev_disable_msi_x(struct pci_dev *dev)
@@ -1801,33 +1815,93 @@ int pci_dev_is_pending_msi_x(struct pci_dev *dev, int num)
   return val;
 }
 
-int nk_msi_find_and_reserve_range(nk_ivec_t num, nk_ivec_t *first)
+int nk_msi_find_range(int num_msi, nk_irq_t *base)
 {
-  return -1;
-/*
-  return nk_ivec_find_range(
-      num,
-      1,
-      NK_IVEC_DESC_FLAG_MSI, // Required flags
-      NK_IVEC_DESC_FLAG_RESERVED|NK_IVEC_DESC_FLAG_PERCPU|NK_IVEC_DESC_FLAG_NMI, // Banned flags
-      NK_IVEC_DESC_FLAG_RESERVED, // Flags to set
-      0, // Flags to clear
-      first);
-*/
+    nk_irq_t current = NK_NULL_IRQ;
+    // We want to distribute handlers across available IRQ's
+    unsigned current_min_handlers = (unsigned)(-1);
+    for(nk_irq_t irq = 0; irq <= nk_max_irq(); irq++) 
+    {
+        struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+        if(desc == NULL) {
+            continue;
+        }
+        if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
+            continue;
+        }
+
+        unsigned num_handlers = desc->num_actions;
+        if(num_handlers >= current_min_handlers) {
+            continue;
+        }
+
+        size_t block_size;
+        if(nk_irq_msi_block_size(irq, &block_size)) {
+            continue;
+        }
+
+        if(block_size < num_msi) {
+            continue;
+        }
+
+        int index_block_failed = 0;
+        for(int i = 1; i < block_size; i++) {
+            nk_irq_t block_irq;
+            if(nk_irq_msi_index_block(irq, i, &block_irq)) {
+                index_block_failed = 1;
+                break;
+            }
+
+            struct nk_irq_desc *desc = nk_irq_to_desc(block_irq);
+            if(desc == NULL) {
+                index_block_failed = 1;
+                break;
+            }
+            num_handlers += desc->num_actions;
+        }
+
+        if(index_block_failed) {
+            continue;
+        }
+
+        if(num_handlers < current_min_handlers) {
+            current = irq;
+            current_min_handlers = num_handlers;
+        }
+    }
+
+    *base = current;
+
+    if(current == NK_NULL_IRQ) {
+        return 1;
+    }
+    return 0;
 }
-int nk_msi_x_find_and_reserve_range(nk_ivec_t num, nk_ivec_t *first)
+
+int nk_msi_x_find(nk_irq_t *irq)
 {
-  return -1;
-  /*
-  return nk_ivec_find_range(
-      num,
-      1,
-      NK_IVEC_DESC_FLAG_MSI_X, // Required flags
-      NK_IVEC_DESC_FLAG_RESERVED|NK_IVEC_DESC_FLAG_PERCPU|NK_IVEC_DESC_FLAG_NMI, // Banned flags
-      NK_IVEC_DESC_FLAG_RESERVED, // Flags to set
-      0, // Flags to clear
-      first);
-      */
+  nk_irq_t current = NK_NULL_IRQ;
+  unsigned min_actions = (unsigned)(-1);
+  for(nk_irq_t irq = 0; irq <= nk_max_irq(); irq++) {
+      struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+      if(desc == NULL) {
+          continue;
+      }
+      if(desc->num_actions >= min_actions) {
+          continue;
+      }
+      if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI_X)) {
+          continue;
+      }
+      current = irq;
+      min_actions = desc->num_actions;
+  }
+
+  *irq = current;
+  if(current == NK_NULL_IRQ) {
+      return 1;
+  }
+  return 0;
 }
 
 void pci_dev_dump_msi_x(struct pci_dev *dev)

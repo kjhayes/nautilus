@@ -1,5 +1,8 @@
 
-#include <dev/
+#include <dev/pci.h>
+#include <nautilus/naut_types.h>
+#include <nautilus/nautilus.h>
+#include <nautilus/cpu.h>
 
 #define PCI_CFG_ADDR_PORT 0xcf8
 #define PCI_CFG_DATA_PORT 0xcfc

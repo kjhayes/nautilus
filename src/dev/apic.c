@@ -816,12 +816,121 @@ static int apic_dev_broadcast_ipi(void *state, nk_hwirq_t hwirq) {
     apic_bcast_ipi(apic, hwirq);
     return 0;
 }
+
+/*
+  the structure of an x86 address register is:
+
+  [32 bits - (presumably top half all zeros...) ]
+
+  [12 bits]  [8 bits]  [8 bits] [1] [1] [2 bits]
+   0xfee      dest_id    rsvd   RH  DM   XX 
+
+  dest_id => equivalent to bits 63:56 of ioapic redirectionentry
+             (physical or logical apic id)
+  RH => redirection hint, 1=> send to lowest priority, 0=> send it
+  DM => destination mode, 1=> interpret dest_id as logical
+  XX => ? probably zero
+
+  the structure of an x86 data register is:
+
+  [32 bits reserved => 0}
+  [16 bits]    [1] [1]  [3]   [3]   [8]
+   rsvd        TM  LEV  rsvd  DM    VEC
+
+   TM = trigger mode, 0=> edge, 1=> level
+   LEV = level for trigger mode, 0=> don't care, else 0/1 = deassert/assert
+   DM = delivery mode (fixed, lowest priority, smi, res, nmi, init, res, extint)
+
+   Intel Volvume 3A, 10.11.1, 10.11.2
+ */
+static int apic_dev_msi_addr(void *state, nk_hwirq_t hwirq, void **addr) 
+{
+    int target_cpu = 0;
+    uint32_t mar_low;
+    mar_low  = 0xfee00000;
+    mar_low |= (target_cpu & 0xff) << 12;
+    // we use RH=0 because we don't want lowest priority
+    // we use DM=0 because we want physical delivery
+
+    *addr = (void*)(uint64_t)mar_low;
+
+    return 0;
+}
+static int apic_dev_msi_msg(void *state, nk_hwirq_t hwirq, uint16_t *data) 
+{
+    uint16_t mdr = (hwirq & 0xff);
+    // We use DM=0 to get fixed delivery
+    // We use LEV=0 because we don't care and are using edge
+    // We use TM=0 to get edge    
+
+    *data = mdr;
+
+    return 0;
+}
+static int apic_dev_msi_x_addr(void *state, nk_hwirq_t hwirq, void **addr) 
+{
+    uint32_t mar_low;
+
+    // Target cpu 0 by default
+    int target_cpu = 0;
+
+    mar_low  = 0xfee00000;
+    mar_low |= (target_cpu & 0xff) << 12;
+    // we use RH=0 because we don't want lowest priority
+    // we use DM=0 because we want physical delivery
+    
+    *addr = (void*)(uint64_t)mar_low;
+
+    return 0;
+}
+static int apic_dev_msi_x_msg(void *state, nk_hwirq_t hwirq, uint32_t *data) 
+{
+    uint32_t mdr;
+    mdr = (hwirq & 0xff);
+    // We use DM=0 to get fixed delivery
+    // We use LEV=0 because we don't care and are using edge
+    // We use TM=0 to get edge
+    
+    *data = mdr;
+
+    return 0;
+}
+
+static int
+apic_dev_msi_block_size(void *state, nk_hwirq_t hwirq, size_t *size) {
+    if(hwirq < 32 || hwirq >= 256) {
+        *size = 0;
+        return 1;
+    }
+
+    size_t ret = __builtin_ctz(hwirq) + 1;
+    if(ret > 32) {
+        ret = 32;
+    }
+
+    *size = ret;
+    return 0;
+}
+
+static int
+apic_dev_msi_index_block(void *state, nk_hwirq_t base, size_t index, nk_hwirq_t *out) {
+    *out = base + index;
+    return 0;
+}
+
 static struct nk_irq_dev_int apic_ops = {
   .get_characteristics = apic_dev_get_characteristics,
   .eoi_irq = apic_dev_eoi_irq,
   .irq_status = apic_dev_irq_status,
   .send_ipi = apic_dev_send_ipi,
   .broadcast_ipi = apic_dev_broadcast_ipi,
+  .msi_addr = apic_dev_msi_addr,
+  .msi_msg= apic_dev_msi_msg,
+  .msi_x_addr = apic_dev_msi_x_addr,
+  .msi_x_msg= apic_dev_msi_x_msg,
+  .msi_block_size = apic_dev_msi_block_size,
+  .msi_index_block = apic_dev_msi_index_block,
+
   // Leave the rest as NULL
 };
 

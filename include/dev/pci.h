@@ -195,10 +195,8 @@ struct pci_msi_info {
   
   // these come from the user -  these reflect how the
   // user configured the device
-  int       base_vec; // interrupt will occur on [vec,vec+num_vecs_used)
-  int       num_vecs; 
-  int       target_cpu;
-
+  int       base_irq; // interrupt will occur on [vec,vec+num_vecs_used)
+  int       num_irq;
 };
 
 
@@ -308,51 +306,59 @@ int      pci_dev_scan_capabilities(struct pci_dev *dev,
 				   void *state);
 
 
-// target cpu must currently be a single, physical cpu
 // after enabling, msi is *off* and the mask bits (if available)
 // are set.   In other words, this brings up MSI, but leaves it
 // in a MASKED state.  An unmask is needed
-int pci_dev_enable_msi(struct pci_dev *dev, int base_vec, int num_vecs, 
-		       int target_cpu);
-		       
+int pci_dev_enable_msi(struct pci_dev *dev, nk_irq_t base_irq, int num_irq);
+
+// Get the number of enabled MSI interrupts for this device
+int pci_dev_num_msi_irqs(struct pci_dev *dev);
+// Get the underlying IRQ number of the n-th MSI interrupt for this device
+nk_irq_t pci_dev_msi_irq(struct pci_dev *dev, int msi_num);
+		      
+// msi_num in mask_msi, unmask_msi, and pending_msi, is the index of the MSI
+// for this specific device, not the specific x86 vector anymore -KJH
+// E.g. if a device has N MSI IRQ's msi_num will be in the range [0,N)
+
 // if there is no per-vec masking, then this will mask/unmask all
-// vec=-1 means to unmask all vectors on the device
-int pci_dev_mask_msi(struct pci_dev *dev, int vec);
-int pci_dev_unmask_msi(struct pci_dev *dev, int vec);
+// msi_num=-1 means to unmask all vectors on the device
+int pci_dev_mask_msi(struct pci_dev *dev, int msi_num);
+int pci_dev_unmask_msi(struct pci_dev *dev, int msi_num);
 
 // this makes no sense with no per-vec masking
 // with no per-vec masking, it always returns 0
 // with per-vec masking it returns the pending bit
 int pci_dev_is_pending_msi(struct pci_dev *dev, int vec);
 
-int nk_msi_find_and_reserve_range(nk_ivec_t num, nk_ivec_t *first);
+int nk_msi_find_range(int num_irq, nk_irq_t *base);
 
 /*
   There is currently no specific support for registering MSI interrupt handlers,
   You want to follow roughly these steps:
 
   struct pci_dev *d = ... find the device... - it must have MSI...
-  int num_vecs = d->msi.num_vectors_needed;
+  int num_irq = d->msi.num_vectors_needed;
 
-  int base_vec;
+  nk_irq_t base_irq;
 
   // try to find an aligned chunk of vectors we can use
   // note that prioritization here is your problem
-  if (nk_msi_find_and_reserve_range(num_vecs,&base_vec) {
+  if (nk_msi_find_range(num_irq,&base_irq) {
      // fail - cannot find aligned block of vectors
   }
-  if (pci_dev_enable_msi(d,base_vec,num_vecs, target_cpu=?) {
+  if (pci_dev_enable_msi(d,base_irq,num_irq) {
      // failed to enable...
   }
   // now register your handlers
-  for (i=base_vec;i<base_vec+num_vecs;i++) { 
-     // Possibly use nk_ivec_add_handler_dev() if you have registered the device before this
-     if (nk_ivec_add_handler(i, handler, state)) { 
+  for (i=0;i<num_irq;i++) { 
+     nk_irq_t block_irq = pci_dev_msi_irq(d,i);
+     // Possibly use nk_irq_add_handler_dev() if you have registered the device before this
+     if (nk_irq_add_handler(block_irq, handler, state)) { 
          // failed.... 
      }
   }
   // Now we can unmask 
-  for (i=base_vec;i<base_vec+num_vecs;i++) { 
+  for (i=0;i<num_irqs;i++) { 
      if (pci_dev_unmask_msi(d, i)) {
          // failed.... 
      }
@@ -361,9 +367,8 @@ int nk_msi_find_and_reserve_range(nk_ivec_t num, nk_ivec_t *first);
 */
 
 
-// target cpu must currently be a single, physical cpu
 // entry is initially in the masked state
-int pci_dev_set_msi_x_entry(struct pci_dev *dev, int num, int vec, int target_cpu);
+int pci_dev_set_msi_x_entry(struct pci_dev *dev, int msi_num, nk_irq_t irq);
 
 int pci_dev_mask_msi_x_entry(struct pci_dev *dev, int num);
 int pci_dev_unmask_msi_x_entry(struct pci_dev *dev, int num);
@@ -378,7 +383,7 @@ int pci_dev_is_pending_msi_x(struct pci_dev *dev, int num);
 
 void pci_dev_dump_msi_x(struct pci_dev *dev);
 
-int nk_msi_x_find_and_reserve_range(nk_ivec_t num, nk_ivec_t *first);
+int nk_msi_x_find(nk_irq_t *irq);
 
 /*
   There is currently little support for registering MSI-X interrupt handlers,
@@ -386,23 +391,23 @@ int nk_msi_x_find_and_reserve_range(nk_ivec_t num, nk_ivec_t *first);
 
   struct pci_dev *d = ... find the device... - it must have MSI-X...
 
-  int num_vecs = d->msix.size;
+  int num_irqs = d->msix.size;
 
   // now fill out the device's MSI-X table
-  for (i=0;i<num_vecs;i++) { 
+  for (i=0;i<num_irqs;i++) { 
      // find a free vector
      // note that prioritization here is your problem
-     if (nk_msi_x_find_and_reserve_range(1,&vec)) {
+     if (nk_msi_x_find(&irq)) {
        // fail - cannot find a vector entry...
      }
-     // register your handler for that vector
+     // register your handler for that IRQ 
      // (If you have registered the device at this point, use
-     //  nk_ivec_add_handler_dev() instead and pass in the nk_dev*)
-     if (nk_ivec_add_handler(vec, handler, state)) { 
+     //  nk_irq_add_handler_dev() instead and pass in the nk_dev*)
+     if (nk_irq_add_handler(irq, handler, state)) { 
          // failed.... 
      }
      // set the table entry to point to your handler
-     if (pci_dev_set_msi_x_entry(d,i,vec,cpu)) { 
+     if (pci_dev_set_msi_x_entry(d,i,irq)) { 
          // failed to set entry...
      }
      // and unmask it (device is still masked)
@@ -435,8 +440,6 @@ int nk_msi_x_find_and_reserve_range(nk_ivec_t num, nk_ivec_t *first);
 
 */
  
-
-
 // print out human readable config space info for device on the VC
 int pci_dump_device(struct pci_dev *d);
 
