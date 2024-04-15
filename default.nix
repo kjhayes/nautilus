@@ -19,7 +19,6 @@ pkgs.stdenv.mkDerivation {
     gcc
     binutils
     xorriso
-    gllvm
 
     bashInteractive
   ];
