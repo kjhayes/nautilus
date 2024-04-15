@@ -509,34 +509,185 @@ int nk_unmask_irq(nk_irq_t irq) {
 
 int nk_send_ipi(nk_irq_t irq, cpu_id_t cpu) {
   struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
   if(desc == NULL) {
+    IRQ_ERROR("Called nk_send_ipi on IRQ with NULL descriptor!\n");
     return 1;
   }
   if(!(desc->flags & NK_IRQ_DESC_FLAG_IPI)) {
-    // Calling send_ipi on a Non-IPI interrupt no.
+    IRQ_ERROR("Called nk_send_ipi on IRQ without NK_IRQ_DESC_FLAG_IPI!\n");
     return 1;
   }
+#endif
   struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
   if(irq_dev == NULL) {
-    // Can't call send_ipi on a device-less IRQ
+    IRQ_ERROR("Called nk_send_ipi on IRQ without an irq_dev!\n");
     return 1;
   }
+#endif
   return nk_irq_dev_send_ipi(irq_dev, desc->hwirq, cpu);
 }
 
 int nk_broadcast_ipi(nk_irq_t irq) {
     struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(desc == NULL) {
+        IRQ_ERROR("Called nk_broadcast_ipi on IRQ with NULL descriptor!\n");
         return 1;
     }
     if(!(desc->flags & NK_IRQ_DESC_FLAG_IPI)) {
+        IRQ_ERROR("Called nk_broadcast_ipi on IRQ without NK_IRQ_DESC_FLAG_IPI!\n");
         return 1;
     }
+#endif
     struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(irq_dev == NULL) {
+        IRQ_ERROR("Called nk_broadcast_ipi on IRQ without an irq_dev!\n");
         return 1;
     }
+#endif
     return nk_irq_dev_broadcast_ipi(irq_dev, desc->hwirq);
+}
+
+int nk_irq_msi_addr(nk_irq_t irq, void **addr) {
+    struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(desc == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_addr on IRQ with NULL descriptor!\n");
+        return 1;
+    }
+    if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
+        IRQ_ERROR("Called nk_irq_msi_addr on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
+        return 1;
+    }
+#endif
+    struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(irq_dev == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_addr on IRQ without an irq_dev!\n");
+        return 1;
+    }
+#endif
+    return nk_irq_dev_msi_addr(irq_dev, desc->hwirq, addr);
+}
+
+int nk_irq_msi_x_addr(nk_irq_t irq, void **addr) {
+    struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(desc == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_x_addr on IRQ with NULL descriptor!\n");
+        return 1;
+    }
+    if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
+        IRQ_ERROR("Called nk_irq_msi_x_addr on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
+        return 1;
+    }
+#endif
+    struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(irq_dev == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_x_addr on IRQ without an irq_dev!\n");
+        return 1;
+    }
+#endif
+    return nk_irq_dev_msi_x_addr(irq_dev, desc->hwirq, addr);
+}
+
+int nk_irq_msi_msg(nk_irq_t irq, uint16_t *msg) {
+    struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(desc == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_msg on IRQ with NULL descriptor!\n");
+        return 1;
+    }
+    if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
+        IRQ_ERROR("Called nk_irq_msi_msg on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
+        return 1;
+    }
+#endif
+    struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(irq_dev == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_msg on IRQ without an irq_dev!\n");
+        return 1;
+    }
+#endif
+    return nk_irq_dev_msi_msg(irq_dev, desc->hwirq, msg);
+}
+
+int nk_irq_msi_x_msg(nk_irq_t irq, uint32_t *msg) {
+    struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(desc == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_x_msg on IRQ with NULL descriptor!\n");
+        return 1;
+    }
+    if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
+        IRQ_ERROR("Called nk_irq_msi_x_msg on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
+        return 1;
+    }
+#endif
+    struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(irq_dev == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_x_msg on IRQ without an irq_dev!\n");
+        return 1;
+    }
+#endif
+    return nk_irq_dev_msi_x_msg(irq_dev, desc->hwirq, msg);
+}
+
+int nk_irq_msi_block_size(nk_irq_t irq, size_t *block_size) {
+    struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(desc == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_block_size on IRQ with NULL descriptor!\n");
+        return 1;
+    }
+    if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
+        IRQ_ERROR("Called nk_irq_msi_block_size on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
+        return 1;
+    }
+#endif
+    struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(irq_dev == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_block_size on IRQ without an irq_dev!\n");
+        return 1;
+    }
+#endif
+    return nk_irq_dev_msi_block_size(irq_dev, desc->hwirq, block_size);
+}
+
+int nk_irq_msi_index_block(nk_irq_t irq, size_t index, nk_irq_t *out) {
+    struct nk_irq_desc *desc = nk_irq_to_desc(irq);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(desc == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_index_block on IRQ with NULL descriptor!\n");
+        return 1;
+    }
+    if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
+        IRQ_ERROR("Called nk_irq_msi_index_block on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
+        return 1;
+    }
+#endif
+    struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+    if(irq_dev == NULL) {
+        IRQ_ERROR("Called nk_irq_msi_index_block on IRQ without an irq_dev!\n");
+        return 1;
+    }
+#endif
+    nk_hwirq_t out_hwirq;
+
+    int res = nk_irq_dev_msi_index_block(irq_dev, desc->hwirq, index, &out_hwirq);
+    if(res) {
+        return res;
+    }
+
+    return nk_irq_dev_revmap(irq_dev, out_hwirq, out);
 }
 
 INTERRUPT int nk_handle_interrupt_generic(struct nk_irq_action *action, struct nk_regs *regs, struct nk_irq_dev *irq_dev) 

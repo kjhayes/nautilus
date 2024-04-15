@@ -7,6 +7,11 @@
 #include<nautilus/spinlock.h>
 #include<nautilus/irqdev.h>
 
+// -KJH This hopefully isn't needed anymore but leave this to avoid errors for now
+//      (We do need a way to end an interrupt handler early in some cases, but with
+//       multiple handlers per IRQ the way it's set up currently doesn't allow for this easily)
+#define IRQ_HANDLER_END()
+
 nk_irq_t nk_max_irq(void);
 
 struct nk_regs;
@@ -191,6 +196,14 @@ int nk_unmask_irq(nk_irq_t);
 
 int nk_send_ipi(nk_irq_t, cpu_id_t);
 int nk_broadcast_ipi(nk_irq_t);
+
+int nk_irq_msi_addr(nk_irq_t, void**);
+int nk_irq_msi_msg(nk_irq_t, uint16_t*);
+int nk_irq_msi_x_addr(nk_irq_t, void**);
+int nk_irq_msi_x_msg(nk_irq_t, uint32_t*);
+
+int nk_irq_msi_block_size(nk_irq_t block_base, size_t *size);
+int nk_irq_msi_index_block(nk_irq_t block_base, size_t index, nk_irq_t *out);
 
 // Flow which utilizes nk_irq_dev_ack to get the hwirq number and signals EOI after handling all actions
 int nk_handle_interrupt_generic(struct nk_irq_action *null, struct nk_regs *regs, struct nk_irq_dev *dev);

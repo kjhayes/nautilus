@@ -23,12 +23,25 @@ struct nk_irq_dev_int {
   
   int (*irq_status)(void *state, nk_hwirq_t irq);
 
+  // Map hwirq to global IRQ
   int (*revmap)(void *state, nk_hwirq_t hwirq, nk_irq_t *irq);
 
+  // Firmware Interrupt Specifier Translation
   int(*translate)(void *state, nk_dev_info_type_t type, const void *raw_irq, nk_hwirq_t *out_hwirq);
 
+  // IPI's
   int(*send_ipi)(void *state, nk_hwirq_t hwirq, cpu_id_t cpu);
   int(*broadcast_ipi)(void *state, nk_hwirq_t hwirq);
+
+  // MSI (-X) Support
+  int (*msi_addr)(void *state, nk_hwirq_t hwirq, void **addr);
+  int (*msi_msg)(void *state, nk_hwirq_t hwirq, uint16_t *msg);
+
+  int (*msi_block_size)(void *state, nk_hwirq_t hwirq, size_t *size);
+  int (*msi_index_block)(void *state, nk_hwirq_t hwirq, size_t index, nk_hwirq_t *out);
+
+  int (*msi_x_addr)(void *state, nk_hwirq_t hwirq, void **addr);
+  int (*msi_x_msg)(void *state, nk_hwirq_t hwirq, uint32_t *msg);
 };
 
 struct nk_irq_dev {
@@ -77,12 +90,24 @@ int nk_irq_dev_disable_irq(struct nk_irq_dev *d, nk_hwirq_t irq);
 #define IRQ_STATUS_ACTIVE  (1<<4) // Interrupt is active (between ack and eoi)
 int nk_irq_dev_irq_status(struct nk_irq_dev *d, nk_hwirq_t hwirq);
 
+#define IRQ_IPI_SUCCESS       0
 #define IRQ_IPI_ERROR_IRQ_NO  (1<<1) // Error with the nk_hwirq_t being requested
 #define IRQ_IPI_ERROR_CPUID   (1<<2) // Error with the cpu_id_t being requested
 #define IRQ_IPI_ERROR_UNKNOWN (1<<3) // Unknown Cause 
 int nk_irq_dev_send_ipi(struct nk_irq_dev *d, nk_hwirq_t hwirq, cpu_id_t cpu);
 // Sends the IPI to all processors other than the current processor
 int nk_irq_dev_broadcast_ipi(struct nk_irq_dev *d, nk_hwirq_t hwirq);
+
+#define IRQ_MSI_SUCCESS       0
+#define IRQ_MSI_UNSUPPORTED   (1<<0)
+#define IRQ_MSI_ERROR_UNKNOWN (1<<1)
+int nk_irq_dev_msi_addr(struct nk_irq_dev *d, nk_hwirq_t hwirq, void **addr);
+int nk_irq_dev_msi_msg(struct nk_irq_dev *d, nk_hwirq_t hwirq, uint16_t *msg);
+int nk_irq_dev_msi_x_addr(struct nk_irq_dev *d, nk_hwirq_t hwirq, void **addr);
+int nk_irq_dev_msi_x_msg(struct nk_irq_dev *d, nk_hwirq_t hwirq, uint32_t *msg);
+
+int nk_irq_dev_msi_block_size(struct nk_irq_dev *dev, nk_hwirq_t, size_t *num);
+int nk_irq_dev_msi_index_block(struct nk_irq_dev *dev, nk_hwirq_t, size_t index, nk_hwirq_t *out);
 
 /*
  * Maps from IRQ device local interrupt numbers to global nk_irq_t

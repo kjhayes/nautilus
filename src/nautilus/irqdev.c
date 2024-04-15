@@ -224,3 +224,105 @@ int nk_irq_dev_broadcast_ipi(struct nk_irq_dev *dev, nk_hwirq_t hwirq)
 #endif 
 }
 
+int nk_irq_dev_msi_addr(struct nk_irq_dev *dev, nk_hwirq_t hwirq, void **addr)
+{
+  struct nk_dev *d = (struct nk_dev *)(&(dev->dev));
+  struct nk_irq_dev_int *di = (struct nk_irq_dev_int *)(d->interface);
+
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+  if(di && di->msi_addr) {
+    return di->msi_addr(d->state, hwirq, addr);
+  } else {
+    ERROR("NULL nk_irq_dev_msi_addr in interface of device %s\n", d->name);
+    return -1;
+  }
+#else
+  return di->msi_addr(d->state, hwirq, addr);
+#endif 
+}
+
+int nk_irq_dev_msi_msg(struct nk_irq_dev *dev, nk_hwirq_t hwirq, uint16_t *msg)
+{
+  struct nk_dev *d = (struct nk_dev *)(&(dev->dev));
+  struct nk_irq_dev_int *di = (struct nk_irq_dev_int *)(d->interface);
+
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+  if(di && di->msi_msg) {
+    return di->msi_msg(d->state, hwirq, msg);
+  } else {
+    ERROR("NULL nk_irq_dev_msi_msg in interface of device %s\n", d->name);
+    return -1;
+  }
+#else
+  return di->msi_msg(d->state, hwirq, msg);
+#endif 
+}
+
+int nk_irq_dev_msi_x_addr(struct nk_irq_dev *dev, nk_hwirq_t hwirq, void **addr)
+{
+  struct nk_dev *d = (struct nk_dev *)(&(dev->dev));
+  struct nk_irq_dev_int *di = (struct nk_irq_dev_int *)(d->interface);
+
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+  if(di && di->msi_x_addr) {
+    return di->msi_x_addr(d->state, hwirq, addr);
+  } else {
+    ERROR("NULL nk_irq_dev_msi_x_addr in interface of device %s\n", d->name);
+    return -1;
+  }
+#else
+  return di->msi_x_addr(d->state, hwirq, addr);
+#endif 
+}
+
+int nk_irq_dev_msi_x_msg(struct nk_irq_dev *dev, nk_hwirq_t hwirq, uint32_t *msg)
+{
+  struct nk_dev *d = (struct nk_dev *)(&(dev->dev));
+  struct nk_irq_dev_int *di = (struct nk_irq_dev_int *)(d->interface);
+
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+  if(di && di->msi_x_msg) {
+    return di->msi_x_msg(d->state, hwirq, msg);
+  } else {
+    ERROR("NULL nk_irq_dev_msi_x_msg in interface of device %s\n", d->name);
+    return -1;
+  }
+#else
+  return di->msi_x_msg(d->state, hwirq, msg);
+#endif 
+}
+
+int nk_irq_dev_msi_block_size(struct nk_irq_dev *dev, nk_hwirq_t hwirq, size_t *size) 
+{
+  struct nk_dev *d = (struct nk_dev *)(&(dev->dev));
+  struct nk_irq_dev_int *di = (struct nk_irq_dev_int *)(d->interface);
+
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+  if(di && di->msi_block_size) {
+    return di->msi_block_size(d->state, hwirq, size);
+  } else {
+    ERROR("NULL nk_irq_dev_msi_block_size in interface of device %s\n", d->name);
+    return -1;
+  }
+#else
+  return di->msi_block_size(d->state, hwirq, size);
+#endif 
+}
+
+int nk_irq_dev_msi_index_block(struct nk_irq_dev *dev, nk_hwirq_t hwirq, size_t index, nk_hwirq_t *out) 
+{
+  struct nk_dev *d = (struct nk_dev *)(&(dev->dev));
+  struct nk_irq_dev_int *di = (struct nk_irq_dev_int *)(d->interface);
+
+#ifdef NAUT_CONFIG_ENABLE_ASSERTS
+  if(di && di->msi_index_block) {
+    return di->msi_index_block(d->state, hwirq, index, out);
+  } else {
+    ERROR("NULL nk_irq_dev_msi_index_block in interface of device %s\n", d->name);
+    return -1;
+  }
+#else
+  return di->msi_index_block(d->state, hwirq, index, out);
+#endif 
+}
+
