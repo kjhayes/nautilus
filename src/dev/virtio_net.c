@@ -25,11 +25,15 @@
 
 #include <nautilus/nautilus.h>
 #include <nautilus/netdev.h>
-#include <nautilus/irq.h>
+#include <nautilus/interrupt.h>
 #include <nautilus/backtrace.h>
 
 #include <dev/pci.h>
 #include <dev/virtio_net.h>
+
+#ifdef NAUT_CONFIG_ARCH_X86
+#include <arch/x64/irq.h>
+#endif
 
 #ifndef NAUT_CONFIG_DEBUG_VIRTIO_NET
 #undef DEBUG_PRINT
@@ -637,8 +641,8 @@ int virtio_net_init(struct virtio_pci_dev *dev)
     // if we do fail, the rest of this code will leak
 
     struct pci_dev *p = dev->pci_dev;
-    uint16_t num_vec = p->msix.size;
-    ulong_t vec;
+    uint16_t num_irq = p->msix.size;
+    nk_irq_t irq;
     uint16_t i;
 
     // now set up interrupts
@@ -650,7 +654,7 @@ int virtio_net_init(struct virtio_pci_dev *dev)
 
         DEBUG("setting up interrupts via MSI-X\n");
 
-        if (dev->num_virtqs != num_vec) {
+        if (dev->num_virtqs != num_irq) {
             ERROR("weird mismatch: numqueues=%u msixsize=%u\n",
                 dev->num_virtqs, p->msix.size);
             //continue for now...
@@ -659,21 +663,21 @@ int virtio_net_init(struct virtio_pci_dev *dev)
         }
 
         // now fill out the device's MSI-X table
-        for (i=0;i<num_vec;i++) {
+        for (i=0;i<num_irq;i++) {
             // find a free vector
             // note that prioritization here is your problem
-            if (nk_msi_x_find_and_reserve_range(1,&vec)) {
+            if (nk_msi_x_find(&irq)) {
                 ERROR("Cannot get vector...\n");
                 return -1;
             }
             // register your handler for that vector
-            if (nk_ivec_add_handler_dev(vec, handler, d, (struct nk_dev*)d->net_dev)) {
+            if (nk_irq_add_handler_dev(irq, handler, d, (struct nk_dev*)d->net_dev)) {
                 ERROR("Failed to register int handler\n");
                 return -1;
                 // failed....
             }
             // set the table entry to point to your handler
-            if (pci_dev_set_msi_x_entry(p,i,vec,0)) {
+            if (pci_dev_set_msi_x_entry(p,i,irq)) {
                 ERROR("Failed to set MSI-X entry\n");
                 return -1;
             }
@@ -692,16 +696,18 @@ int virtio_net_init(struct virtio_pci_dev *dev)
         }
 	
     } else {
-	
+
+#ifdef NAUT_CONFIG_ARCH_X86
         DEBUG("setting up interrupts via legacy path at 0x%x\n",HACKED_LEGACY_VECTOR);
 	INFO("THIS HACKED LEGACY INTERRUPT SETUP IS PROBABLY NOT WHAT YOU WANT\n");
 
-        if (nk_ivec_add_handler_dev(HACKED_LEGACY_VECTOR, handler, d, (struct nk_dev*)d->net_dev)) {
+    nk_irq_t hacked_irq = x86_vector_to_irq(HACKED_LEGACY_VECTOR);
+        if (nk_irq_add_handler_dev(hacked_irq, handler, d, (struct nk_dev*)d->net_dev)) {
             ERROR("Failed to register int handler\n");
             return -1;
         }
 
-	nk_unmask_irq(HACKED_LEGACY_IRQ);
+	nk_unmask_irq(hacked_irq);
 
 	// for (i=0; i<256; i++) { nk_umask_irq(i); }
 	
@@ -709,6 +715,10 @@ int virtio_net_init(struct virtio_pci_dev *dev)
         uint16_t cmd = pci_dev_cfg_readw(p,0x4);
         cmd &= ~0x0400;
         pci_dev_cfg_writew(p,0x4,cmd);
+#else
+        ERROR("Failed to set up interrupts!\n");
+        return -1;
+#endif
     }
 
     // get MAC address

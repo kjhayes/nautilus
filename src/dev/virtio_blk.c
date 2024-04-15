@@ -25,9 +25,14 @@
 
 #include <nautilus/nautilus.h>
 #include <nautilus/blkdev.h>
+#include <nautilus/interrupt.h>
 
 #include <dev/pci.h>
 #include <dev/virtio_blk.h>
+
+#ifdef NAUT_CONFIG_ARCH_X86
+#include <arch/x64/irq.h>
+#endif
 
 #ifndef NAUT_CONFIG_DEBUG_VIRTIO_BLK
 #undef DEBUG_PRINT
@@ -634,7 +639,7 @@ int virtio_blk_init(struct virtio_pci_dev *dev)
     
     struct pci_dev *p = dev->pci_dev;
     uint8_t i;
-    ulong_t vec;
+    nk_irq_t irq;
     
     if (dev->itype==VIRTIO_PCI_MSI_X_INTERRUPT) {
 	// we assume MSI-X has been enabled on the device
@@ -653,25 +658,25 @@ int virtio_blk_init(struct virtio_pci_dev *dev)
 	// this should really go by virtqueue, not entry
 	// and ideally pulled into a per-queue setup routine
 	// in virtio_pci...
-	uint16_t num_vec = p->msix.size;
+	uint16_t num_irq = p->msix.size;
         
 	// now fill out the device's MSI-X table
-	for (i=0;i<num_vec;i++) {
+	for (i=0;i<num_irq;i++) {
 	    // find a free vector
 	    // note that prioritization here is your problem
-	    if (nk_msi_x_find_and_reserve_range(1,&vec)) 
+	    if (nk_msi_x_find(&irq)) 
 	    {
 		ERROR("cannot get vector...\n");
 		return -1;
 	    }
 	    // register your handler for that vector
-	    if (nk_irq_add_handler_dev(vec, handler, d, (struct nk_dev*)d->blk_dev)) {
+	    if (nk_irq_add_handler_dev(irq, handler, d, (struct nk_dev*)d->blk_dev)) {
 		ERROR("failed to register int handler\n");
 		return -1;
 		// failed....
 	    }
 	    // set the table entry to point to your handler
-	    if (pci_dev_set_msi_x_entry(p,i,vec,0)) {
+	    if (pci_dev_set_msi_x_entry(p,i,irq)) {
 		ERROR("failed to set MSI-X entry\n");
 		return -1;
 	    }
@@ -680,7 +685,7 @@ int virtio_blk_init(struct virtio_pci_dev *dev)
 		ERROR("failed to unmask entry\n");
 		return -1;
 	    }
-	    DEBUG("finished setting up entry %d for vector %u on cpu 0\n",i,vec);
+	    DEBUG("finished setting up entry %d for vector %u on cpu 0\n",i,irq);
 	}
 	
 	// unmask entire function

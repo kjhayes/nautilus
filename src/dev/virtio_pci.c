@@ -89,10 +89,11 @@ uint32_t virtio_pci_read_regl(struct virtio_pci_dev *dev, uint32_t offset)
         //__asm__ __volatile__ ("movl (%1), %0" : "=r"(result) : "r"(addr) : "memory");
         result = __atomic_load_n((uint32_t*)addr, __ATOMIC_SEQ_CST);
     } else {
-#ifndef NAUT_CONFIG_HAS_PORT_IO
+#ifdef NAUT_CONFIG_HAS_PORT_IO
+        result = inl(dev->ioport_start+offset);
+#else
         panic("Virtio PCI device is trying to use PMIO without architecture support!\n");
 #endif
-        result = inl(dev->ioport_start+offset);
     }
     return result;
 }
@@ -109,10 +110,11 @@ uint16_t virtio_pci_read_regw(struct virtio_pci_dev *dev, uint32_t offset)
         //__asm__ __volatile__ ("movw (%1), %0" : "=r"(result) : "r"(addr) : "memory");
         result = __atomic_load_n((uint16_t*)addr, __ATOMIC_SEQ_CST);
     } else {
-#ifndef NAUT_CONFIG_HAS_PORT_IO
+#ifdef NAUT_CONFIG_HAS_PORT_IO
+        result = inw(dev->ioport_start+offset);
+#else
         panic("Virtio PCI device is trying to use PMIO without architecture support!\n");
 #endif
-        result = inw(dev->ioport_start+offset);
     }
     return result;
 }
@@ -129,10 +131,11 @@ uint8_t virtio_pci_read_regb(struct virtio_pci_dev *dev, uint32_t offset)
         //__asm__ __volatile__ ("movb (%1), %0" : "=r"(result) : "r"(addr) : "memory");
         result = __atomic_load_n((uint8_t*)addr, __ATOMIC_SEQ_CST);
     } else {
-#ifndef NAUT_CONFIG_HAS_PORT_IO
+#ifdef NAUT_CONFIG_HAS_PORT_IO
+        result = inb(dev->ioport_start+offset);
+#else
         panic("Virtio PCI device is trying to use PMIO without architecture support!\n");
 #endif
-        result = inb(dev->ioport_start+offset);
     }
     return result;
 }
@@ -148,10 +151,11 @@ void virtio_pci_write_regl(struct virtio_pci_dev *dev, uint32_t offset, uint32_t
 	//__asm__ __volatile__ ("movl %1, (%0)" : "=r"(addr): "r"(data) : "memory");
         __atomic_store_n((uint32_t*)addr, (uint32_t)data, __ATOMIC_SEQ_CST);
     } else {
-#ifndef NAUT_CONFIG_HAS_PORT_IO
+#ifdef NAUT_CONFIG_HAS_PORT_IO
+        outl(data,dev->ioport_start+offset);
+#else
         panic("Virtio PCI device is trying to use PMIO without architecture support!\n");
 #endif
-        outl(data,dev->ioport_start+offset);
     }
 }
 
@@ -166,10 +170,11 @@ void virtio_pci_write_regw(struct virtio_pci_dev *dev, uint32_t offset, uint16_t
 	//__asm__ __volatile__ ("movw %1, (%0)" : "=r"(addr): "r"(data) : "memory");
         __atomic_store_n((uint16_t*)addr, (uint16_t)data, __ATOMIC_SEQ_CST);
     } else {
-#ifndef NAUT_CONFIG_HAS_PORT_IO
+#ifdef NAUT_CONFIG_HAS_PORT_IO
+        outw(data,dev->ioport_start+offset);
+#else
         panic("Virtio PCI device is trying to use PMIO without architecture support!\n");
 #endif
-        outw(data,dev->ioport_start+offset);
     }
 }
 
@@ -184,10 +189,11 @@ void virtio_pci_write_regb(struct virtio_pci_dev *dev, uint32_t offset, uint8_t 
         //__asm__ __volatile__ ("movb %1, (%0)" : "=r"(addr): "r"(data) : "memory");
         __atomic_store_n((uint8_t*)addr, (uint8_t)data, __ATOMIC_SEQ_CST);
     } else {
-#ifndef NAUT_CONFIG_HAS_PORT_IO
+#ifdef NAUT_CONFIG_HAS_PORT_IO
+        outb(data,dev->ioport_start+offset);
+#else
         panic("Virtio PCI device is trying to use PMIO without architecture support!\n");
 #endif
-        outb(data,dev->ioport_start+offset);
     }
 }
 
@@ -432,10 +438,11 @@ static int legacy_discover(struct virtio_pci_dev *vdev)
 	}
     }
 
-    if (foundio) {
-	vdev->method = IO;
-    } else if (foundmem) {
+    // Prefer MMIO for the sake of architecture's without Port I/O
+    if (foundmem) {
 	vdev->method = MEMORY;
+    } else if (foundio) {
+	vdev->method = IO;
     } else {
 	vdev->method = NONE;
 	ERROR("Device has no register access method... Impossible...\n");
