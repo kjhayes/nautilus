@@ -7524,6 +7524,7 @@ _STYLES = {
     selection=fg:black,bg:green,bold
     frame=fg:black,bg:yellow,bold
     help=bold
+    show-help=list
     frame=bold,standout
     body=
     edit=standout
