@@ -686,7 +686,7 @@ int virtio_net_init(struct virtio_pci_dev *dev)
                 ERROR("Failed to unmask entry\n");
                 return -1;
             }
-            DEBUG("Finished setting up entry %d for vector %u on cpu 0\n",i,vec);
+            DEBUG("Finished setting up entry %d for IRQ %u on cpu 0\n",i,irq);
         }
 
         // unmask entire function

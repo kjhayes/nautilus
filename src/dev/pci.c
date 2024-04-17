@@ -1619,11 +1619,11 @@ int pci_dev_set_msi_x_entry(struct pci_dev *dev, int msi_num, nk_irq_t irq)
   }
 
   if (msi_num<0 || msi_num >= m->size) {
-    PCI_DEBUG("entry %d is out of range\n",num);
+    PCI_DEBUG("entry %d is out of range\n",msi_num);
     return -1;
   }
 
-  PCI_DEBUG("msix enable - num = %d irq = %d\n", num, irq);
+  PCI_DEBUG("msix enable - num = %d irq = %d\n", msi_num, irq);
 
   // We're currently assuming 64-bit pointers
   ASSERT(sizeof(void*) == 8);
@@ -1648,7 +1648,7 @@ int pci_dev_set_msi_x_entry(struct pci_dev *dev, int msi_num, nk_irq_t irq)
   WRITEL(&t->vector_control,1); // masked
 
   PCI_DEBUG("entry %d at %p written as mar=%08x:%08x mdr=%08x vc=%x\n",
-	    num, t, 0, mar_low, mdr, 1);
+	    msi_num, t, 0, mar_low, mdr, 1);
 
   return 0;
 }
