@@ -48,7 +48,8 @@ extern "C" {
 
 struct naut_info;
 
-void fpu_init(struct naut_info *, int is_ap);
+int fpu_init(struct naut_info *);
+int fpu_excp_init(struct naut_info *);
 
 #ifdef __cplusplus
 }

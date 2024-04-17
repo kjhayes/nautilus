@@ -10,7 +10,9 @@ endif
 
 ifdef NAUT_CONFIG_ARCH_RISCV
 GCC_CROSS_COMPILE ?= ~/opt/toolchain/riscv64/bin/riscv64-linux-gnu-
-LDFLAGS += -m elf64lriscv_lp64f
+CFLAGS += -finline-atomics
+LDFLAGS += -m elf64lriscv_lp64f -L ~/opt/toolchain/riscv64/lib/gcc/riscv64-linux-gnu/12.2.0
+LDFLAGS += -lgcc
 endif
 
 CC = $(GCC_CROSS_COMPILE)gcc
@@ -23,7 +25,7 @@ AR = $(GCC_CROSS_COMPILE)ar
 OBJCOPY = $(GCC_CROSS_COMPILE)objcopy
 OBJDUMP = $(GCC_CROSS_COMPILE)objdump
 
-COMMON_FLAGS += -O2  -fno-delete-null-pointer-checks
+COMMON_FLAGS += -O$(NAUT_CONFIG_COMPILER_OPT_LEVEL) -fno-delete-null-pointer-checks
 GCCVERSIONGTE6 := $(shell expr `$(CC) -dumpversion | cut -f1 -d.` \>= 6)
 ifeq "$(GCCVERSIONGTE6)" "1"
   COMMON_FLAGS += -no-pie -fno-pic -fno-PIC -fno-PIE

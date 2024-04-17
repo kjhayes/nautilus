@@ -163,7 +163,7 @@ nk_add_int_entry (int_trig_t trig_mode,
 }
 
 nk_irq_t x86_irq_vector_base = NK_NULL_IRQ;
-static struct nk_irq_desc x86_irq_vector_descs[256];
+static struct nk_irq_desc x86_irq_vector_descs[256] = { 0 };
 
 int 
 x86_irq_vector_init (struct sys_info * sys)

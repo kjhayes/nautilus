@@ -519,8 +519,8 @@ fpu_init_common (struct naut_info * naut)
  * to this point then we do...
  *
  */
-void
-fpu_init (struct naut_info * naut, int is_ap)
+int
+fpu_init (struct naut_info * naut)
 {
     FPU_DEBUG("Probing for Floating Point/SIMD extensions...\n");
 
@@ -532,22 +532,23 @@ fpu_init (struct naut_info * naut, int is_ap)
         intel_fpu_init(naut);
     } else {
         ERROR_PRINT("Unsupported processor type!\n");
-        return;
+        return 1;
+    }
+    return 0;
+}
+
+int fpu_excp_init(struct naut_info *info) 
+{
+    nk_irq_t xm_excp_irq = x86_vector_to_irq(XM_EXCP);
+    if (xm_excp_irq == NK_NULL_IRQ || nk_irq_set_handler_early(xm_excp_irq, xm_handler, NULL) != 0) {
+        ERROR_PRINT("Could not register excp handler for XM\n");
+        return 1;
     }
 
-    if (is_ap == 0) {
-
-        nk_irq_t xm_excp_irq = x86_vector_to_irq(XM_EXCP);
-        if (xm_excp_irq == NK_NULL_IRQ || nk_irq_set_handler_early(xm_excp_irq, xm_handler, NULL) != 0) {
-            ERROR_PRINT("Could not register excp handler for XM\n");
-            return;
-        }
-
-        nk_irq_t mf_excp_irq = x86_vector_to_irq(MF_EXCP);
-        if (mf_excp_irq == NK_NULL_IRQ || nk_irq_set_handler_early(mf_excp_irq, mf_handler, NULL) != 0) {
-            ERROR_PRINT("Could not register excp handler for MF\n");
-            return;
-        }
-
+    nk_irq_t mf_excp_irq = x86_vector_to_irq(MF_EXCP);
+    if (mf_excp_irq == NK_NULL_IRQ || nk_irq_set_handler_early(mf_excp_irq, mf_handler, NULL) != 0) {
+        ERROR_PRINT("Could not register excp handler for MF\n");
+        return 1;
     }
+    return 0;
 }

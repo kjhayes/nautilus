@@ -55,13 +55,16 @@ struct ap_init_area {
     uint64_t cr3; // 74
     struct cpu * cpu_ptr; // 82
 
-    void (*entry)(struct cpu * core); // 90
-
+    void *(*boot_entry)(struct cpu * core); // 90
+    void (*thread_entry)(void); // 98
 } __packed;
 
 int smp_early_init(struct naut_info * naut);
 int smp_bringup_aps(struct naut_info * naut);
-void smp_ap_entry (struct cpu * core);
+
+void * smp_ap_entry_boot_stack (struct cpu * core);
+void smp_ap_entry_threaded (void);
+
 int smp_setup_xcall_bsp (struct cpu * core);
 
 #ifdef __cplusplus

@@ -6,6 +6,7 @@
 #include <nautilus/scheduler.h>
 #include <nautilus/semaphore.h>
 #include <nautilus/waitqueue.h>
+#include <nautilus/atomic.h>
 
 #define BOGUS_FUN_ERR() ERROR_PRINT("Function (%s) is BOGUS\n", __func__)
 #define BOGUS() BOGUS_FUN_ERR()
@@ -549,7 +550,7 @@ int pte_osAtomicExchange(int *pTarg, int val){
  *==========================================================================================*/
 int pte_osAtomicCompareExchange(int *pdest, int exchange, int comp){
     DEBUG("AtomicCompareEXCHANGE");
-  return __sync_val_compare_and_swap(pdest,comp,exchange);
+  return atomic_cmpswap(pdest,comp,exchange);
   // return atomic_cmpswap(pdest, comp, exchange);
 } 
 

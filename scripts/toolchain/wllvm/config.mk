@@ -1,7 +1,5 @@
 
-LLVM_PASS_DIR := $(ROOT_DIR)/llvm
-LLVM_PASS_LIST := $(LLVM_PASS_DIR)/passes.txt
-LLVM_PASS_PLUGIN_LIST := $(LLVM_PASS_DIR)/passplugins.txt
+-include $(SCRIPTS_DIR)/toolchain/wllvm/include.mk
 
 $(shell mkdir -p $(LLVM_PASS_DIR))
 $(shell rm -f $(LLVM_PASS_LIST))
@@ -20,7 +18,7 @@ OBJDUMP := llvm-objdump
 
 export GLLVM_OBJCOPY:=$(OBJCOPY)
 
-COMMON_FLAGS += -O2  # -fno-delete-null-pointer-checks
+COMMON_FLAGS += -O$(NAUT_CONFIG_COMPILER_OPT_LEVEL)  # -fno-delete-null-pointer-checks
 # -O3 will also work - PAD
 
 ifdef NAUT_CONFIG_ARCH_X86

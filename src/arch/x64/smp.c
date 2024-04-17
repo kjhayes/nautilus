@@ -807,7 +807,8 @@ init_ap_area (struct ap_init_area * ap_area,
 #endif
 
     /* pointer to our entry routine */
-    ap_area->entry       = smp_ap_entry;
+    ap_area->boot_entry       = smp_ap_entry_boot_stack;
+    ap_area->thread_entry       = smp_ap_entry_threaded;
 
     return 0;
 }
@@ -1024,7 +1025,7 @@ smp_ap_setup (struct cpu * core)
     msr_write(MSR_GS_BASE, (uint64_t)core_addr);
     DEBUG_PRINT("Setup per-cpu segment on Core %u\n", core->id);
 
-    fpu_init(nk_get_nautilus_info(), FPU_AP_INIT);
+    fpu_init(nk_get_nautilus_info());
     DEBUG_PRINT("Setup FPU on Core %u\n", core->id);
     
     if (nk_mtrr_init_ap()) {
@@ -1137,8 +1138,9 @@ smp_ap_finish (struct cpu * core)
 
 extern void idle(void* in, void**out);
 
-void 
-smp_ap_entry (struct cpu * core) 
+// Returns base of the thread stack
+void *
+smp_ap_entry_boot_stack (struct cpu * core) 
 { 
     struct cpu * my_cpu;
     SMP_DEBUG("Core %u starting up\n", core->id);
@@ -1162,7 +1164,13 @@ smp_ap_entry (struct cpu * core)
      * my_cpu. This is so we don't lose it in the
      * switch (it's sitting on the stack!)
      */
-    my_cpu = smp_ap_stack_switch(cur->rsp, cur->rsp, my_cpu);
+    return cur->rsp;
+}
+
+void
+smp_ap_entry_threaded(void) 
+{
+    struct cpu *my_cpu = get_cpu();
 
     // wait for the other cores and turn on interrupts
     smp_ap_finish(my_cpu);

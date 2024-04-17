@@ -28,6 +28,9 @@
 .extern boot_stack_end
 .extern boot_stack_start
 
+.extern boot_stack_init
+.extern threaded_init
+
 #include <asm/lowlevel.h>
 
 /**
@@ -105,7 +108,14 @@ GLOBAL(nautilus_entry)
     movq $boot_stack_end, %rsp
 
     /* multiboot info is still in rdi and rsi */
-    movq $main, %rax
+    movq $boot_stack_init, %rax
+    callq *%rax
+
+    // %rax should now contain our dynamically allocated thread stack
+    movq %rax, %rsp
+    movq %rax, %rbp
+    
+    movq $threaded_init, %rax
     callq *%rax
 
     /* shouldn't get here */

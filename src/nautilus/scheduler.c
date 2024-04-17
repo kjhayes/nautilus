@@ -4773,8 +4773,9 @@ void nk_sched_start()
 
 }
     
-
+#ifdef NAUT_CONFIG_ARCH_X86
 static void timing_test(uint64_t N, uint64_t M, int print);
+#endif
 
 /* 
  * nk_sched_init
@@ -4809,6 +4810,7 @@ nk_sched_init(struct nk_sched_config *cfg)
 
 
 
+#ifdef NAUT_CONFIG_ARCH_X86
 extern void nk_simple_timing_loop(uint64_t);
 
 static void timing_test(uint64_t N, uint64_t M, int print)
@@ -4854,6 +4856,7 @@ static void timing_test(uint64_t N, uint64_t M, int print)
   }
 
 }
+#endif
 
 
 static int

@@ -305,8 +305,6 @@ static int launch_vmm_environment()
 " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
 "+===============================================+  \n\n"
 
-extern struct naut_info * smp_ap_stack_switch(uint64_t, uint64_t, struct naut_info*);
-
 /*
   You can add a script here that the shell will run at startup
   
@@ -320,8 +318,8 @@ char *script[] = { "sigtest",
                     0 };
 */
 
-void
-init (unsigned long mbd,
+void *
+boot_stack_init (unsigned long mbd,
       unsigned long magic)
 {
     struct naut_info * naut = &nautilus_info;
@@ -335,13 +333,16 @@ init (unsigned long mbd,
 
     vga_early_init();
 
+    fpu_init(naut);
+
     // At this point we have VGA output only    
     if(x86_irq_vector_init(&naut->sys)) {
       //Nothing we can really do
       panic("Couldn't initialize x86 vector IRQ descriptors!\n");
     }
 
-    fpu_init(naut, FPU_BSP_INIT);
+    // Install FPU Exception Handlers
+    fpu_excp_init(naut);
 
     // Now we are safe to use optimized code that relies
     // on SSE
@@ -349,7 +350,7 @@ init (unsigned long mbd,
     printk_init();
 
     setup_idt();
-    
+
 #ifdef NAUT_CONFIG_PC_8250_UART
 #ifdef NAUT_CONFIG_PC_8250_UART_EARLY_OUTPUT
     pc_8250_pre_vc_init();
@@ -481,15 +482,18 @@ init (unsigned long mbd,
     nk_group_sched_init();
 
     /* we now switch away from the boot-time stack in low memory */
-    naut = smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, naut);
+    return get_cur_thread()->rsp;
+}
 
-    // O0 doesn't play well with the stack switch (I really want to come up with a better way around swapping stacks)... -KJH
+void
+threaded_init(void) {
+    struct naut_info *naut = nk_get_nautilus_info();
 
     mm_boot_kmem_cleanup();
 
-    smp_setup_xcall_bsp(nk_get_nautilus_info()->sys.cpus[0]);
+    smp_setup_xcall_bsp(naut->sys.cpus[0]);
 
-    nk_cpu_topo_discover(nk_get_nautilus_info()->sys.cpus[0]); 
+    nk_cpu_topo_discover(naut->sys.cpus[0]); 
 
 #ifdef NAUT_CONFIG_HPET
     nk_hpet_init();
@@ -508,7 +512,7 @@ init (unsigned long mbd,
     // vesa_test();
 #endif
 
-    smp_bringup_aps(nk_get_nautilus_info());
+    smp_bringup_aps(naut);
 
 #ifdef NAUT_CONFIG_ASPACE_CARAT
     // carat requires global initialization
@@ -571,31 +575,31 @@ init (unsigned long mbd,
 #endif
 
 #ifdef NAUT_CONFIG_PARTITION_SUPPORT
-    nk_partition_init(nk_get_nautilus_info());
+    nk_partition_init(naut);
 #endif
 
 #ifdef NAUT_CONFIG_RAMDISK
-    nk_ramdisk_init(nk_get_nautilus_info());
+    nk_ramdisk_init(naut);
 #endif
 
 #ifdef NAUT_CONFIG_ATA
-    nk_ata_init(nk_get_nautilus_info());
+    nk_ata_init(naut);
 #endif
 
 #ifdef NAUT_CONFIG_VIRTIO_PCI
-    virtio_pci_init(nk_get_nautilus_info());
+    virtio_pci_init(naut);
 #endif
 
 #ifdef NAUT_CONFIG_MLX3_PCI
-    mlx3_init(nk_get_nautilus_info());
+    mlx3_init(naut);
 #endif
 
 #ifdef NAUT_CONFIG_E1000_PCI
-    e1000_pci_init(nk_get_nautilus_info());
+    e1000_pci_init(naut);
 #endif
 
 #ifdef NAUT_CONFIG_E1000E_PCI
-    e1000e_pci_init(nk_get_nautilus_info());
+    e1000e_pci_init(naut);
 #endif
 
 #ifdef NAUT_CONFIG_NET_ETHERNET
@@ -622,22 +626,22 @@ init (unsigned long mbd,
 #endif
 #endif
 
-    nk_linker_init(nk_get_nautilus_info());
-    nk_prog_init(nk_get_nautilus_info());
+    nk_linker_init(naut);
+    nk_prog_init(naut);
 
     // nk_loader_init();
 
-    nk_pmc_init(nk_get_nautilus_info());
+    nk_pmc_init(naut);
 
     launch_vmm_environment();
 
-    nk_cmdline_init(nk_get_nautilus_info());
-    nk_test_init(nk_get_nautilus_info());
+    nk_cmdline_init(naut);
+    nk_test_init(naut);
 
-    nk_cmdline_dispatch(nk_get_nautilus_info());
+    nk_cmdline_dispatch(naut);
 
 #ifdef NAUT_CONFIG_RUN_TESTS_AT_BOOT
-    nk_run_tests(nk_get_nautilus_info());
+    nk_run_tests(naut);
 #endif
 
 #ifdef NAUT_CONFIG_WATCHDOG

@@ -122,7 +122,7 @@ int nk_request_irq_range(int n, nk_irq_t *out_base);
 struct nk_irq_desc * nk_alloc_irq_desc(nk_hwirq_t hwirq, int flags, struct nk_irq_dev *);
 struct nk_irq_desc * nk_alloc_irq_descs(int n, nk_hwirq_t hwirq, int flags, struct nk_irq_dev *);
 
-// Initializes statically allocated IRQ descriptors
+// Initializes statically allocated IRQ descriptors (assumes all desc have been memset to all zero bytes)
 int nk_setup_irq_desc(struct nk_irq_desc *desc, nk_hwirq_t hwirq, int flags, struct nk_irq_dev *dev);
 int nk_setup_irq_descs(int n, struct nk_irq_desc *descs, nk_hwirq_t hwirq, int flags, struct nk_irq_dev *dev);
 

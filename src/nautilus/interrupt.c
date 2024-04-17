@@ -92,6 +92,7 @@ struct nk_irq_desc * nk_alloc_irq_desc(nk_hwirq_t hwirq, int flags, struct nk_ir
   if(desc == NULL) {
     return desc;
   }
+  memset(desc, 0, sizeof(struct nk_irq_desc));
   if(nk_setup_irq_desc(desc, hwirq, flags, dev)) {
     free(desc);
     return NULL;
@@ -104,6 +105,7 @@ struct nk_irq_desc * nk_alloc_irq_descs(int num, nk_hwirq_t base_hwirq, int flag
   if(descs == NULL) {
     return descs;
   }
+  memset(descs, 0, sizeof(struct nk_irq_desc) * num);
   if(nk_setup_irq_descs(num, descs, base_hwirq, flags, dev)) {
     free(descs);
     return NULL;
@@ -115,7 +117,6 @@ struct nk_irq_desc * nk_alloc_irq_descs(int num, nk_hwirq_t base_hwirq, int flag
 
 int nk_setup_irq_desc(struct nk_irq_desc *desc, nk_hwirq_t hwirq, int flags, struct nk_irq_dev *dev) 
 {
-  memset(desc, 0, sizeof(struct nk_irq_desc));
   desc->irq = NK_NULL_IRQ;
   desc->hwirq = hwirq;
   desc->flags = flags;
@@ -124,7 +125,6 @@ int nk_setup_irq_desc(struct nk_irq_desc *desc, nk_hwirq_t hwirq, int flags, str
 }
 int nk_setup_irq_descs(int n, struct nk_irq_desc *descs, nk_hwirq_t base_hwirq, int flags, struct nk_irq_dev *dev) 
 {
-  memset(descs, 0, sizeof(struct nk_irq_desc) * n);
   for(int i = 0; i < n; i++) {
     descs[i].irq = NK_NULL_IRQ;
     descs[i].hwirq = base_hwirq + i;
@@ -136,7 +136,6 @@ int nk_setup_irq_descs(int n, struct nk_irq_desc *descs, nk_hwirq_t base_hwirq, 
 
 int nk_setup_irq_desc_devless(struct nk_irq_desc *desc, nk_hwirq_t hwirq, int flags, int status) 
 {
-  memset(desc, 0, sizeof(struct nk_irq_desc));
   desc->irq = NK_NULL_IRQ;
   desc->hwirq = hwirq;
   desc->flags = flags;
@@ -146,7 +145,6 @@ int nk_setup_irq_desc_devless(struct nk_irq_desc *desc, nk_hwirq_t hwirq, int fl
 }
 int nk_setup_irq_descs_devless(int n, struct nk_irq_desc *descs, nk_hwirq_t base_hwirq, int flags, int status) 
 {
-  memset(descs, 0, sizeof(struct nk_irq_desc) * n);
   for(int i = 0; i < n; i++) {
     descs[i].irq = NK_NULL_IRQ;
     descs[i].hwirq = base_hwirq + i;

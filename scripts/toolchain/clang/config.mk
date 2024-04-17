@@ -8,7 +8,7 @@ CPP = cpp
 OBJCOPY = llvm-objcopy
 OBJDUMP = llvm-objdump
 
-COMMON_FLAGS += -O2  # -fno-delete-null-pointer-checks
+COMMON_FLAGS += -O$(NAUT_CONFIG_COMPILER_OPT_LEVEL)  # -fno-delete-null-pointer-checks
 # -O3 will also work - PAD
 
 ifdef NAUT_CONFIG_ARCH_X86

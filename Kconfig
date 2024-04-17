@@ -242,6 +242,15 @@ menu "Build"
      config USE_WLLVM
        bool "Clang/WLLVM (generates top level bitcode file)" 
     endchoice
+
+    config COMPILER_OPT_LEVEL
+       int "Compiler Optimization Level"
+       range 0 3
+       default 3
+       help
+           Set the optimization level passed to the build toolchain "-O3" by default
+
+
     config USE_NOELLE 
        bool "Enable Noelle"
        default false
