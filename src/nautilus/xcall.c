@@ -93,6 +93,10 @@ smp_setup_xcall_bsp (struct cpu * core)
 int
 smp_xcall_init_queue (struct cpu * core)
 {
+    if(core == NULL) {
+        ERROR_PRINT("Passed NULL struct cpu to smp_xcall_init_queue!\n");
+        return -1;
+    }
     core->xcall_q = nk_queue_create();
     if (!core->xcall_q) {
         ERROR_PRINT("Could not allocate xcall queue on cpu %u\n", core->id);

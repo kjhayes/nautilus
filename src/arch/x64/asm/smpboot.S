@@ -166,6 +166,10 @@ ENTRY(init_smp_boot)
     notq %rbx
     andq %rbx, %rax	
     movq %rax, %cr0
+
+    // Begin using the much larger bsp boot stack
+    // (Otherwise we overrun the 1KB stack with -O0 set)
+    movq $boot_stack_end, %rsp
 	
     // Enter the C code with our argument
     callq *%rsi

@@ -3,16 +3,16 @@ ifdef QEMU
 
 QEMU_FLAGS += -smp cpus=4
 QEMU_FLAGS += -serial stdio
-#QEMU_FLAGS += -display none
+QEMU_FLAGS += -display none
 QEMU_FLAGS += -m 2G
-QEMU_FLAGS += -device pci-serial
+#QEMU_FLAGS += -device virtio-net-pci -nic socket,udp=1000,localaddr=localhost
 
 qemu: $(QEMU_DEPS)
 	$(call quiet-cmd,QEMU,)
 	$(QEMU) $(QEMU_FLAGS)
 qemu-gdb: $(QEMU_DEPS)
 	$(call quiet-cmd,QEMU,)
-	$(QEMU) $(QEMU_FLAGS) -gdb tcp::1234 -S
+	$(QEMU) $(QEMU_FLAGS) -gdb tcp::1234 -S -d int -no-reboot -no-shutdown
 qemu-gdb-%: $(QEMU_DEPS)
 	$(call quiet-cmd,QEMU,)
 	$(QEMU) $(QEMU_FLAGS) -gdb tcp::$* -S

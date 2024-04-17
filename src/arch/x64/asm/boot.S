@@ -25,6 +25,9 @@
 .section .mbhdr
 .align 8
 
+.extern boot_stack_end
+.extern boot_stack_start
+
 #include <asm/lowlevel.h>
 
 /**

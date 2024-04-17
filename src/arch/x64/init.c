@@ -483,11 +483,13 @@ init (unsigned long mbd,
     /* we now switch away from the boot-time stack in low memory */
     naut = smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, naut);
 
+    // O0 doesn't play well with the stack switch (I really want to come up with a better way around swapping stacks)... -KJH
+
     mm_boot_kmem_cleanup();
 
-    smp_setup_xcall_bsp(naut->sys.cpus[0]);
+    smp_setup_xcall_bsp(nk_get_nautilus_info()->sys.cpus[0]);
 
-    nk_cpu_topo_discover(naut->sys.cpus[0]); 
+    nk_cpu_topo_discover(nk_get_nautilus_info()->sys.cpus[0]); 
 
 #ifdef NAUT_CONFIG_HPET
     nk_hpet_init();
@@ -506,7 +508,7 @@ init (unsigned long mbd,
     // vesa_test();
 #endif
 
-    smp_bringup_aps(naut);
+    smp_bringup_aps(nk_get_nautilus_info());
 
 #ifdef NAUT_CONFIG_ASPACE_CARAT
     // carat requires global initialization
@@ -569,31 +571,31 @@ init (unsigned long mbd,
 #endif
 
 #ifdef NAUT_CONFIG_PARTITION_SUPPORT
-    nk_partition_init(naut);
+    nk_partition_init(nk_get_nautilus_info());
 #endif
 
 #ifdef NAUT_CONFIG_RAMDISK
-    nk_ramdisk_init(naut);
+    nk_ramdisk_init(nk_get_nautilus_info());
 #endif
 
 #ifdef NAUT_CONFIG_ATA
-    nk_ata_init(naut);
+    nk_ata_init(nk_get_nautilus_info());
 #endif
 
 #ifdef NAUT_CONFIG_VIRTIO_PCI
-    virtio_pci_init(naut);
+    virtio_pci_init(nk_get_nautilus_info());
 #endif
 
 #ifdef NAUT_CONFIG_MLX3_PCI
-    mlx3_init(naut);
+    mlx3_init(nk_get_nautilus_info());
 #endif
 
 #ifdef NAUT_CONFIG_E1000_PCI
-    e1000_pci_init(naut);
+    e1000_pci_init(nk_get_nautilus_info());
 #endif
 
 #ifdef NAUT_CONFIG_E1000E_PCI
-    e1000e_pci_init(naut);
+    e1000e_pci_init(nk_get_nautilus_info());
 #endif
 
 #ifdef NAUT_CONFIG_NET_ETHERNET
@@ -620,22 +622,22 @@ init (unsigned long mbd,
 #endif
 #endif
 
-    nk_linker_init(naut);
-    nk_prog_init(naut);
+    nk_linker_init(nk_get_nautilus_info());
+    nk_prog_init(nk_get_nautilus_info());
 
     // nk_loader_init();
 
-    nk_pmc_init(naut);
+    nk_pmc_init(nk_get_nautilus_info());
 
     launch_vmm_environment();
 
-    nk_cmdline_init(naut);
-    nk_test_init(naut);
+    nk_cmdline_init(nk_get_nautilus_info());
+    nk_test_init(nk_get_nautilus_info());
 
-    nk_cmdline_dispatch(naut);
+    nk_cmdline_dispatch(nk_get_nautilus_info());
 
 #ifdef NAUT_CONFIG_RUN_TESTS_AT_BOOT
-    nk_run_tests(naut);
+    nk_run_tests(nk_get_nautilus_info());
 #endif
 
 #ifdef NAUT_CONFIG_WATCHDOG

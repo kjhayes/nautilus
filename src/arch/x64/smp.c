@@ -101,7 +101,6 @@ parse_mptable_cpu (struct sys_info * sys, struct mp_table_entry_cpu * cpu)
     spinlock_init(&new_cpu->lock);
 
     sys->cpus[sys->num_cpus] = new_cpu;
-
     sys->num_cpus++;
 }
 
@@ -1010,23 +1009,29 @@ smp_ap_setup (struct cpu * core)
     // Note that any use of SSE/AVX, for example produced by
     // clang/llvm optimation, that happens before fpu_init will
     // cause a panic.  Initialize FPU ASAP.
-    
+
     // setup IDT
     lidt(&idt_descriptor);
+    DEBUG_PRINT("Setup IDT on Core %u\n", core->id);
 
     // setup GDT
     lgdt64(&gdtr64);
+    DEBUG_PRINT("Setup GDT on Core %u\n", core->id);
 
     uint64_t core_addr = (uint64_t) core->system->cpus[core->id];
 
     // set GS base (for per-cpu state)
     msr_write(MSR_GS_BASE, (uint64_t)core_addr);
+    DEBUG_PRINT("Setup per-cpu segment on Core %u\n", core->id);
 
     fpu_init(nk_get_nautilus_info(), FPU_AP_INIT);
+    DEBUG_PRINT("Setup FPU on Core %u\n", core->id);
     
     if (nk_mtrr_init_ap()) {
 	ERROR_PRINT("Could not initialize MTRRs for core %u\n",core->id);
 	return -1;
+    } else {
+    DEBUG_PRINT("Setup MTRRs on Core %u\n", core->id);
     }
 
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING 
