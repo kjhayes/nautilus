@@ -53,8 +53,6 @@ struct pl011_uart {
 int pl011_uart_pre_vc_init(uint64_t dtb);
 #endif
 
-int pl011_uart_init(void);
-
 int pl011_uart_dev_write(void*, uint8_t *src);
 int pl011_uart_dev_read(void*, uint8_t *dest);
 

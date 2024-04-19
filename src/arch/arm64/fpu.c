@@ -30,11 +30,11 @@
  */
 
 
-#include<nautilus/fpu.h>
+#include<arch/arm64/fpu.h>
 
 #include<arch/arm64/sys_reg.h>
 
-void fpu_init(struct naut_info *info, int is_ap) {
+int fpu_init_percpu(struct naut_info *info) {
 
   cpacr_el1_t cpacr;
   LOAD_SYS_REG(CPACR_EL1, cpacr.raw);
@@ -58,5 +58,7 @@ void fpu_init(struct naut_info *info, int is_ap) {
   fpcr.raw |= (1<<12); // Inexact Exception
 
   STORE_SYS_REG(FPCR, fpcr.raw);
+
+  return 0;
 }
 

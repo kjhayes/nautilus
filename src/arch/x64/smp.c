@@ -34,7 +34,7 @@
 #include <nautilus/percpu.h>
 #include <nautilus/numa.h>
 #include <nautilus/cpu.h>
-#include <nautilus/fpu.h>
+#include <arch/x64/fpu.h>
 #include <arch/x64/irq.h>
 
 #ifndef NAUT_CONFIG_DEBUG_SMP

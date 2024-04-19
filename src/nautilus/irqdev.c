@@ -31,7 +31,7 @@
 
 #include<nautilus/irqdev.h>
 
-#ifdef NAUT_CONFIG_DEBUG_DEV
+#ifndef NAUT_CONFIG_DEBUG_DEV
 #undef DEBUG_PRINT
 #define DEBUG_PRINT(fmt, args...) 
 #endif

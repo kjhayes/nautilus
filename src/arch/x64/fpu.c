@@ -23,7 +23,6 @@
 
 #include <nautilus/nautilus.h>
 #include <nautilus/printk.h>
-#include <nautilus/fpu.h>
 #include <nautilus/cpu.h>
 #include <nautilus/smp.h>
 
@@ -31,6 +30,7 @@
 #include <arch/x64/idt.h>
 #include <arch/x64/msr.h>
 #include <arch/x64/irq.h>
+#include <arch/x64/fpu.h>
 
 #include <nautilus/backtrace.h>
 #ifndef NAUT_CONFIG_DEBUG_FPU

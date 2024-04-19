@@ -33,6 +33,7 @@
 #include<nautilus/nautilus.h>
 #include<nautilus/naut_types.h>
 #include<nautilus/interrupt.h>
+#include<nautilus/module.h>
 #include<dev/8250/core.h>
 #include<dev/8250/pc_8250.h>
 
@@ -217,4 +218,11 @@ int pc_8250_init(void)
 
   return num_failed;
 }
+
+struct nk_module pc_8250_uart_module = {
+    .name = "pc_8250",
+    .init = pc_8250_init,
+};
+
+nk_declare_module(pc_8250_uart_module);
 

@@ -35,24 +35,7 @@ SECTIONS
     *(.data .data.*)
   }
 
-  .rodata : {
-    . = ALIGN(16);
-    *(.srodata .srodata.*) /* do not need to distinguish this from .rodata */
-    . = ALIGN(16);
-    *(.rodata .rodata.*)
-  }
-
-  .cmdline_flags ALIGN(0x1000) : {
-    __start_flags = .;
-    *(.cmdline_flags*);
-    __stop_flags = .;
-  }
-
-  .shell_cmds ALIGN(0x1000) : {
-    __start_shell_cmds = .;
-    KEEP(*(SORT_BY_NAME(.shell_cmd.*)));
-    __stop_shell_cmds = .;
-  }
+#include "rodata_common.ld.inc"
 
   _loadEnd = .;
 

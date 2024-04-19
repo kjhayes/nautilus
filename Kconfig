@@ -1151,6 +1151,13 @@ menu "Debugging"
       help
         Turn on debug prints for paging subsystem
 
+    config DEBUG_MODULES
+      bool "Debug Modules"
+      depends on DEBUG_PRINTS
+      default n
+      help
+        Turn on debug prints for the module framework
+
     config DEBUG_INTERRUPT_FRAMEWORK
       bool "Debug Interrupt Framework"
       depends on DEBUG_PRINTS
@@ -1411,6 +1418,12 @@ config DEBUG_GROUP
       default n
       help
         Turn on debug output for network device interface
+    config DEBUG_IRQDEV
+      bool "Debug IRQ Device Interface"
+      depends on DEBUG_DEV
+      default n
+      help
+        Turn on debug output for IRQ device interface
     config DEBUG_GPUDEV
       bool "Debug GPU (Graphics) Device Interface"
       depends on DEBUG_DEV

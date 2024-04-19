@@ -35,6 +35,4 @@
 int of_8250_pre_vc_init(void *fdt);
 #endif
 
-int of_8250_init(void);
-
 #endif

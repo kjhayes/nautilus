@@ -28,8 +28,10 @@
 #include <arch/x64/mtrr.h>
 #include <arch/x64/cpuid.h>
 #include <arch/x64/smp.h>
+#include <arch/x64/fpu.h>
 
 #include <nautilus/nautilus.h>
+#include <nautilus/module.h>
 #include <nautilus/paging.h>
 #include <nautilus/spinlock.h>
 #include <nautilus/mb_utils.h>
@@ -49,7 +51,6 @@
 #include <nautilus/idle.h>
 #include <nautilus/percpu.h>
 #include <nautilus/errno.h>
-#include <nautilus/fpu.h>
 #include <nautilus/random.h>
 #include <nautilus/acpi.h>
 #include <nautilus/atomic.h>
@@ -540,7 +541,7 @@ threaded_init(void) {
 
 #ifdef NAUT_CONFIG_PC_8250_UART
     // Use the driver based on the generic 8250
-    pc_8250_init();
+    // (In a module currently)
 #else
     // Use the non-generic 8250 based driver
     serial_init();
@@ -561,18 +562,13 @@ threaded_init(void) {
     nk_gdt_init();
 #endif
     
+    nk_vc_init();
+   
     arch_enable_ints();
-
+    
     //nk_dump_all_irq();
 
     /* interrupts are now on */
-
-    nk_vc_init();
-
-    
-#ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE
-    nk_vc_start_chardev_console(NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE_NAME);
-#endif
 
 #ifdef NAUT_CONFIG_PARTITION_SUPPORT
     nk_partition_init(naut);
@@ -611,7 +607,17 @@ threaded_init(void) {
 #ifdef NAUT_CONFIG_NET_COLLECTIVE_ETHERNET
     nk_net_ethernet_collective_init();
 #endif
+
+    INFO_PRINT("Initializing built-in modules...\n");
+    int num_failed_builtin_modules = nk_init_builtin_modules();
+    if(num_failed_builtin_modules > 0) {
+        ERROR_PRINT("Failed to initialize all built-in modules! (num_failed = %u)\n", num_failed_builtin_modules);
+    }
     
+#ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE
+    nk_vc_start_chardev_console(NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE_NAME);
+#endif
+ 
     nk_fs_init();
 
 #ifdef NAUT_CONFIG_EXT2_FILESYSTEM_DRIVER

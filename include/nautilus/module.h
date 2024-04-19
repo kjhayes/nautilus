@@ -23,10 +23,33 @@
 #ifndef __MODULE_H__
 #define __MODULE_H__
 
+#include <nautilus/nautilus.h>
+
+#define NK_MOD_FLAG_INITED    (1<<0)
+
+struct nk_module
+{
+    const char *name;
+    int(*init)(void);
+    int flags;
+};
+
+// Returns the number of modules which returned an error code
+int nk_init_builtin_modules(void);
+
+// Zero if the module is initialized on return, non-zero otherwise
+int nk_try_init_module(struct nk_module *info);
+
+#define nk_declare_module(MOD) \
+    __attribute__((used, section(".module." # MOD))) \
+    static struct nk_module *__nk_mod_##MOD = &MOD;
+
+// Multiboot Module Stuff
+#ifdef NAUT_CONFIG_USE_MULTIBOOT
 #define ST_MAGIC    0x00952700  // magic number of symbol table file
 #define ELF_MAGIC   0x464c457f
 
-
 int nk_register_mod(struct multiboot_info * mb_info, struct multiboot_tag_module * m);
+#endif
 
 #endif

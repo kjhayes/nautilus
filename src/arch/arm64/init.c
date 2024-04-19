@@ -33,8 +33,8 @@
 #define __NAUTILUS_MAIN__
 
 #include<nautilus/nautilus.h>
+#include<nautilus/module.h>
 #include<nautilus/printk.h>
-#include<nautilus/fpu.h>
 #include<nautilus/naut_string.h>
 #include<nautilus/arch.h>
 #include<nautilus/dev.h>
@@ -73,6 +73,7 @@
 #include<arch/arm64/timer.h>
 #include<arch/arm64/psci.h>
 #include<arch/arm64/paging.h>
+#include<arch/arm64/fpu.h>
 
 #ifdef NAUT_CONFIG_PL011_UART
 #include<dev/pl011.h>
@@ -179,7 +180,7 @@ volatile static uint8_t __secondary_init_second_phase_token = 0;
 
 void secondary_init(void) {
 
-  fpu_init(&nautilus_info, 1);
+  fpu_init_percpu(&nautilus_info);
 
   if(smp_init_tpidr()) {
     INIT_ERROR("Could not set TPIDR_EL1 for CPU!\n");
@@ -403,7 +404,7 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   nk_low_level_memset((void*)_bssStart, 0, (uint64_t)_bssEnd - (uint64_t)_bssStart);
  
   // Enable the FPU
-  fpu_init(&nautilus_info, 0);
+  fpu_init_percpu(&nautilus_info);
 
   nautilus_info.sys.dtb = (struct dtb_fdt_header*)dtb;
 
@@ -544,12 +545,6 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   }
 
   // Now we should be able to install irq handlers
-#ifdef NAUT_CONFIG_PL011_UART
-  pl011_uart_init();
-#endif
-#ifdef NAUT_CONFIG_DW_8250_UART
-  dw_8250_init();
-#endif
 #ifdef NAUT_CONFIG_VIRTIO_PCI
   virtio_pci_init(&nautilus_info);
   INIT_DEBUG("virtio pci inited!\n");
@@ -562,6 +557,12 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   e1000e_pci_init(&nautilus_info);
   INIT_DEBUG("e1000e pci inited!\n");
 #endif
+
+  INIT_PRINT("Intializing built-in modules...\n");
+  int num_failed_builtin_modules = nk_init_builtin_modules();
+  if(num_failed_builtin_modules > 0) {
+      INIT_ERROR("Failed to initialize all built-in modules! (num_failed = %u)\n", num_failed_builtin_modules);
+  }
 
   nk_fs_init();
   INIT_DEBUG("FS inited!\n");

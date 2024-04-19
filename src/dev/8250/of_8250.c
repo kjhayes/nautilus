@@ -38,6 +38,7 @@
 #include<nautilus/of/dt.h>
 #include<nautilus/interrupt.h>
 #include<nautilus/iomap.h>
+#include<nautilus/module.h>
 
 #ifndef NAUT_CONFIG_DEBUG_OF_8250_UART
 #undef DEBUG_PRINT
@@ -322,9 +323,16 @@ static struct of_dev_id of_8250_of_dev_ids[] = {
 };
 declare_of_dev_match_id_array(of_8250_of_match, of_8250_of_dev_ids);
 
-int of_8250_init(void)
+static int of_8250_init(void)
 {
   of_for_each_match(&of_8250_of_match, of_8250_dev_init_one);
   return 0;
 }
+
+struct nk_module of_8250_uart_module = {
+    .name = "of_8250",
+    .init = of_8250_init,
+};
+
+nk_declare_module(of_8250_uart_module);
 

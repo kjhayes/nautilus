@@ -32,6 +32,7 @@
 
 #include<dev/pl011.h>
 
+#include<nautilus/module.h>
 #include<nautilus/dev.h>
 #include<nautilus/chardev.h>
 #include<nautilus/spinlock.h>
@@ -482,8 +483,12 @@ static struct of_dev_id pl011_dev_ids[] = {
 };
 declare_of_dev_match_id_array(pl011_of_match, pl011_dev_ids);
 
-int pl011_uart_init(void) {
+static int pl011_uart_init(void) {
   return of_for_each_match(&pl011_of_match, pl011_uart_init_one);
+}
+
+int pl011_uart_exit(void) {
+    return 0;
 }
 
 void pl011_uart_putchar_blocking(struct pl011_uart *p, const char c) {
@@ -502,4 +507,11 @@ void pl011_uart_puts_blocking(struct pl011_uart *p, const char *src) {
   }
   spin_unlock_irq_restore(&p->output_lock, flags);
 }
+
+struct nk_module pl011_uart_module = {
+    .name = "pl011",
+    .init = pl011_uart_init,
+};
+
+nk_declare_module(pl011_uart_module);
 

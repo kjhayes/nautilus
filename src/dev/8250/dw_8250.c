@@ -38,6 +38,7 @@
 #include<nautilus/of/fdt.h>
 #include<nautilus/of/dt.h>
 #include<nautilus/interrupt.h>
+#include<nautilus/module.h>
 
 // Driver for the DesignWare 8250 UART
 
@@ -347,9 +348,16 @@ static struct of_dev_id dw_8250_of_dev_ids[] = {
 };
 declare_of_dev_match_id_array(dw_8250_of_match, dw_8250_of_dev_ids);
 
-int dw_8250_init(void)
+static int dw_8250_init(void)
 {
   of_for_each_match(&dw_8250_of_match, dw_8250_dev_init_one);
   return 0;
 }
+
+struct nk_module dw_8250_uart_module = {
+    .name = "dw_8250",
+    .init = dw_8250_init,
+};
+
+nk_declare_module(dw_8250_uart_module);
 

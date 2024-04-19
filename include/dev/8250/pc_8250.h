@@ -41,6 +41,4 @@
 int pc_8250_pre_vc_init(void);
 #endif
 
-int pc_8250_init(void);
-
 #endif

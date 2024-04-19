@@ -379,15 +379,17 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   /* interrupts are now on */
 
-#ifdef NAUT_CONFIG_OF_8250_UART
-  of_8250_init();
-#endif
-
   start_secondary(&(naut->sys));
 
   nk_sched_start();
 
   //nk_dump_all_irq();
+
+  printk("Initializing built-in modules...\n");
+  int num_failed_builtin_modules = nk_init_builtin_modules();
+  if(num_failed_builtin_modules > 0) {
+      ERROR_PRINT("Failed to initialize all built-in modules! (num_failed = %lu)\n", num_failed_builtin_modules);
+  }
 
   nk_fs_init();
 
