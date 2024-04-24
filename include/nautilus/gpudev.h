@@ -289,12 +289,5 @@ nk_gpu_dev_font_t   *nk_gpu_dev_font_create(uint32_t width, uint32_t height);
 #define              NK_GPU_DEV_FONT_BIT_RESET(font,ch,x,y)  ((font)->data[NK_GPU_DEV_FONT_BIT_OFFSET(font,ch,x,y)/8]) &= ~(0x1 << (NK_GPU_DEV_FONT_BIT_OFFSET(font,ch,x,y)%8))
 void                 nk_gpu_dev_font_destroy(nk_gpu_dev_font_t *font);
     
-
-
-
-// called on BSP at startup and shutdown, respectively
-int nk_gpu_dev_init();
-int nk_gpu_dev_deinit();
-
 #endif
 

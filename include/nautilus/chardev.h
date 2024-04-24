@@ -56,9 +56,6 @@ struct nk_char_dev {
     struct nk_dev dev;
 };
 
-int nk_char_dev_init();
-int nk_char_dev_deinit();
-
 struct nk_char_dev * nk_char_dev_register(char *name, uint64_t flags, struct nk_char_dev_int *inter, void *state); 
 int                  nk_char_dev_unregister(struct nk_char_dev *);
 

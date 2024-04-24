@@ -84,9 +84,6 @@ struct nk_irq_dev {
  * Device Interface to the rest of the Kernel
  */
 
-int nk_irq_dev_init(void);
-int nk_irq_dev_deinit(void);
-
 struct nk_irq_dev * nk_irq_dev_register(char *name, uint64_t flags, struct nk_irq_dev_int *inter, void *state);
 int nk_irq_dev_unregister(struct nk_irq_dev *);
 

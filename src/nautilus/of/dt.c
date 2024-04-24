@@ -31,6 +31,7 @@
 #include<nautilus/of/dt.h>
 #include<nautilus/of/fdt.h>
 #include<nautilus/dev.h>
+#include<nautilus/init.h>
 #include<nautilus/endian.h>
 #include<nautilus/interrupt.h>
 
@@ -740,10 +741,15 @@ int fdt_unflatten_tree(void *fdt, struct dt_node **root)
 }
 
 static struct dt_node *global_dt_root;
-int of_init(void *fdt) 
+
+static int 
+of_init_unflattened(void) 
 {
-  if(fdt_unflatten_tree(fdt, &global_dt_root)) {
-    return -1;
+  void *dtb = nk_get_nautilus_info()->sys.dtb;
+
+  int res = fdt_unflatten_tree(dtb, &global_dt_root);
+  if(res) {
+    return res;
   }
 
   DEBUG("inited\n");
@@ -751,14 +757,18 @@ int of_init(void *fdt)
   return 0;
 }
 
-int of_cleanup(void)
+static int 
+of_cleanup(void)
 {
-  if(free_dt_node_list()) {
-    return -1;
+  int res = free_dt_node_list();
+  if(res) {
+    return res;
   }
 
   return 0;
 }
+
+nk_declare_kmem_init(of_init_unflattened);
 
 static int of_node_matches(struct dt_node *node, const struct of_dev_id *id) {
   if(id == NULL || node == NULL) 

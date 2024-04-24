@@ -31,14 +31,13 @@
 
 
 #include<dev/8250/core.h>
-#include<dev/8250/dw_8250.h>
 #include<nautilus/endian.h>
 #include<nautilus/iomap.h>
 #include<nautilus/dev.h>
 #include<nautilus/of/fdt.h>
 #include<nautilus/of/dt.h>
 #include<nautilus/interrupt.h>
-#include<nautilus/module.h>
+#include<nautilus/init.h>
 
 // Driver for the DesignWare 8250 UART
 
@@ -72,8 +71,7 @@ static int dw_8250_handle_irq(struct uart_8250_port *uart, unsigned int iir)
       // Timeout with empty recv buffer,
       // This is a possible error state for the DW UART,
       // do a read of RBR to fix it
-      uint8_t read_val = uart_8250_read_reg(uart,UART_8250_RBR);
-      generic_8250_direct_putchar(uart, read_val);
+      (void)uart_8250_read_reg(uart,UART_8250_RBR);
     }
   }
   else if(iir_reason == DW_8250_IIR_BUSY) {
@@ -81,10 +79,11 @@ static int dw_8250_handle_irq(struct uart_8250_port *uart, unsigned int iir)
     // Rewrite LCR and read the USR reg to make it go away 
     uart_8250_write_reg(uart,UART_8250_LCR,((struct dw_8250*)uart)->last_lcr);
     (void)uart_8250_read_reg(uart,DW_8250_USR);
-    return 0;
   } else {
     return generic_8250_handle_irq(uart,iir);
   }
+
+  return 0;
 }
 
 static void dw_8250_write_reg8(struct uart_8250_port *uart, int offset, unsigned int val) 
@@ -161,8 +160,10 @@ static void dw_8250_early_putchar(char c) {
   generic_8250_direct_putchar(&pre_vc_dw_8250.port, c);
 }
 
-int dw_8250_pre_vc_init(uint64_t dtb) 
+static int dw_8250_pre_vc_init(void) 
 {
+  void *dtb = nk_get_nautilus_info()->sys.dtb;
+
   memset(&pre_vc_dw_8250, 0, sizeof(struct dw_8250));
 
   // KJH - HACK for getting to rockpro64 uart2
@@ -197,6 +198,9 @@ int dw_8250_pre_vc_init(uint64_t dtb)
 
   return 0;
 }
+
+nk_declare_silent_init(dw_8250_pre_vc_init);
+
 #endif
 
 static int dw_8250_dev_init_one(struct nk_dev_info *info)
@@ -300,7 +304,7 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
   snprintf(name_buf,DEV_NAME_LEN,"serial%u",nk_dev_get_serial_device_number());
 
   struct nk_char_dev *dev = nk_char_dev_register(name_buf,NK_DEV_FLAG_NO_WAIT,&generic_8250_char_dev_int,(void*)&dw->port);
-  dw->port.dev = dev;
+  dw->port.dev = (struct nk_dev*)dev;
 
   if(dev == NULL) {
     ERROR("Failed to register DW UART as a character device!\n");
@@ -354,10 +358,5 @@ static int dw_8250_init(void)
   return 0;
 }
 
-struct nk_module dw_8250_uart_module = {
-    .name = "dw_8250",
-    .init = dw_8250_init,
-};
-
-nk_declare_module(dw_8250_uart_module);
+nk_declare_driver_init(dw_8250_init);
 

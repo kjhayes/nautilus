@@ -1,4 +1,5 @@
 obj-y += \
+	init.o \
 	fmtout.o \
 	printk.o \
 	doprnt.o \

@@ -36,47 +36,6 @@
 #define ERROR(fmt, args...) ERROR_PRINT("Module: " fmt, ##args)
 
 
-
-int nk_init_builtin_modules(void) 
-{
-    extern struct nk_module * __start_modules[];
-    extern struct nk_module * __stop_modules[];
-    size_t modules_size = (void*)__stop_modules - (void*)__start_modules;
-    size_t num_modules = modules_size / sizeof(struct nk_module*);
-
-    DEBUG(".modules size in bytes = %lu\n", modules_size);
-    DEBUG(".modules num entries = %lu\n", num_modules);
-
-    int num_failures = 0;
-    for(size_t i = 0; i < num_modules; i++) {
-        struct nk_module *mod = __start_modules[i];
-        INFO("Trying to intialize built-in module: \"%s\"\n", mod->name);
-        if(nk_try_init_module(mod)) {
-          ERROR("Failed to initialize built-in module: \"%s\"!\n", mod->name);
-          num_failures += 1;
-        } else {
-          INFO("Initialized built-in module: \"%s\"\n", mod->name);
-        }
-    }
-    return num_failures;
-}
-
-int nk_try_init_module(struct nk_module *mod) 
-{
-    if(mod->flags & NK_MOD_FLAG_INITED) {
-        // This module has already been initialized
-        return 0;
-    }
-
-    int ret = (mod->init)();
-    if(ret) {
-        return ret;
-    } else {
-        mod->flags |= NK_MOD_FLAG_INITED;
-        return 0;
-    }
-}
-
 #ifdef NAUT_CONFIG_USE_MULTIBOOT
 /*
  * The current model of modules is that they are basically binary blobs, but

@@ -44,6 +44,7 @@
 #include <nautilus/errno.h>
 #include <nautilus/math.h>
 #include <nautilus/vc.h>
+#include <nautilus/init.h>
 
 #ifdef NAUT_CONFIG_ARCH_RISCVBLAG
 #include <dev/sifive_serial.h>
@@ -58,10 +59,13 @@
 
 spinlock_t printk_lock;
 
-int printk_init(void) {
+static int 
+printk_init(void) {
   spinlock_init(&printk_lock);
   return 0;
 }
+
+nk_declare_silent_init(printk_init);
 
 //extern void sifive_serial_putchar(uchar_t c);
 //extern void serial_putln(const char * ln);

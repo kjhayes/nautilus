@@ -29,10 +29,7 @@
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
 
-
-#include<dev/pl011.h>
-
-#include<nautilus/module.h>
+#include<nautilus/init.h>
 #include<nautilus/dev.h>
 #include<nautilus/chardev.h>
 #include<nautilus/spinlock.h>
@@ -42,6 +39,24 @@
 #include<nautilus/interrupt.h>
 
 #include<nautilus/of/dt.h>
+
+#include<nautilus/naut_types.h>
+#include<nautilus/chardev.h>
+#include<nautilus/spinlock.h>
+
+struct pl011_uart {
+  struct nk_char_dev *dev;
+
+  void *mmio_base;
+  uint64_t clock;
+
+  uint32_t baudrate;
+
+  nk_irq_t irq;
+
+  spinlock_t input_lock;
+  spinlock_t output_lock;
+};
 
 #define UART_DATA        0x0
 #define UART_RECV_STATUS 0x4
@@ -110,6 +125,9 @@
 #define DEBUG(fmt, args...) DEBUG_PRINT("[pl011] " fmt, ##args)
 #define ERROR(fmt, args...) ERROR_PRINT("[pl011] " fmt, ##args)
 #define WARN(fmt, args...) WARN_PRINT("[pl011] " fmt, ##args)
+
+static void pl011_uart_putchar_blocking(struct pl011_uart *p, const char c);
+static void pl011_uart_puts_blocking(struct pl011_uart *p, const char *src);
 
 static inline void pl011_write_reg(struct pl011_uart *p, uint32_t reg, uint32_t val) {
   *(volatile uint32_t*)(p->mmio_base + reg) = val;
@@ -201,21 +219,25 @@ static uint64_t pre_vc_pl011_dtb_offset = -1;
 
 #define QEMU_PL011_VIRT_BASE_CLOCK 24000000 // 24 MHz Clock
          
-void pl011_uart_pre_vc_puts(char *s) {
+static void pl011_uart_pre_vc_puts(char *s) {
   pl011_uart_puts_blocking(&pre_vc_pl011, s);
 }
-void pl011_uart_pre_vc_putchar(char c) {
+static void pl011_uart_pre_vc_putchar(char c) {
   pl011_uart_putchar_blocking(&pre_vc_pl011, c);
 }
 
-int pl011_uart_pre_vc_init(uint64_t dtb) {
+static int
+pl011_uart_pre_vc_init(void) {
+
+  void *dtb = nk_get_nautilus_info()->sys.dtb;
 
   struct pl011_uart *p = &pre_vc_pl011;
  
   int offset = fdt_node_offset_by_compatible((void*)dtb, -1, "arm,pl011");
 
   if(offset < 0) {
-    return 1;
+    // This is a success, (it's just not here)
+    return 0;
   }
 
   pre_vc_pl011_dtb_offset = offset;
@@ -224,7 +246,7 @@ int pl011_uart_pre_vc_init(uint64_t dtb) {
 
   fdt_reg_t reg = { .address = 0, .size = 0 };
   if(fdt_getreg((void*)dtb, offset, &reg)) {
-    return 1;
+    return -1;
   }
   
   // TODO: Still need to use the fdt to read the clock speed but it's less clear how to get it,
@@ -240,21 +262,24 @@ int pl011_uart_pre_vc_init(uint64_t dtb) {
   p->mmio_base = nk_io_map((void*)reg.address, reg.size, 0);
 
   if(p->mmio_base == NULL) {
-    return 1;
+    return -1;
   }
 
   if(pl011_uart_configure(p)) {
     nk_io_unmap((void*)reg.address);
-    return 1;
+    return -1;
   }
 
   if(nk_pre_vc_register(pl011_uart_pre_vc_putchar, pl011_uart_pre_vc_puts)) {
     nk_io_unmap((void*)reg.address);
-    return 1;
+    return -1;
   }
 
   return 0;
 }
+
+nk_declare_silent_init(pl011_uart_pre_vc_init);
+
 #endif
 
 static int pl011_uart_dev_get_characteristics(void *state, struct nk_char_dev_characteristics *c) {
@@ -291,7 +316,7 @@ static inline void pl011_uart_puts_non_blocking(struct pl011_uart *p, const char
 }
 
 // Non-blocking
-int pl011_uart_dev_read(void *state, uint8_t *dest) {
+static int pl011_uart_dev_read(void *state, uint8_t *dest) {
 
   struct pl011_uart *p = (struct pl011_uart*)state;
 
@@ -321,7 +346,7 @@ int pl011_uart_dev_read(void *state, uint8_t *dest) {
 }
 
 // Non-blocking
-int pl011_uart_dev_write(void *state, uint8_t *src) {
+static int pl011_uart_dev_write(void *state, uint8_t *src) {
 
   struct pl011_uart *p = (struct pl011_uart*)state;
 
@@ -483,7 +508,8 @@ static struct of_dev_id pl011_dev_ids[] = {
 };
 declare_of_dev_match_id_array(pl011_of_match, pl011_dev_ids);
 
-static int pl011_uart_init(void) {
+static int 
+pl011_uart_init(void) {
   return of_for_each_match(&pl011_of_match, pl011_uart_init_one);
 }
 
@@ -491,14 +517,14 @@ int pl011_uart_exit(void) {
     return 0;
 }
 
-void pl011_uart_putchar_blocking(struct pl011_uart *p, const char c) {
+static void pl011_uart_putchar_blocking(struct pl011_uart *p, const char c) {
   int flags = spin_lock_irq_save(&p->output_lock);
   while(pl011_busy(p) || pl011_write_full(p)) {}
   __pl011_uart_putchar(p, c);
   spin_unlock_irq_restore(&p->output_lock, flags);
 }
 
-void pl011_uart_puts_blocking(struct pl011_uart *p, const char *src) {
+static void pl011_uart_puts_blocking(struct pl011_uart *p, const char *src) {
   int flags = spin_lock_irq_save(&p->output_lock);
   while(*src != '\0') {
     while(pl011_busy(p) || pl011_write_full(p)) {}
@@ -508,10 +534,5 @@ void pl011_uart_puts_blocking(struct pl011_uart *p, const char *src) {
   spin_unlock_irq_restore(&p->output_lock, flags);
 }
 
-struct nk_module pl011_uart_module = {
-    .name = "pl011",
-    .init = pl011_uart_init,
-};
-
-nk_declare_module(pl011_uart_module);
+nk_declare_driver_init(pl011_uart_init);
 

@@ -31,14 +31,13 @@
 
 
 #include<dev/8250/core.h>
-#include<dev/8250/of_8250.h>
 #include<nautilus/dev.h>
 #include<nautilus/endian.h>
 #include<nautilus/of/fdt.h>
 #include<nautilus/of/dt.h>
 #include<nautilus/interrupt.h>
 #include<nautilus/iomap.h>
-#include<nautilus/module.h>
+#include<nautilus/init.h>
 
 #ifndef NAUT_CONFIG_DEBUG_OF_8250_UART
 #undef DEBUG_PRINT
@@ -116,8 +115,10 @@ static void of_8250_early_putchar(char c) {
 
 #define OF_8250_PRE_VC_COMPAT "ns16550a"
 
-int of_8250_pre_vc_init(void *dtb) 
+static int of_8250_pre_vc_init(void) 
 {
+  void *dtb = nk_get_nautilus_info()->sys.dtb;
+
   memset(&pre_vc_of_8250, 0, sizeof(struct uart_8250_port));
 
   int offset = fdt_node_offset_by_compatible((void*)dtb, -1, OF_8250_PRE_VC_COMPAT);
@@ -146,6 +147,9 @@ int of_8250_pre_vc_init(void *dtb)
 
   return 0;
 }
+
+nk_declare_silent_init(of_8250_pre_vc_init);
+
 #endif
 
 static int of_8250_dev_init_one(struct nk_dev_info *info)
@@ -329,10 +333,5 @@ static int of_8250_init(void)
   return 0;
 }
 
-struct nk_module of_8250_uart_module = {
-    .name = "of_8250",
-    .init = of_8250_init,
-};
-
-nk_declare_module(of_8250_uart_module);
+nk_declare_driver_init(of_8250_init);
 

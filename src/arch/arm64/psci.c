@@ -34,6 +34,7 @@
 
 #include<arch/arm64/smccc.h>
 #include<nautilus/nautilus.h>
+#include<nautilus/init.h>
 #include<nautilus/shell.h>
 #include<nautilus/of/fdt.h>
 
@@ -137,7 +138,10 @@ int psci_system_reset(void) {
   return -1;
 }
 
-int psci_init(void *dtb) {
+static int 
+psci_init(void) 
+{
+  void *dtb = nk_get_nautilus_info()->sys.dtb;
 
   int offset = fdt_node_offset_by_compatible(dtb, -1, "arm,psci");
   if(offset < 0) {
@@ -150,7 +154,7 @@ int psci_init(void *dtb) {
   if(offset < 0) {
     PSCI_PRINT("Could not find PSCI support in the device tree!\n");
     psci_valid = 0;
-    return -1;
+    return -ENXIO;
   }
 
   int lenp;
@@ -184,6 +188,8 @@ int psci_init(void *dtb) {
   PSCI_PRINT("Initialized PSCI\n");
   return 0;
 }
+
+nk_declare_static_init(psci_init);
 
 static int
 reboot_handler(char *buf, void *priv) {

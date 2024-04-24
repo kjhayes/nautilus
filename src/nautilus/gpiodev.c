@@ -30,6 +30,8 @@
  */
 
 #include<nautilus/gpiodev.h>
+#include<nautilus/init.h>
+#include<nautilus/errno.h>
 #include<nautilus/spinlock.h>
 #include<nautilus/nautilus.h>
 
@@ -43,14 +45,22 @@
 #define WARN(fmt, args...) WARN_PRINT("gpiodev: " fmt, ##args)
 #define INFO(fmt, args...) INFO_PRINT("gpiodev: " fmt, ##args)
 
-int nk_gpio_dev_init(void) {
+static int 
+nk_gpio_dev_init(void) {
+  if(!nk_dev_inited()) {
+      return -EINIT_DEFER;
+  }
   INFO("init\n");
   return 0;
 }
-int nk_gpio_dev_deinit(void) {
+
+static int 
+nk_gpio_dev_deinit(void) {
   INFO("deinit\n");
   return 0;
 }
+
+nk_declare_static_init(nk_gpio_dev_init);
 
 struct nk_gpio_dev * nk_gpio_dev_register(char *name, uint64_t flags, struct nk_gpio_dev_int *inter, void *state)
 {

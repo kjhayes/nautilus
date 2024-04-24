@@ -2403,7 +2403,4 @@ typedef struct mlx3_cmd_box {
 } mlx3_cmd_box_t;
 
 
-
-int mlx3_init(struct naut_info * naut);
-
 #endif

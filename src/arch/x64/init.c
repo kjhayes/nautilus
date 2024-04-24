@@ -31,7 +31,7 @@
 #include <arch/x64/fpu.h>
 
 #include <nautilus/nautilus.h>
-#include <nautilus/module.h>
+#include <nautilus/init.h>
 #include <nautilus/paging.h>
 #include <nautilus/spinlock.h>
 #include <nautilus/mb_utils.h>
@@ -128,15 +128,6 @@
 #include <dev/vga.h>
 #ifdef NAUT_CONFIG_VIRTIO_PCI
 #include <dev/virtio_pci.h>
-#endif
-#ifdef NAUT_CONFIG_MLX3_PCI
-#include <dev/mlx3_ib.h>
-#endif
-#ifdef NAUT_CONFIG_E1000_PCI
-#include <dev/e1000_pci.h>
-#endif
-#ifdef NAUT_CONFIG_E1000E_PCI
-#include <dev/e1000e_pci.h>
 #endif
 #ifdef NAUT_CONFIG_RAMDISK
 #include <dev/ramdisk.h>
@@ -293,19 +284,6 @@ static int launch_vmm_environment()
   return 0;
 }
 
-
-
-#define NAUT_WELCOME \
-"Welcome to                                         \n" \
-"    _   __               __   _  __                \n" \
-"   / | / /____ _ __  __ / /_ (_)/ /__  __ _____    \n" \
-"  /  |/ // __ `// / / // __// // // / / // ___/    \n" \
-" / /|  // /_/ // /_/ // /_ / // // /_/ /(__  )     \n" \
-"/_/ |_/ \\__,_/ \\__,_/ \\__//_//_/ \\__,_//____/  \n" \
-"+===============================================+  \n" \
-" Kyle C. Hale (c) 2014 | Northwestern University   \n" \
-"+===============================================+  \n\n"
-
 /*
   You can add a script here that the shell will run at startup
   
@@ -348,13 +326,12 @@ boot_stack_init (unsigned long mbd,
     // Now we are safe to use optimized code that relies
     // on SSE
 
-    printk_init();
+    nk_handle_init_stage_silent();
 
     setup_idt();
 
 #ifdef NAUT_CONFIG_PC_8250_UART
 #ifdef NAUT_CONFIG_PC_8250_UART_EARLY_OUTPUT
-    pc_8250_pre_vc_init();
 #endif
 #else
     // Bring serial device up early so we can have output
@@ -371,22 +348,15 @@ boot_stack_init (unsigned long mbd,
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING 
     nk_gdb_init();
 #endif
-
-
-    nk_dev_init();
-    nk_irq_dev_init();
-    nk_gpio_dev_init();
-    nk_char_dev_init();
-    nk_block_dev_init();
-    nk_net_dev_init();
-    nk_gpu_dev_init();
-
-    nk_vc_print(NAUT_WELCOME);
-    
+ 
     detect_cpu();
+
+    nk_handle_init_stage_static();
 
     /* setup the temporary boot-time allocator */
     mm_boot_init(mbd);
+
+    nk_handle_init_stage_boot();
 
     naut->sys.mb_info = multiboot_parse(mbd, magic);
     if (!naut->sys.mb_info) {
@@ -445,10 +415,8 @@ boot_stack_init (unsigned long mbd,
     ioapic_init(&(naut->sys));
     i8254_init(naut);
 
-    printk("4\n");
     nk_future_init();
     
-    printk("5\n");
     nk_timer_init();
 
     //apic_init();
@@ -586,18 +554,6 @@ threaded_init(void) {
     virtio_pci_init(naut);
 #endif
 
-#ifdef NAUT_CONFIG_MLX3_PCI
-    mlx3_init(naut);
-#endif
-
-#ifdef NAUT_CONFIG_E1000_PCI
-    e1000_pci_init(naut);
-#endif
-
-#ifdef NAUT_CONFIG_E1000E_PCI
-    e1000e_pci_init(naut);
-#endif
-
 #ifdef NAUT_CONFIG_NET_ETHERNET
     nk_net_ethernet_packet_init();
     nk_net_ethernet_agent_init();
@@ -608,11 +564,7 @@ threaded_init(void) {
     nk_net_ethernet_collective_init();
 #endif
 
-    INFO_PRINT("Initializing built-in modules...\n");
-    int num_failed_builtin_modules = nk_init_builtin_modules();
-    if(num_failed_builtin_modules > 0) {
-        ERROR_PRINT("Failed to initialize all built-in modules! (num_failed = %u)\n", num_failed_builtin_modules);
-    }
+    nk_handle_init_stage_driver();
     
 #ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE
     nk_vc_start_chardev_console(NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE_NAME);

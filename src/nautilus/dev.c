@@ -24,6 +24,7 @@
  */
 
 #include <nautilus/nautilus.h>
+#include <nautilus/init.h>
 #include <nautilus/spinlock.h>
 #include <nautilus/dev.h>
 #include <nautilus/thread.h>
@@ -48,11 +49,20 @@ static spinlock_t state_lock;
 
 static struct list_head dev_list;
 
+// This isn't really useful, just to demostrate -EINIT_DEFER,
+// by forcing other device frameworks to wait on nk_dev_init
+static int dev_init_status = 0;
 
-int nk_dev_init()
+int nk_dev_inited(void) {
+    return dev_init_status;
+}
+
+static int 
+nk_dev_init()
 {
     INIT_LIST_HEAD(&dev_list);
     spinlock_init(&state_lock);
+    dev_init_status = 1;
     INFO("devices inited\n");
     return 0;
 }
@@ -64,10 +74,12 @@ int nk_dev_deinit()
 	return -1;
     }
     spinlock_deinit(&state_lock);
+    dev_init_status = 0;
     INFO("device deinit\n");
     return 0;
 }
 
+nk_declare_init_stage_func(nk_dev_init, static, 10);
 
 struct nk_dev *nk_dev_register(char *name, nk_dev_type_t type, uint64_t flags, struct nk_dev_int *inter, void *state)
 {

@@ -23,6 +23,7 @@
 #define __NAUTILUS_MAIN__
 
 #include <nautilus/nautilus.h>
+#include <nautilus/init.h>
 #include <nautilus/arch.h>
 #include <nautilus/paging.h>
 #include <nautilus/barrier.h>
@@ -271,8 +272,6 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   printk_init();
 
-  printk(NAUT_WELCOME);
-
   naut->sys.bsp_id = hartid;
   naut->sys.dtb = (struct dtb_fdt_header *)fdt;
 
@@ -286,16 +285,12 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   // asm volatile ("wfi");
 
-  nk_dev_init();
-  nk_irq_dev_init();
-  nk_gpio_dev_init();
-  nk_char_dev_init();
-  nk_block_dev_init();
-  nk_net_dev_init();
-  nk_gpu_dev_init();
+  nk_handle_init_stage_static();
 
   // Setup the temporary boot-time allocator
   mm_boot_init(fdt);
+
+  nk_handle_init_stage_boot();
 
   // Enumate CPUs and initialize them
   arch_smp_early_init(naut);
@@ -385,11 +380,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   //nk_dump_all_irq();
 
-  printk("Initializing built-in modules...\n");
-  int num_failed_builtin_modules = nk_init_builtin_modules();
-  if(num_failed_builtin_modules > 0) {
-      ERROR_PRINT("Failed to initialize all built-in modules! (num_failed = %lu)\n", num_failed_builtin_modules);
-  }
+  nk_handle_init_stage_driver();
 
   nk_fs_init();
 

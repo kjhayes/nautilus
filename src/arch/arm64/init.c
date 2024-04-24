@@ -33,7 +33,7 @@
 #define __NAUTILUS_MAIN__
 
 #include<nautilus/nautilus.h>
-#include<nautilus/module.h>
+#include<nautilus/init.h>
 #include<nautilus/printk.h>
 #include<nautilus/naut_string.h>
 #include<nautilus/arch.h>
@@ -75,13 +75,6 @@
 #include<arch/arm64/paging.h>
 #include<arch/arm64/fpu.h>
 
-#ifdef NAUT_CONFIG_PL011_UART
-#include<dev/pl011.h>
-#endif
-#ifdef NAUT_CONFIG_DW_8250_UART
-#include<dev/8250/dw_8250.h>
-#endif
-
 #include<dev/pci.h>
 #ifdef NAUT_CONFIG_OF_PCI
 #include<dev/pci/of.h>
@@ -96,12 +89,6 @@
 #ifdef NAUT_CONFIG_VIRTIO_PCI
 #include<dev/virtio_pci.h>
 #endif
-#ifdef NAUT_CONFIG_E1000_PCI
-#include<dev/e1000_pci.h>
-#endif
-#ifdef NAUT_CONFIG_E1000E_PCI
-#include <dev/e1000e_pci.h>
-#endif
 
 #ifndef NAUT_CONFIG_DEBUG_PRINTS
 #undef DEBUG_PRINT
@@ -112,17 +99,6 @@
 #define INIT_DEBUG(fmt, args...) DEBUG_PRINT("init: " fmt, ##args)
 #define INIT_ERROR(fmt, args...) ERROR_PRINT("init: " fmt, ##args)
 #define INIT_WARN(fmt, args...) WARN_PRINT("init: " fmt, ##args)
-
-#define NAUT_WELCOME                                      \
-  "Welcome to                                         \n" \
-  "    _   __               __   _  __                \n" \
-  "   / | / /____ _ __  __ / /_ (_)/ /__  __ _____    \n" \
-  "  /  |/ // __ `// / / // __// // // / / // ___/    \n" \
-  " / /|  // /_/ // /_/ // /_ / // // /_/ /(__  )     \n" \
-  "/_/ |_/ \\__,_/ \\__,_/ \\__//_//_/ \\__,_//____/  \n" \
-  "+===============================================+  \n" \
-  " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
-  "+===============================================+  \n\n"
 
 void smp_ap_stack_switch(void *new_stack, void *new_base, void *survive);
 
@@ -415,37 +391,13 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   nautilus_info.sys.bsp_aff2 = mpidr_el1.aff2;
   nautilus_info.sys.bsp_aff3 = mpidr_el1.aff3;
 
-  // Initialize pre vc output
-#ifdef NAUT_CONFIG_PL011_UART_EARLY_OUTPUT
-  pl011_uart_pre_vc_init(dtb); 
-#endif
-#ifdef NAUT_CONFIG_DW_8250_UART_EARLY_OUTPUT
-  dw_8250_pre_vc_init(dtb);
-#endif
-
-  printk_init();
-
-  printk(NAUT_WELCOME);
+  nk_handle_init_stage_silent();
 
   printk("initializing in EL%u\n", arm64_get_current_el());
 
   per_cpu_sys_ctrl_reg_init();
 
-  psci_init((void*)dtb);
-
-  dump_io_map();
-
-  //INIT_PRINT("--- Device Tree ---\n");
-  //print_fdt((void*)dtb);
-
-  // Init devices
-  nk_dev_init();
-  nk_irq_dev_init();
-  nk_gpio_dev_init();
-  nk_char_dev_init();
-  nk_block_dev_init();
-  nk_net_dev_init();
-  nk_gpu_dev_init();
+  nk_handle_init_stage_static();
   
   // Setup the temporary boot-time allocator
   mm_boot_init(dtb);
@@ -465,11 +417,12 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
     panic("Could not get NUMA information!\n");
   }
 
-  mm_dump_page_map(); 
+  nk_handle_init_stage_boot();
 
-  // Start using the main kernel allocator (with fake atomics potentially)
   nk_kmem_init();
   mm_boot_kmem_init();
+
+  nk_handle_init_stage_kmem();
 
   // Do this early to speed up the boot process with data caches enabled
   // (Plus atomics might not work without cacheability because ARM is weird)
@@ -485,9 +438,6 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
     panic("Failed to start secondaries!\n");
   }
   
-  // Needs kmem to unflatten the device tree
-  INIT_PRINT("of_init(dtb=%p)\n", dtb);
-  of_init((void*)dtb);
   nk_gpio_init();
 
   nk_wait_queue_init();
@@ -509,9 +459,14 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
 
   nk_thread_name(get_cur_thread(), "init");
 
+  nk_handle_init_stage_sched();
+
+  nk_handle_init_stage_subsys();
+
 #ifdef NAUT_CONFIG_OF_PCI 
-  of_pci_init();
-  pci_dump_device_list();
+  if(!of_pci_init()) {
+    pci_dump_device_list();
+  }
 #endif
 
 #if defined(NAUT_CONFIG_GIC_VERSION_2) || defined(NAUT_CONFIG_GIC_VERSION_2M)
@@ -549,20 +504,6 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   virtio_pci_init(&nautilus_info);
   INIT_DEBUG("virtio pci inited!\n");
 #endif
-#ifdef NAUT_CONFIG_E1000_PCI
-  e1000_pci_init(&nautilus_info);
-  INIT_DEBUG("e1000 pci inited!\n");
-#endif
-#ifdef NAUT_CONFIG_E1000E_PCI
-  e1000e_pci_init(&nautilus_info);
-  INIT_DEBUG("e1000e pci inited!\n");
-#endif
-
-  INIT_PRINT("Intializing built-in modules...\n");
-  int num_failed_builtin_modules = nk_init_builtin_modules();
-  if(num_failed_builtin_modules > 0) {
-      INIT_ERROR("Failed to initialize all built-in modules! (num_failed = %u)\n", num_failed_builtin_modules);
-  }
 
   nk_fs_init();
   INIT_DEBUG("FS inited!\n");
@@ -589,13 +530,14 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   percpu_timer_init();
   arch_set_timer(arch_realtime_to_cycles(sched_cfg.aperiodic_quantum));
  
-  // Free device tree data structures
-  of_cleanup();
-   
   // Enable interrupts
   arch_enable_ints(); 
 
   INIT_PRINT("Interrupts are now enabled\n"); 
+
+  nk_handle_init_stage_driver();
+
+  nk_handle_init_stage_start();
 
 #ifdef NAUT_CONFIG_IPI_STRESS
   ipi_stress_init();
@@ -608,6 +550,7 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   nk_vc_start_chardev_console(chardev_name);
   INIT_DEBUG("chardev console inited!\n");
 #endif 
+
   /*
   const char ** script = {
     "threadtest",

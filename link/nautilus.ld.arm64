@@ -35,6 +35,9 @@ SECTIONS
       *(.gnu.linkconce.got*)
   }
 
+/* Needs to be RW */
+#include "init_stages.ld.inc"
+
   _rodataStart = .;
 #include "rodata_common.ld.inc"
   _rodataEnd = .;

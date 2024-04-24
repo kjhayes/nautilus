@@ -85,6 +85,9 @@ SECTIONS
         *(.gnu.linkconce.got*)
     }
 
+/* Needs to be RW */
+#include "init_stages.ld.inc"
+
 #include "rodata_common.ld.inc"
 
    .tdata  ALIGN(0x1000) : AT(ADDR(.alloc_impls)+SIZEOF(.alloc_impls))

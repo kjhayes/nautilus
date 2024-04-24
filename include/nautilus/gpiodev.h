@@ -79,9 +79,6 @@ struct nk_gpio_dev
   struct nk_dev dev;
 };
 
-int nk_gpio_dev_init(void);
-int nk_gpio_dev_deinit(void);
-
 struct nk_gpio_dev * nk_gpio_dev_register(char *name, uint64_t flags, struct nk_gpio_dev_int *inter, void *state);
 int nk_gpio_dev_unregister(struct nk_gpio_dev*);
 

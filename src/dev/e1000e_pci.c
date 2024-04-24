@@ -26,12 +26,12 @@
  */
 
 #include <nautilus/nautilus.h>
+#include <nautilus/init.h>
 #include <nautilus/netdev.h>
 #include <nautilus/cpu.h>
 #include <dev/pci.h>
 #include <nautilus/mm.h>              // malloc, free
-#include <dev/e1000e_pci.h>
-#include <nautilus/irq.h>             // interrupt register
+#include <nautilus/interrupt.h>             // interrupt register
 #include <nautilus/naut_string.h>     // memset, memcpy
 #include <nautilus/dev.h>             // NK_DEV_REQ_*
 #include <nautilus/timer.h>           // nk_sleep(ns);
@@ -1137,9 +1137,9 @@ static struct nk_net_dev_int ops = {
 };
 
 
-int e1000e_pci_init(struct naut_info * naut)
+static int e1000e_pci_init(void)
 {
-  struct pci_info *pci = naut->sys.pci;
+  struct pci_info *pci = nk_get_nautilus_info()->sys.pci;
   struct list_head *curbus, *curdev;
   uint16_t num = 0;
 
@@ -1182,7 +1182,7 @@ int e1000e_pci_init(struct naut_info * naut)
 
         // find out the bar for e1000e
         for (int i=0;i<6;i++) {
-          uint32_t bar = pci_cfg_readl(bus->num, pdev->num, 0, 0x10 + i*4);
+          uint32_t bar = pci_cfg_readl(pci,bus->num, pdev->num, 0, 0x10 + i*4);
           uint32_t size;
           DEBUG("bar %d: 0x%0x\n",i, bar);
           // go through until the last one, and get out of the loop
@@ -1201,10 +1201,10 @@ int e1000e_pci_init(struct naut_info * naut)
 
           // determine size
           // write all 1s, get back the size mask
-          pci_cfg_writel(bus->num, pdev->num, 0, 0x10 + i*4, 0xffffffff);
+          pci_cfg_writel(pci, bus->num, pdev->num, 0, 0x10 + i*4, 0xffffffff);
           // size mask comes back + info bits
           // write all ones and read back. if we get 00 (negative size), size = 4.
-          size = pci_cfg_readl(bus->num, pdev->num, 0, 0x10 + i*4);
+          size = pci_cfg_readl(pci, bus->num, pdev->num, 0, 0x10 + i*4);
 
           // mask all but size mask
           if (bar & 0x1) { // I/O
@@ -1217,7 +1217,7 @@ int e1000e_pci_init(struct naut_info * naut)
           size++;
 
           // now we have to put back the original bar
-          pci_cfg_writel(bus->num, pdev->num, 0, 0x10 + i*4, bar);
+          pci_cfg_writel(pci, bus->num, pdev->num, 0, 0x10 + i*4, bar);
 
           if (!size) { // size = 0 -> non-existent bar, skip to next one
             continue;
@@ -1247,7 +1247,7 @@ int e1000e_pci_init(struct naut_info * naut)
 
         uint16_t pci_cmd = E1000E_PCI_CMD_MEM_ACCESS_EN | E1000E_PCI_CMD_IO_ACCESS_EN | E1000E_PCI_CMD_LANRW_EN; // | E1000E_PCI_CMD_INT_DISABLE;
         DEBUG("init fn: new pci cmd: 0x%04x\n", pci_cmd);
-        pci_cfg_writew(bus->num,pdev->num,0,E1000E_PCI_CMD_OFFSET, pci_cmd);
+        pci_cfg_writew(pci, bus->num,pdev->num,0,E1000E_PCI_CMD_OFFSET, pci_cmd);
         DEBUG("init fn: pci_cmd 0x%04x expects 0x%04x\n",
               pci_cfg_readw(bus->num,pdev->num, 0, E1000E_PCI_CMD_OFFSET),
               pci_cmd);
@@ -1360,17 +1360,17 @@ int e1000e_pci_init(struct naut_info * naut)
 	    continue;
 	}
 
-	uint64_t num_irqs = pdev->msi.num_vectors_needed;
-	uint64_t base_irq = 0;
+	size_t num_irqs = pdev->msi.num_vectors_needed;
+	nk_irq_t base_irq = 0;
 
-	if (nk_msi_find_and_reserve_range(num_irqs, &base_irq)) {
+	if (nk_msi_find_range(num_irqs, &base_irq)) {
 	    ERROR("Cannot find %d interrupts for %s - skipping\n",num_irqs,state->name);
 	    continue;
 	}
 
 	DEBUG("%s vectors are %d..%d\n",state->name,base_irq,base_irq+num_irqs-1);
 
-	if (pci_dev_enable_msi(pdev, base_irq, num_irqs, 0)) {
+	if (pci_dev_enable_msi(pdev, base_irq, num_irqs)) {
 	    ERROR("Failed to enable MSI for device %s - skipping\n", state->name);
 	    continue;
 	}
@@ -1380,19 +1380,19 @@ int e1000e_pci_init(struct naut_info * naut)
 
 	for (i=base_irq;i<(base_irq+num_irqs);i++) {
 	    if (nk_irq_add_handler_dev(i, e1000e_irq_handler, state, (struct nk_dev*)state->netdev)) {
-		ERROR("Failed to register handler for IRQ %d on device %s - skipping\n",i,state->name);
-		failed=1;
-		break;
+		  ERROR("Failed to register handler for IRQ %d on device %s - skipping\n",i,state->name);
+		  failed=1;
+		  break;
 	    }
 	}
 
 	if (!failed) { 
 	    for (i=base_irq; i<(base_irq+num_irqs);i++) {
-		if (pci_dev_unmask_msi(pdev, i)) {
+		  if (pci_dev_unmask_msi(pdev, i)) {
 		    ERROR("Failed to unmask interrupt %d for device %s\n",i,state->name);
 		    failed = 1;
 		    break;
-		}
+		  }
 	    }
 	}
 
@@ -1445,10 +1445,12 @@ int e1000e_pci_init(struct naut_info * naut)
 
 }
 
-int e1000e_pci_deinit() {
+static int e1000e_pci_deinit() {
   INFO("deinited and leaking\n");
   return 0;
 }
+
+nk_decl_driver_init(e1000e_pci_init);
 
 //
 // DEBUGGING AND TIMING ROUTINES FOLLOW

@@ -96,10 +96,6 @@ int fdt_free_tree(struct dt_node *root);
 int fdt_unflatten_tree(void *fdt, struct dt_node **root);
 
 
-int of_init(void *fdt);
-// Frees the device tree data structure at the end of initialization
-int of_cleanup(void);
-
 // Returns the number of devices which matched but init_callback returned NULL
 int of_for_each_match(const struct of_dev_match *match, int(*callback)(struct nk_dev_info *info));
 int of_for_each_subnode_match(const struct of_dev_match *match, int(*callback)(struct nk_dev_info *info), struct nk_dev_info *root);

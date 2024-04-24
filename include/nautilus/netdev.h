@@ -61,9 +61,6 @@ struct nk_net_dev {
     struct nk_dev dev;
 };
 
-int nk_net_dev_init();
-int nk_net_dev_deinit();
-
 struct nk_net_dev * nk_net_dev_register(char *name, uint64_t flags, struct nk_net_dev_int *inter, void *state); 
 int                 nk_net_dev_unregister(struct nk_net_dev *);
 

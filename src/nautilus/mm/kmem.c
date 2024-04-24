@@ -37,6 +37,7 @@
 #include <nautilus/percpu.h>
 #include <nautilus/shell.h>
 #include <nautilus/atomic.h>
+#include <nautilus/errno.h>
 
 #include <dev/port_gpio.h>
 
@@ -384,6 +385,7 @@ nk_kmem_init (void)
     unsigned i = 0, j = 0;
     uint64_t total_mem=0;
     uint64_t total_phys_mem=0;
+    int res;
     
     kmem_private_start = boot_mm_get_cur_top();
 
@@ -400,7 +402,7 @@ nk_kmem_init (void)
             ent->mm_state = create_zone(ent);
             if (!ent->mm_state) {
                 panic("Could not create kmem zone for region %u in domain %u\n", j, i);
-                return -1;
+                return -ENOMEM;
             }
 	    total_phys_mem += ent->len;
             ++j;
@@ -422,7 +424,7 @@ nk_kmem_init (void)
             struct mem_reg_entry * newent = mm_boot_alloc(sizeof(struct mem_reg_entry));
             if (!newent) {
                 KMEM_ERROR("Could not allocate mem region entry\n");
-                return -1;
+                return -ENOMEM;
             }
             newent->mem = mem;
             KMEM_DEBUG("Adding region [%p] in domain %u to CPU %u's local region list\n",
@@ -441,7 +443,7 @@ nk_kmem_init (void)
                 struct mem_reg_entry * newent = mm_boot_alloc(sizeof(struct mem_reg_entry));
                 if (!newent) {
                     ERROR_PRINT("Could not allocate mem region entry\n");
-                    return -1;
+                    return -ENOMEM;
                 }
                 newent->mem = rem_reg;
                 list_add_tail(&newent->mem_ent, local_regions);
@@ -469,9 +471,10 @@ nk_kmem_init (void)
 
     KMEM_PRINT("Malloc configured to support a maximum of: 0x%lx bytes of physical memory\n", total_phys_mem);
 
-    if (block_hash_init(total_phys_mem)) { 
+    res = block_hash_init(total_phys_mem);
+    if(res) { 
       KMEM_ERROR("Failed to initialize block hash\n");
-      return -1;
+      return res;
     }
 
 
@@ -481,7 +484,6 @@ nk_kmem_init (void)
 
     return 0;
 }
-
 
 // A fake header representing the boot allocations
 static void     *boot_start;

@@ -22,6 +22,8 @@
  */
 
 #include <nautilus/nautilus.h>
+#include <nautilus/init.h>
+#include <nautilus/errno.h>
 #include <nautilus/dev.h>
 #include <nautilus/blkdev.h>
 #include <nautilus/shell.h>
@@ -44,18 +46,24 @@ static spinlock_t state_lock;
 
 #endif
 
-int nk_block_dev_init()
+static int 
+nk_block_dev_init()
 {
+    if(!nk_dev_inited()) {
+        return -EINIT_DEFER;
+    }
     INFO("init\n");
     return 0;
 }
 
-int nk_block_dev_deinit()
+static int 
+nk_block_dev_deinit()
 {
     INFO("deinit\n");
     return 0;
 }
 
+nk_declare_static_init(nk_block_dev_init);
 
 struct nk_block_dev * nk_block_dev_register(char *name, uint64_t flags, struct nk_block_dev_int *inter, void *state)
 {

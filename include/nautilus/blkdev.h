@@ -56,9 +56,6 @@ struct nk_block_dev {
     struct nk_dev dev;
 };
 
-int nk_block_dev_init();
-int nk_block_dev_deinit();
-
 struct nk_block_dev * nk_block_dev_register(char *name, uint64_t flags, struct nk_block_dev_int *inter, void *state); 
 int                   nk_block_dev_unregister(struct nk_block_dev *);
 

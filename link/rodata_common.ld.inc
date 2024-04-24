@@ -24,12 +24,6 @@
     __stop_shell_cmds = .;
   }
 
-  .modules ALIGN(0x1000) : {
-    __start_modules = .;
-    *(.module.*);
-    __stop_modules = .;
-  }
-
   .aspace_impls ALIGN(0x1000) : {
       __start_aspace_impls = .;
       *(.aspace_impls*);

@@ -33,9 +33,8 @@
 #include<nautilus/nautilus.h>
 #include<nautilus/naut_types.h>
 #include<nautilus/interrupt.h>
-#include<nautilus/module.h>
+#include<nautilus/init.h>
 #include<dev/8250/core.h>
-#include<dev/8250/pc_8250.h>
 
 #ifndef NAUT_CONFIG_DEBUG_PC_8250_UART
 #undef DEBUG_PRINT
@@ -80,7 +79,7 @@ static void pc_8250_early_putchar(char c)
   generic_8250_direct_putchar(&pre_vc_pc_8250, c);
 }
 
-int pc_8250_pre_vc_init(void)
+static int pc_8250_pre_vc_init(void)
 {
   memset(&pre_vc_pc_8250, 0, sizeof(struct uart_8250_port));
 
@@ -106,6 +105,8 @@ int pc_8250_pre_vc_init(void)
 
   return 0;
 }
+
+nk_decl_silent_init(pc_8250_pre_vc_init);
 
 #endif
 
@@ -219,10 +220,5 @@ int pc_8250_init(void)
   return num_failed;
 }
 
-struct nk_module pc_8250_uart_module = {
-    .name = "pc_8250",
-    .init = pc_8250_init,
-};
-
-nk_declare_module(pc_8250_uart_module);
+nk_decl_driver_init(pc_8250_init);
 

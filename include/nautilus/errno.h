@@ -23,6 +23,7 @@
 #ifndef __ERRNO_H__
 #define __ERRNO_H__
 
+// Visible from userspace (so useful for linux compat layer)
 #define EPERM        1  /* Operation not permitted */
 #define ENOENT       2  /* No such file or directory */
 #define ESRCH        3  /* No such process */
@@ -57,4 +58,9 @@
 #define EPIPE       32  /* Broken pipe */
 #define EDOM        33  /* Math argument out of domain of func */
 #define ERANGE      34  /* Math result not representable */
+
+// Kernel only (so we differ from linux)
+#define EINIT_DEFER    512 /* Similar to linux EPROBE_DEFER but from any init_stage, 
+                              (init function requests we try again later) */
+
 #endif

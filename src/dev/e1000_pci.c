@@ -26,16 +26,15 @@
  */
 
 #include <nautilus/nautilus.h>
+#include <nautilus/init.h>
 #include <nautilus/netdev.h>
 #include <nautilus/cpu.h>
 #include <dev/pci.h>
 #include <nautilus/mm.h>              // malloc, free
-#include <dev/e1000_pci.h>
-#include <nautilus/irq.h>             // interrupt register
+#include <nautilus/interrupt.h>             // interrupt register
 #include <nautilus/naut_string.h>     // memset, memcpy
 
-
-
+#include <arch/x64/irq.h>
 
 #ifndef NAUT_CONFIG_DEBUG_E1000_PCI
 #undef DEBUG_PRINT
@@ -752,9 +751,9 @@ int map_pci_irq_to_vec(struct pci_bus *bus, struct pci_dev *pdev)
     return IRQ_NUMBER;
 }
 
-int e1000_pci_init(struct naut_info * naut) 
+static int e1000_pci_init(void) 
 {
-  struct pci_info *pci = naut->sys.pci;
+  struct pci_info *pci = nk_get_nautilus_info()->sys.pci;
   struct list_head *curbus, *curdev;
   uint32_t num = 0;
 
@@ -799,7 +798,7 @@ int e1000_pci_init(struct naut_info * naut)
 
         // find out the bar for e1000
         for (int i=0;i<6;i++) {
-          uint32_t bar = pci_cfg_readl(bus->num, pdev->num, 0, 0x10 + i*4);
+          uint32_t bar = pci_cfg_readl(pci, bus->num, pdev->num, 0, 0x10 + i*4);
           uint32_t size;
           DEBUG("bar %d: 0x%0x\n",i, bar);
           // go through until the last one, and get out of the loop
@@ -818,10 +817,10 @@ int e1000_pci_init(struct naut_info * naut)
 
           // determine size
           // write all 1s, get back the size mask
-          pci_cfg_writel(bus->num, pdev->num, 0, 0x10 + i*4, 0xffffffff);
+          pci_cfg_writel(pci, bus->num, pdev->num, 0, 0x10 + i*4, 0xffffffff);
           // size mask comes back + info bits
           // write all ones and read back. if we get 00 (negative size), size = 4.
-          size = pci_cfg_readl(bus->num, pdev->num, 0, 0x10 + i*4);
+          size = pci_cfg_readl(pci, bus->num, pdev->num, 0, 0x10 + i*4);
 
           // mask all but size mask
           if (bar & 0x1) { // I/O
@@ -834,7 +833,7 @@ int e1000_pci_init(struct naut_info * naut)
           size++;
 
           // now we have to put back the original bar
-          pci_cfg_writel(bus->num, pdev->num, 0, 0x10 + i*4, bar);
+          pci_cfg_writel(pci, bus->num, pdev->num, 0, 0x10 + i*4, bar);
 
           if (!size) { // size = 0 -> non-existent bar, skip to next one
             continue;
@@ -859,7 +858,7 @@ int e1000_pci_init(struct naut_info * naut)
              state->ioport_start, state->ioport_end,
              state->mem_start, state->mem_end);
 
-        uint16_t old_cmd = pci_cfg_readw(bus->num,pdev->num,0,0x4);
+        uint16_t old_cmd = pci_cfg_readw(pci, bus->num,pdev->num,0,0x4);
         DEBUG("Old PCI CMD: 0x%04x\n",old_cmd);
 
         old_cmd |= 0x7;  // make sure bus master is enabled
@@ -867,9 +866,9 @@ int e1000_pci_init(struct naut_info * naut)
 
         DEBUG("New PCI CMD: 0x%04x\n",old_cmd);
 
-        pci_cfg_writew(bus->num,pdev->num,0,0x4,old_cmd);
+        pci_cfg_writew(pci, bus->num,pdev->num,0,0x4,old_cmd);
 
-        uint16_t stat = pci_cfg_readw(bus->num,pdev->num,0,0x6);
+        uint16_t stat = pci_cfg_readw(pci, bus->num,pdev->num,0,0x6);
         DEBUG("PCI STATUS: 0x%04x\n",stat);
 
         // read the status register at void ptr + offset
@@ -894,8 +893,9 @@ int e1000_pci_init(struct naut_info * naut)
         }
 
 	// register the interrupt handler
-	register_irq_handler(state->intr_vec, e1000_irq_handler, state);
-	nk_unmask_irq(state->intr_vec);
+    nk_irq_t irq = x86_vector_to_irq(state->intr_vec);
+	nk_irq_add_handler(irq, e1000_irq_handler, state);
+	nk_unmask_irq(irq);
 
 	// interrupt delay value = 0 -> does not delay
 	WRITE_MEM(state, E1000_TIDV_OFFSET, 0);
@@ -927,8 +927,11 @@ int e1000_pci_init(struct naut_info * naut)
   return 0;
 }
 
-int e1000_pci_deinit() 
+static int e1000_pci_deinit() 
 {
   INFO("deinited\n");
   return 0;
 }
+
+nk_decl_driver_init(e1000_pci_init);
+

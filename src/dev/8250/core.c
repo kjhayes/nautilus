@@ -410,30 +410,30 @@ int generic_8250_handle_irq(struct uart_8250_port *port, unsigned int iir)
 {
   switch(iir & 0xF) {
     case UART_8250_IIR_NONE:
-//      generic_8250_direct_putchar(port,'N');
+      generic_8250_direct_putchar(port,'N');
       break;
     case UART_8250_IIR_MSR_RESET:
-//      generic_8250_direct_putchar(port,'M');
+      generic_8250_direct_putchar(port,'M');
       (void)uart_8250_read_reg(port,UART_8250_MSR);
       break;
     case UART_8250_IIR_XMIT_REG_EMPTY:
-//      generic_8250_direct_putchar(port,'X');
+      generic_8250_direct_putchar(port,'X');
       uart_8250_kick_output(port);
       break;
     case UART_8250_IIR_RECV_TIMEOUT:
-//      generic_8250_direct_putchar(port,'T');
+      generic_8250_direct_putchar(port,'T');
       uart_8250_kick_input(port);
       break;
     case UART_8250_IIR_RECV_DATA_AVAIL:
-//      generic_8250_direct_putchar(port,'R');
+      generic_8250_direct_putchar(port,'R');
       uart_8250_kick_input(port);
       break;
     case UART_8250_IIR_LSR_RESET:
-//      generic_8250_direct_putchar(port,'L');
+      generic_8250_direct_putchar(port,'L');
       (void)uart_8250_read_reg(port,UART_8250_LSR);
       break;
     default:
-//      generic_8250_direct_putchar(port,'U');
+      generic_8250_direct_putchar(port,'U');
       break;
   }
 

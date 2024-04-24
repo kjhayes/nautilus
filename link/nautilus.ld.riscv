@@ -35,6 +35,9 @@ SECTIONS
     *(.data .data.*)
   }
 
+/* Needs to be RW */
+#include "init_stages.ld.inc"
+
 #include "rodata_common.ld.inc"
 
   _loadEnd = .;

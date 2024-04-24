@@ -74,8 +74,7 @@ struct nk_dev {
 // for a specific device type
 typedef enum {NK_DEV_REQ_BLOCKING, NK_DEV_REQ_NONBLOCKING, NK_DEV_REQ_CALLBACK} nk_dev_request_type_t;
 
-int nk_dev_init();
-int nk_dev_deinit();
+int nk_dev_inited(void);
 
 struct nk_dev *nk_dev_register(char *name, nk_dev_type_t type, uint64_t flags, struct nk_dev_int *inter, void *state);
 int nk_dev_register_pre_allocated(struct nk_dev *d, char *name, nk_dev_type_t type, uint64_t flags, struct nk_dev_int *inter, void *state);

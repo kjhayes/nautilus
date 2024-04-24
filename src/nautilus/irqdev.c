@@ -30,6 +30,8 @@
  */
 
 #include<nautilus/irqdev.h>
+#include<nautilus/init.h>
+#include<nautilus/errno.h>
 
 #ifndef NAUT_CONFIG_DEBUG_DEV
 #undef DEBUG_PRINT
@@ -40,14 +42,21 @@
 #define DEBUG(fmt, args...) DEBUG_PRINT("irqdev: " fmt, ##args)
 #define INFO(fmt, args...) INFO_PRINT("irqdev: " fmt, ##args)
 
-int nk_irq_dev_init(void) {
+static int
+nk_irq_dev_init(void) {
+  if(!nk_dev_inited()) {
+      return -EINIT_DEFER;
+  }
   INFO("init\n");
   return 0;
 }
+static
 int nk_irq_dev_deinit(void) {
   INFO("deinit\n");
   return 0;
 }
+
+nk_declare_static_init(nk_irq_dev_init);
 
 struct nk_irq_dev * nk_irq_dev_register(char *name, uint64_t flags, struct nk_irq_dev_int *interface, void *state) 
 {

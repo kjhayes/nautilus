@@ -24,15 +24,19 @@
  */
 
 #include <nautilus/nautilus.h>
+#include <nautilus/init.h>
 #include <nautilus/macros.h>
 #include <nautilus/cpu.h>
 #include <nautilus/dev.h>
 #include <nautilus/netdev.h>
-#include <nautilus/mtrr.h>
 #include <nautilus/math.h>
 #include <dev/pci.h>
 #include <dev/mlx3_ib.h>
-#include <nautilus/irq.h>
+#include <nautilus/interrupt.h>
+
+#ifdef NAUT_CONFIG_ARCH_X64
+#include <arch/x64/mtrr.h>
+#endif
 
 #ifndef NAUT_CONFIG_DEBUG_MLX3_PCI
 #undef DEBUG_PRINT
@@ -5503,8 +5507,8 @@ init_queue_offsets (struct mlx3_ib * mlx)
 }
 
 
-int 
-mlx3_init (struct naut_info * naut) 
+static int 
+mlx3_init (void) 
 {
     struct mlx3_init_hca_param init_hca;
     struct pci_dev * idev = NULL;
@@ -5721,4 +5725,6 @@ out_err:
     free(mlx);
     return -1;
 }
+
+nk_decl_driver_init(mlx3_init);
 

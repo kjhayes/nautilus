@@ -105,7 +105,6 @@ void nk_msg_queue_deinit()
     INFO("deinit\n");
 }
 
-
 struct nk_msg_queue *nk_msg_queue_create(char *name,
 					 uint64_t size,
 					 nk_msg_queue_type_t type,
