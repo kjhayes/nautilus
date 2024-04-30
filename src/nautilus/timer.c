@@ -356,12 +356,10 @@ uint64_t nk_timer_handler (void)
 {
     uint32_t my_cpu = my_cpu_id();
     // Why is this necessary for RISCV? -KJH
-#if defined(NAUT_CONFIG_ARCH_X86) || defined(NAUT_CONFIG_ARCH_ARM64)
-    if (my_cpu!=0) {
+    if (!per_cpu_get(is_bsp)) {
 	  DEBUG("update: cpu %d - ignored/infinity\n",my_cpu);
 	  return -1;  // infinitely far in the future
     }
-#endif
     ACTIVE_LOCK_CONF;
     nk_timer_t *cur, *temp;
     uint64_t now = nk_sched_get_realtime();
