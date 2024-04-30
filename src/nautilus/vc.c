@@ -27,6 +27,7 @@
  */
 
 #include <nautilus/nautilus.h>
+#include <nautilus/init.h>
 #include <nautilus/thread.h>
 #include <nautilus/timer.h>
 #include <nautilus/waitqueue.h>
@@ -1732,7 +1733,6 @@ static void chardev_console(void *in, void **out)
     snprintf(buf,80,"\r\n*** %s ***\r\n",c->cur_vc->name);
     char_dev_write_all(c->dev,strlen(buf),buf,NK_DEV_REQ_BLOCKING);
 
-
  top:
     cur = 0;
     while (atomic_add(c->shutdown,0) == 0) {
@@ -1936,7 +1936,7 @@ int nk_vc_stop_chardev_console(char *chardev)
 
 
 
-int nk_vc_init()
+int nk_vc_init(void)
 {
   INFO("init\n");
   spinlock_init(&state_lock);
@@ -2013,3 +2013,18 @@ int nk_vc_deinit()
 
   return 0;
 }
+
+nk_declare_subsys_init(nk_vc_init);
+
+#ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE
+
+static int launch_chardev_console(void) {
+  if(!nk_vc_is_active()) {
+      return -EINIT_DEFER;
+  }
+  return nk_vc_start_chardev_console(NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE_NAME);
+}
+nk_declare_launch_init(launch_chardev_console);
+
+#endif
+

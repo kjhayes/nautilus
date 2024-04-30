@@ -23,6 +23,7 @@
  */
 #include <nautilus/nautilus.h>
 #include <nautilus/shell.h>
+#include <nautilus/init.h>
 #include <nautilus/vc.h>
 
 #ifndef NAUT_CONFIG_DEBUG_SHELL
@@ -965,3 +966,14 @@ static struct shell_cmd_impl hist_impl = {
     .handler  = handle_hist,
 };
 nk_register_shell_cmd(hist_impl);
+
+static int launch_root_shell(void) {
+    nk_thread_id_t shell_id = nk_launch_shell("root-shell",0,0,0);
+    if(shell_id == 0) {
+        // Not sure what errno this should be -KJH
+        return 1;
+    }
+    return 0;
+}
+nk_declare_launch_init(launch_root_shell);
+
