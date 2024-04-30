@@ -140,6 +140,7 @@ test_fork_join(int nump, int numt)
 #ifdef NAUT_CONFIG_ARCH_RISCV
     return -1;
 #else
+
     nk_thread_id_t t;
     
     for (i=0;i<nump;i++) {
@@ -342,7 +343,7 @@ int test_threads()
 
 
 static int
-handle_threads (char * buf, void * priv)
+handle_thread_test (char * buf, void * priv)
 {
     test_threads();
     return 0;
@@ -351,7 +352,7 @@ handle_threads (char * buf, void * priv)
 static struct shell_cmd_impl threads_impl = {
     .cmd      = "threadtest",
     .help_str = "threadtest",
-    .handler  = handle_threads,
+    .handler  = handle_thread_test,
 };
 nk_register_shell_cmd(threads_impl);
 
