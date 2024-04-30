@@ -420,7 +420,7 @@ static int hwtls_config_kernel_tls(nk_thread_t *t)
  * @tid: opaque user object for the thread to be set (this is the output)
  * @bound_cpu: cpu on which to bind the thread. CPU_ANY means any CPU
  *
- * return: on error returns -EINVAL, returns 0 on success
+ * return: on error returns -EINVAL or -ENOMEM, returns 0 on success
  *
  */
 int
@@ -432,6 +432,7 @@ nk_thread_create (nk_thread_fun_t fun,
                   nk_thread_id_t * tid,
                   int bound_cpu)
 {
+    int err = -EINVAL;
     struct sys_info * sys = per_cpu_get(system);
     nk_thread_t * t = NULL;
     int placement_cpu = bound_cpu<0 ? nk_sched_initial_placement() : bound_cpu;
@@ -456,7 +457,7 @@ nk_thread_create (nk_thread_fun_t fun,
 
 	if (!t) {
 	    THREAD_ERROR("Could not allocate thread struct\n");
-	    return -EINVAL;
+	    return -ENOMEM;
 	}
 
 	memset(t, 0, sizeof(nk_thread_t));
@@ -502,9 +503,10 @@ nk_thread_create (nk_thread_fun_t fun,
 #endif
 
 #ifdef NAUT_CONFIG_ENABLE_SIGNALS
-    if (nk_signal_init_task_state(&t->signal_state, t)) {
+    err = nk_signal_init_task_state(&t->signal_state, t);
+    if(err) {
         THREAD_ERROR("Failed to initialize signal state :(\n");
-        return -1;
+        return err;
     }
 #endif
 
@@ -514,7 +516,8 @@ nk_thread_create (nk_thread_fun_t fun,
     t->output = 0;
 
     // scheduler will handle reanimated thread correctly
-    if (nk_sched_thread_post_create(t)) {
+    err = nk_sched_thread_post_create(t);
+    if(err) {
 	THREAD_ERROR("Scheduler does not accept thread creation\n");
 	goto out_err;
     }
@@ -550,7 +553,7 @@ out_err:
     free(t->stack);
     free(t);
 
-    return -EINVAL;
+    return err;
 }
 
 
@@ -581,14 +584,16 @@ nk_thread_start (nk_thread_fun_t fun,
                  nk_thread_id_t * tid,
                  int bound_cpu)
 {
+    int err;
     nk_thread_id_t newtid   = NULL;
     nk_thread_t * newthread = NULL;
 
     THREAD_DEBUG("Start thread, caller %p\n", __builtin_return_address(0));
 
-    if (nk_thread_create(fun, input, output, is_detached, stack_size, &newtid, bound_cpu) < 0) {
-        THREAD_ERROR("Could not create thread\n");
-        return -1;
+    err = nk_thread_create(fun, input, output, is_detached, stack_size, &newtid, bound_cpu) < 0;
+    if(err) {
+        THREAD_ERROR("Could not create thread, nk_thread_create returned %d\n", err);
+        return err;
     }
 
     newthread = (nk_thread_t*)newtid;
@@ -597,11 +602,17 @@ nk_thread_start (nk_thread_fun_t fun,
         *tid = newtid;
     }
 
-    return nk_thread_run(newthread);
+    err = nk_thread_run(newthread);
+    if(err) {
+        THREAD_ERROR("Failed to run thread, nk_thread_run returned %d\n", err);
+        return err;
+    }
+    return 0;
 }
 
 int nk_thread_run(nk_thread_id_t t)
 {
+  int err;
   nk_thread_t * newthread = (nk_thread_t*)t;
 
   THREAD_DEBUG("Trying to execute thread %p (tid %lu)\n", newthread,newthread->tid);
@@ -622,10 +633,11 @@ int nk_thread_run(nk_thread_id_t t)
 #endif
 
   THREAD_DEBUG("Making thread runnable\n");
-  if (nk_sched_make_runnable(newthread, newthread->current_cpu,1)) {
+  err = nk_sched_make_runnable(newthread, newthread->current_cpu,1);
+  if(err) {
       THREAD_ERROR("Scheduler failed to run thread (%p, tid=%u) on cpu %u\n",
 		  newthread, newthread->tid, newthread->current_cpu);
-      return -1;
+      return err;
   }
 
 #ifdef NAUT_CONFIG_DEBUG_THREADS

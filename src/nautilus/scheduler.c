@@ -51,6 +51,7 @@
 
 #include <nautilus/nautilus.h>
 #include <nautilus/arch.h>
+#include <nautilus/errno.h>
 #include <nautilus/thread.h>
 #include <nautilus/waitqueue.h>
 #include <nautilus/task.h>
@@ -765,33 +766,7 @@ void nk_sched_dump_time(int cpu_arg)
     }
 }
 
-void nk_sched_dump_threads(int cpu)
-{
-    GLOBAL_LOCK_CONF;
-    struct sys_info *sys = per_cpu_get(system);
-    struct apic_dev *apic = sys->cpus[my_cpu_id()]->apic;
-
-    GLOBAL_LOCK();
-
-    rt_list_map(global_sched_state.thread_list,print_thread,(void*)(long)cpu);
-
-    GLOBAL_UNLOCK();
-}
-
 #elif defined(NAUT_CONFIG_ARCH_ARM64) || defined(NAUT_CONFIG_ARCH_RISCV)
-
-void nk_sched_dump_threads(int cpu) {
-
-    GLOBAL_LOCK_CONF;
-    struct sys_info *sys = per_cpu_get(system);
-
-    GLOBAL_LOCK();
-
-    rt_list_map(global_sched_state.thread_list,print_thread,(void*)(long)cpu);
-
-    GLOBAL_UNLOCK();
-}
-
 void nk_sched_dump_cores(int cpu) {}
 void nk_sched_dump_time(int cpu) {}
 /*
@@ -804,6 +779,17 @@ void nk_sched_dump_time(int cpu) {}
 */
 
 #endif /* NAUT_CONFIG_ARCH_X86 */
+
+void nk_sched_dump_threads(int cpu)
+{
+    GLOBAL_LOCK_CONF;
+    GLOBAL_LOCK();
+
+    rt_list_map(global_sched_state.thread_list,print_thread,(void*)(long)cpu);
+
+    GLOBAL_UNLOCK();
+}
+
 
 void nk_sched_map_threads(int cpu, void (func)(struct nk_thread *t, void *state), void *state)
 {
@@ -1080,6 +1066,7 @@ void nk_sched_reap(int uncond)
 	return;
     }
 
+    DEBUG("[nk_sched_reap] Trying to grab reaping lock on CPU %u...\n", my_cpu_id());
     if (!atomic_bool_cmpswap(global_sched_state.reaping,0,1)) {
 	// reaping pass is already in progress elsewhere
 	// we will wait for it to  inish.  In this way, our caller
@@ -1091,6 +1078,7 @@ void nk_sched_reap(int uncond)
 	DEBUG("%sconditional reap - previous reap now complete, ignoring this reap\n", uncond ? "un" : "");
 	return;
     }
+    DEBUG("[nk_sched_reap] Acquired reaping lock on CPU %u!\n", my_cpu_id());
 
     DEBUG("Reap begins (%lu threads)\n", global_sched_state.num_threads);
 
@@ -1124,6 +1112,7 @@ void nk_sched_reap(int uncond)
     DEBUG("%sconditional reap ends (%lu threads)\n", uncond ? "un" : "", global_sched_state.num_threads);
     
     // done with reaping - another core can now go
+    DEBUG("[nk_sched_reap] Releasing reaping lock on CPU %u!\n", my_cpu_id());
     atomic_and(global_sched_state.reaping,0);
 }
 
@@ -1151,8 +1140,11 @@ struct nk_thread *nk_sched_reanimate(nk_stack_size_t min_stack_size,
 
     // We are currently overloaded with reaping, so we will wait until
     // we are the sole "reaper"
+    DEBUG("[nk_sched_reanimate] Trying to grab reaping lock on CPU %u...\n", my_cpu_id());
     while (!atomic_bool_cmpswap(global_sched_state.reaping,0,1)) {
-    }
+    } 
+    DEBUG("[nk_sched_reanimate] Acquired reaping lock on CPU %u!\n", my_cpu_id());
+
     DEBUG("Reanimation search begins (%lu threads)\n", global_sched_state.num_threads);
 
     GLOBAL_LOCK();
@@ -1168,10 +1160,12 @@ struct nk_thread *nk_sched_reanimate(nk_stack_size_t min_stack_size,
 	     !cur->thread->thread->refcount &&
 	     cur->thread->thread->stack_size >= min_stack_size &&
 	     (placement_cpu<0 || cur->thread->thread->placement_cpu==placement_cpu))) {
-	
-	//DEBUG("Skipping thread %p (%lu) \"%s\"\n", cur->thread->thread, cur->thread->thread->tid,
-	//      cur->thread->thread->is_idle ? "*idle*" ::q!
-	//      cur->thread->thread->name[0] ? cur->thread->thread->name : "(no name)");
+
+        /*
+	DEBUG("Skipping thread %p (%lu) \"%s\"\n", cur->thread->thread, cur->thread->thread->tid,
+	      cur->thread->thread->is_idle ? "*idle*" :
+	      cur->thread->thread->name[0] ? cur->thread->thread->name : "(no name)");
+          */
 	cur=cur->next;
 	count++;
     }
@@ -1188,11 +1182,15 @@ struct nk_thread *nk_sched_reanimate(nk_stack_size_t min_stack_size,
 	DEBUG("Examined %lu threads without finding a matching one\n", count);
     }
     
+    // done with "reaping" - another core can now go
+    DEBUG("[nk_sched_reap] Releasing reaping lock on CPU %u!\n", my_cpu_id());
+    atomic_and(global_sched_state.reaping,0);
+   
+    // Release the global lock after the reaping lock,
+    // we don't want to swap to another thread before
+    // giving up the "reaping" lock
     GLOBAL_UNLOCK();
 
-    // done with "reaping" - another core can now go
-    atomic_and(global_sched_state.reaping,0);
-    
     if (rt) {
 	DEBUG("Reanimation successful - returning thread %p (sched state %p name \"%s\")\n", rt->thread, rt, rt->thread->name);
 	return rt->thread;
@@ -1299,7 +1297,10 @@ int nk_sched_thread_post_create(nk_thread_t * t)
     
     if (!n) {
     	ERROR("Failed to allocate rt_node in post create\n");
-    	return 0;
+        // This was returning 0 before?
+        // That seems wrong to me.
+        // -KJH
+    	return -ENOMEM;
     }
     
     // now we can safely acquire the lock and put the new thread
@@ -1308,11 +1309,11 @@ int nk_sched_thread_post_create(nk_thread_t * t)
     GLOBAL_LOCK();
 
     if (global_sched_state.num_threads >= MAX_QUEUE) {
-	DEBUG("Scheduler vetos thread creation as there are %lu active threads in system\n", global_sched_state.num_threads);
-	DEBUG("You can increase the maximum of %lu active threads using NAUT_CONFIG_MAX_THREADS\n", NAUT_CONFIG_MAX_THREADS);
+	ERROR("Scheduler vetos thread creation as there are %lu active threads in system\n", global_sched_state.num_threads);
+	ERROR("You can increase the maximum of %lu active threads using NAUT_CONFIG_MAX_THREADS\n", NAUT_CONFIG_MAX_THREADS);
 	GLOBAL_UNLOCK();
 	rt_node_deinit(n);
-	return -1;
+	return -EINVAL;
     }
     
     // this enqueue avoids any malloc and thus no reap should be
@@ -1320,7 +1321,7 @@ int nk_sched_thread_post_create(nk_thread_t * t)
     if (_rt_list_enqueue(global_sched_state.thread_list, t->sched_state, n)) {
 	ERROR("Failed to add new thread to global thread list\n");
 	GLOBAL_UNLOCK();
-	return -1;
+	return -EINVAL;
     }
     global_sched_state.num_threads++;
 
