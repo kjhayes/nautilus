@@ -38,7 +38,7 @@
 
 #define IRQ_ERROR(fmt, args...) ERROR_PRINT("[IRQ] " fmt, ##args)
 #define IRQ_DEBUG(fmt, args...) DEBUG_PRINT("[IRQ] " fmt, ##args)
-#define IRQ_PRINT(fmt, args...) printk("[IRQ] " fmt, ##args)
+#define IRQ_PRINT(fmt, args...) INFO_PRINT("[IRQ] " fmt, ##args)
 
 // Gives us MAX_IRQ_NUM
 #include<nautilus/arch.h>
@@ -756,7 +756,7 @@ int nk_dump_irq(nk_irq_t i)
     return -1;
   }
 
-  IRQ_PRINT("%u: triggered count = %u, num_actions = %u, irqdev = %s, hwirq = %u "
+  printk("%u: triggered count = %u, num_actions = %u, irqdev = %s, hwirq = %u "
       "%s%s%s%s\n",
       desc->irq,
       desc->triggered_count,
@@ -792,7 +792,7 @@ int nk_dump_irq(nk_irq_t i)
         name = percpu_dev->dev.name;
       }
 
-      IRQ_PRINT("\tCPU[%u]: dev=\"%s\" %s%s%s\n", 
+      printk("\tCPU[%u]: dev=\"%s\" %s%s%s\n", 
           cpuid, 
           name,
           status & IRQ_STATUS_ENABLED ? "[ENABLED] " : "[DISABLED] ",
@@ -810,7 +810,7 @@ int nk_dump_irq(nk_irq_t i)
       status = desc->devless_status;
     }
 
-    IRQ_PRINT("\t%s%s%s\n",
+    printk("\t%s%s%s\n",
       status & IRQ_STATUS_ENABLED ? "[ENABLED] " : "[DISABLED] ",
       status & IRQ_STATUS_PENDING ? "[PENDING] " : "",
       status & IRQ_STATUS_ACTIVE ? "[ACTIVE] " : ""
@@ -820,7 +820,7 @@ int nk_dump_irq(nk_irq_t i)
   struct nk_irq_action *action = &desc->action;
   for(int act_num = 0; (act_num < desc->num_actions) && (action != NULL); act_num++, action = action->next) 
   {
-    IRQ_PRINT("\tAction %u: type = %s, device = %s %s\n",
+    printk("\tAction %u: type = %s, device = %s %s\n",
       	act_num,
       	action->type == NK_IRQ_ACTION_TYPE_HANDLER ? "HANDLER" : 
       	action->type == NK_IRQ_ACTION_TYPE_LINK    ? "LINK" :
@@ -830,16 +830,16 @@ int nk_dump_irq(nk_irq_t i)
               );
     switch(action->type) {
       case NK_IRQ_ACTION_TYPE_HANDLER:
-        IRQ_PRINT("\t\t{handler = %p, state = %p}\n",
+        printk("\t\t{handler = %p, state = %p}\n",
             action->handler,
             action->handler_state
             );
         break;
       case NK_IRQ_ACTION_TYPE_LINK:
-        IRQ_PRINT("\t\t{link = %u}\n", action->link_irq);
+        printk("\t\t{link = %u}\n", action->link_irq);
         break;
       default:
-        IRQ_PRINT("\t\t{INVALID ACTION TYPE}\n");
+        printk("\t\t{INVALID ACTION TYPE}\n");
         break;
     }
   }    
@@ -848,7 +848,7 @@ int nk_dump_irq(nk_irq_t i)
 }
 
 int nk_dump_all_irq(void) {
-  IRQ_PRINT("--- Interrupt Descriptors: (total = %u) ---\n", nk_max_irq()+1);
+  printk("--- Interrupt Descriptors: (total = %u) ---\n", nk_max_irq()+1);
   int res = 0;
   for(nk_irq_t i = 0; i < nk_max_irq()+1; i++) 
   {
