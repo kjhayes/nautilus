@@ -35,6 +35,7 @@
 #include<nautilus/interrupt.h>
 #include<nautilus/irqdev.h>
 #include<nautilus/chardev.h>
+#include<nautilus/errno.h>
 
 #ifdef NAUT_CONFIG_HAS_PORT_IO
 #include<nautilus/arch.h>
@@ -147,10 +148,7 @@ int uart_8250_interrupt_handler(struct nk_irq_action *action, struct nk_regs *re
   } while(((iir & 0x1) != 1) && res == 0);
 
   if(res != 0) {
-      // Shouldn't print from an interrupt handler,
-      // but this shouldn't ever occur, so we want to see the error
-      // (even if it means deadlock)
-      ERROR("uart_8250_handle_irq returned a non-zero exit code! (res = %d)\n", res);
+      //ERROR("uart_8250_handle_irq returned a non-zero exit code! (res = %d)\n", res);
       return res;
   }
   
@@ -347,18 +345,14 @@ int uart_8250_kick_output(struct uart_8250_port *port)
 	      // chip is full, stop sending to it
 	      // but since we have more data, have it
 	      // interrupt us when it has room
-	      uint8_t ier = uart_8250_read_reg(port,UART_8250_IER);
-	      ier |= 0x2;
-	      uart_8250_write_reg(port,UART_8250_IER,ier);
+          generic_8250_enable_xmit_interrupts(port);
 	      goto out;
 	  }
     }
     
     // the chip has room, but we have no data for it, so
     // disable the transmit interrupt for now
-    uint8_t ier = uart_8250_read_reg(port,UART_8250_IER);
-    ier &= ~0x2;
-    uart_8250_write_reg(port,UART_8250_IER,ier);
+    generic_8250_disable_xmit_interrupts(port);
 
  out:
     if (count>0) { 
@@ -410,30 +404,30 @@ int generic_8250_handle_irq(struct uart_8250_port *port, unsigned int iir)
 {
   switch(iir & 0xF) {
     case UART_8250_IIR_NONE:
-      generic_8250_direct_putchar(port,'N');
+//generic_8250_direct_putchar(port,'N');
       break;
     case UART_8250_IIR_MSR_RESET:
-      generic_8250_direct_putchar(port,'M');
+//generic_8250_direct_putchar(port,'M');
       (void)uart_8250_read_reg(port,UART_8250_MSR);
       break;
     case UART_8250_IIR_XMIT_REG_EMPTY:
-      generic_8250_direct_putchar(port,'X');
+//generic_8250_direct_putchar(port,'X');
       uart_8250_kick_output(port);
       break;
     case UART_8250_IIR_RECV_TIMEOUT:
-      generic_8250_direct_putchar(port,'T');
+//generic_8250_direct_putchar(port,'T');
       uart_8250_kick_input(port);
       break;
     case UART_8250_IIR_RECV_DATA_AVAIL:
-      generic_8250_direct_putchar(port,'R');
+//generic_8250_direct_putchar(port,'R');
       uart_8250_kick_input(port);
       break;
     case UART_8250_IIR_LSR_RESET:
-      generic_8250_direct_putchar(port,'L');
+//generic_8250_direct_putchar(port,'L');
       (void)uart_8250_read_reg(port,UART_8250_LSR);
       break;
     default:
-      generic_8250_direct_putchar(port,'U');
+//generic_8250_direct_putchar(port,'U');
       break;
   }
 
@@ -478,26 +472,29 @@ void generic_8250_direct_putchar(struct uart_8250_port *port, uint8_t c)
 int generic_8250_enable_fifos(struct uart_8250_port *port) 
 {
   unsigned int fcr = uart_8250_read_reg(port,UART_8250_FCR);
-
-  uart_8250_write_reg(port,UART_8250_FCR,
-      UART_8250_FCR_ENABLE_FIFO|
-      UART_8250_FCR_ENABLE_64BYTE_FIFO|
-      UART_8250_FCR_64BYTE_TRIGGER_LEVEL_56BYTE);
-
   unsigned int iir = uart_8250_read_reg(port,UART_8250_IIR);
+
+  if(iir & UART_8250_IIR_64BYTE_FIFO_ENABLED) { 
+    uart_8250_write_reg(port,UART_8250_FCR,
+        UART_8250_FCR_ENABLE_FIFO|
+        UART_8250_FCR_ENABLE_64BYTE_FIFO|
+        UART_8250_FCR_64BYTE_TRIGGER_LEVEL_56BYTE);
+  } else {
+    uart_8250_write_reg(port,UART_8250_FCR,
+        UART_8250_FCR_ENABLE_FIFO|
+        UART_8250_FCR_TRIGGER_LEVEL_14BYTE);
+  }
+
+  iir = uart_8250_read_reg(port,UART_8250_IIR);
   unsigned int fifo_mask = iir & UART_8250_IIR_FIFO_MASK;
 
   switch(fifo_mask) {
     case UART_8250_IIR_FIFO_ENABLED:
-      if(iir & UART_8250_IIR_64BYTE_FIFO_ENABLED) {
-        return 0;
-      } else {
-        return 0;
-      }
+      return 0;
     default:
     case UART_8250_IIR_FIFO_NON_FUNC:
     case UART_8250_IIR_FIFO_NONE:
-      return -1;
+      return -ENXIO;
   }
 }
 int generic_8250_disable_fifos(struct uart_8250_port *port) 
@@ -518,7 +515,33 @@ int generic_8250_clear_fifos(struct uart_8250_port *port)
 int generic_8250_enable_recv_interrupts(struct uart_8250_port *port) 
 {
   unsigned int ier = uart_8250_read_reg(port, UART_8250_IER);
-  ier |= UART_8250_IER_RECV_DATA_AVAIL | UART_8250_IER_RECV_LINE_STATUS;
+  ier |= UART_8250_IER_RECV_DATA_AVAIL 
+      | UART_8250_IER_RECV_LINE_STATUS;
+  uart_8250_write_reg(port, UART_8250_IER, ier);
+  return 0;
+}
+
+int generic_8250_disable_recv_interrupts(struct uart_8250_port *port) 
+{
+  unsigned int ier = uart_8250_read_reg(port, UART_8250_IER);
+  ier &= (~UART_8250_IER_RECV_DATA_AVAIL 
+       & ~UART_8250_IER_RECV_LINE_STATUS);
+  uart_8250_write_reg(port, UART_8250_IER, ier);
+  return 0;
+}
+
+int generic_8250_enable_xmit_interrupts(struct uart_8250_port *port) 
+{
+  unsigned int ier = uart_8250_read_reg(port, UART_8250_IER);
+  ier |= UART_8250_IER_XMIT_REG_EMPTY; 
+  uart_8250_write_reg(port, UART_8250_IER, ier);
+  return 0;
+}
+
+int generic_8250_disable_xmit_interrupts(struct uart_8250_port *port) 
+{
+  unsigned int ier = uart_8250_read_reg(port, UART_8250_IER);
+  ier &= ~UART_8250_IER_XMIT_REG_EMPTY;
   uart_8250_write_reg(port, UART_8250_IER, ier);
   return 0;
 }
@@ -576,11 +599,15 @@ int generic_8250_char_dev_write(void *state, uint8_t *src)
     wc = 0;
   } else {
     uart_8250_output_buffer_push(uart, *src);
-    uart_8250_kick_output(uart);
     wc = 1;
   }
 
   spin_unlock_irq_restore(&uart->output_lock, flags);
+
+  if(wc > 0) {
+    uart_8250_kick_output(uart);
+  }
+
   return wc;
 }
 

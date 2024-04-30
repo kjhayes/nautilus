@@ -106,7 +106,7 @@ static int pc_8250_pre_vc_init(void)
   return 0;
 }
 
-nk_decl_silent_init(pc_8250_pre_vc_init);
+nk_declare_silent_init(pc_8250_pre_vc_init);
 
 #endif
 
@@ -211,7 +211,9 @@ int pc_8250_init(void)
       DEBUG("Added IRQ handler for COM Port %u to nk_irq_t %u\n", i + 1, com_ports[i]->irq);
     }
 
-    generic_8250_enable_fifos(com_ports[i]);
+    if(generic_8250_enable_fifos(com_ports[i])) {
+      WARN("Failed to enable FIFO's!\n");
+    }
     generic_8250_enable_recv_interrupts(com_ports[i]);
 
     nk_unmask_irq(com_ports[i]->irq);
@@ -220,5 +222,5 @@ int pc_8250_init(void)
   return num_failed;
 }
 
-nk_decl_driver_init(pc_8250_init);
+nk_declare_driver_init(pc_8250_init);
 

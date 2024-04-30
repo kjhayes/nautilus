@@ -59,31 +59,33 @@
 struct dw_8250 
 {
   struct uart_8250_port port;
-  unsigned int last_lcr;
+  uint32_t last_lcr;
 };
 
 static int dw_8250_handle_irq(struct uart_8250_port *uart, unsigned int iir)
 {
   unsigned int iir_reason = iir & 0xF;
 
-  if(iir_reason == UART_8250_IIR_RECV_TIMEOUT) {
-    if(uart_8250_recv_empty(uart)) {
-      // Timeout with empty recv buffer,
-      // This is a possible error state for the DW UART,
-      // do a read of RBR to fix it
-      (void)uart_8250_read_reg(uart,UART_8250_RBR);
-    }
+  if(iir_reason == UART_8250_IIR_RECV_TIMEOUT 
+     && uart_8250_recv_empty(uart)) 
+  {
+    // Timeout with empty recv buffer,
+    // This is a possible error state for the DW UART,
+    // do a read of RBR to fix it
+//    generic_8250_direct_putchar(uart, 'E');
+    (void)uart_8250_read_reg(uart,UART_8250_RBR);
+    return 0;
   }
   else if(iir_reason == DW_8250_IIR_BUSY) {
     // Design ware specific interrupt
     // Rewrite LCR and read the USR reg to make it go away 
+//    generic_8250_direct_putchar(uart, 'B');
     uart_8250_write_reg(uart,UART_8250_LCR,((struct dw_8250*)uart)->last_lcr);
     (void)uart_8250_read_reg(uart,DW_8250_USR);
+    return 0;
   } else {
     return generic_8250_handle_irq(uart,iir);
   }
-
-  return 0;
 }
 
 static void dw_8250_write_reg8(struct uart_8250_port *uart, int offset, unsigned int val) 
@@ -157,7 +159,14 @@ static struct dw_8250 pre_vc_dw_8250;
 static int pre_vc_dw_8250_dtb_offset = -1;
 
 static void dw_8250_early_putchar(char c) {
-  generic_8250_direct_putchar(&pre_vc_dw_8250.port, c);
+  int written = 0;
+  do{
+	  uint8_t ls =  uart_8250_read_reg(&pre_vc_dw_8250.port,UART_8250_LSR);
+	  if (ls & 0x20) {	
+        generic_8250_direct_putchar(&pre_vc_dw_8250.port, c);
+        break;
+      }
+  } while(1);
 }
 
 static int dw_8250_pre_vc_init(void) 
@@ -315,6 +324,8 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
   // Set up UART
   generic_8250_disable_fifos(&dw->port);
   generic_8250_clear_fifos(&dw->port);
+  generic_8250_disable_recv_interrupts(&dw->port);
+  generic_8250_disable_xmit_interrupts(&dw->port);
 
   uart_port_set_baud_rate(&dw->port.port, 115200);
   uart_port_set_word_length(&dw->port.port, 8);
@@ -325,7 +336,9 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
     ERROR("Failed to add IRQ handler for DW UART!\n");
   }
 
-  generic_8250_enable_fifos(&dw->port);
+  if(generic_8250_enable_fifos(&dw->port)) {
+      WARN("Failed to enable FIFO's!\n");
+  } 
   generic_8250_enable_recv_interrupts(&dw->port);
 
   nk_dev_info_set_device(info, (struct nk_dev*)dev);

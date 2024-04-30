@@ -78,6 +78,7 @@
 #define UART_8250_FCR_TRIGGER_LEVEL_4BYTE  0b01000000
 #define UART_8250_FCR_TRIGGER_LEVEL_8BYTE  0b10000000
 #define UART_8250_FCR_TRIGGER_LEVEL_14BYTE 0b11000000
+#define UART_8250_FCR_64BYTE_TRIGGER_LEVEL_1BYTE  0b00000000
 #define UART_8250_FCR_64BYTE_TRIGGER_LEVEL_16BYTE 0b01000000
 #define UART_8250_FCR_64BYTE_TRIGGER_LEVEL_32BYTE 0b10000000
 #define UART_8250_FCR_64BYTE_TRIGGER_LEVEL_56BYTE 0b11000000
@@ -254,6 +255,9 @@ int generic_8250_enable_fifos(struct uart_8250_port *);
 int generic_8250_disable_fifos(struct uart_8250_port *);
 int generic_8250_clear_fifos(struct uart_8250_port *);
 int generic_8250_enable_recv_interrupts(struct uart_8250_port *);
+int generic_8250_disable_recv_interrupts(struct uart_8250_port *);
+int generic_8250_enable_xmit_interrupts(struct uart_8250_port *);
+int generic_8250_disable_xmit_interrupts(struct uart_8250_port *);
 
 /*
  * generic nk_char_dev_int ops 
