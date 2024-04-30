@@ -112,7 +112,7 @@ static inline nk_wait_queue_entry_t *nk_wait_queue_alloc_entry(nk_wait_queue_t *
 
 static inline void nk_wait_queue_free_entry(nk_wait_queue_t *q, nk_wait_queue_entry_t *e)
 {
-  void *null = NULL;
+  struct nk_thread *null = NULL;
   atomic_store(e->thread,null);
 }
 
