@@ -12,7 +12,7 @@ qemu: $(QEMU_DEPS)
 	$(QEMU) $(QEMU_FLAGS)
 qemu-gdb: $(QEMU_DEPS)
 	$(call quiet-cmd,QEMU,)
-	$(QEMU) $(QEMU_FLAGS) -gdb tcp::1234 -S -d int -no-reboot -no-shutdown
+	$(QEMU) $(QEMU_FLAGS) -gdb tcp::1234 -S -no-reboot -no-shutdown
 qemu-gdb-%: $(QEMU_DEPS)
 	$(call quiet-cmd,QEMU,)
 	$(QEMU) $(QEMU_FLAGS) -gdb tcp::$* -S
