@@ -23,6 +23,8 @@ typedef int(*nk_init_func_t)(void);
 #define nk_declare_sched_init(FUNC)   nk_declare_init_stage_func(FUNC, sched, 10)
 #define nk_declare_subsys_init(FUNC) nk_declare_init_stage_func(FUNC, subsys, 10)
 #define nk_declare_driver_init(FUNC) nk_declare_init_stage_func(FUNC, driver, 10)
+#define nk_declare_fs_init(FUNC) nk_declare_init_stage_func(FUNC, fs, 10)
+#define nk_declare_launch_init(FUNC) nk_declare_init_stage_func(FUNC, launch, 10)
 
 #define X(STAGE)\
 int nk_handle_init_stage_##STAGE(void);

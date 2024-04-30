@@ -120,11 +120,7 @@
 #ifdef NAUT_CONFIG_PARALLEL_PORT_GPIO
 #include <dev/port_gpio.h>
 #endif
-#ifdef NAUT_CONFIG_PC_8250_UART
-#include<dev/8250/pc_8250.h>
-#else
 #include <dev/serial.h>
-#endif
 #include <dev/vga.h>
 #ifdef NAUT_CONFIG_VIRTIO_PCI
 #include <dev/virtio_pci.h>
@@ -331,8 +327,6 @@ boot_stack_init (unsigned long mbd,
     setup_idt();
 
 #ifdef NAUT_CONFIG_PC_8250_UART
-#ifdef NAUT_CONFIG_PC_8250_UART_EARLY_OUTPUT
-#endif
 #else
     // Bring serial device up early so we can have output
     serial_early_init();
@@ -483,6 +477,8 @@ threaded_init(void) {
 
     smp_bringup_aps(naut);
 
+    nk_handle_init_stage_subsys();
+
 #ifdef NAUT_CONFIG_ASPACE_CARAT
     // carat requires global initialization
     // because the compiler-transformed kernel
@@ -530,8 +526,6 @@ threaded_init(void) {
     nk_gdt_init();
 #endif
     
-    nk_vc_init();
-   
     arch_enable_ints();
     
     //nk_dump_all_irq();
@@ -566,23 +560,7 @@ threaded_init(void) {
 
     nk_handle_init_stage_driver();
     
-#ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE
-    nk_vc_start_chardev_console(NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE_NAME);
-#endif
- 
-    nk_fs_init();
-
-#ifdef NAUT_CONFIG_EXT2_FILESYSTEM_DRIVER
-#ifdef NAUT_CONFIG_RAMDISK_EMBED
-    nk_fs_ext2_attach("ramdisk0","rootfs", 0);
-#endif
-#endif
-
-#ifdef NAUT_CONFIG_FAT32_FILESYSTEM_DRIVER
-#ifdef NAUT_CONFIG_RAMDISK_EMBED
-    nk_fs_fat32_attach("ramdisk0","rootfs", 0);
-#endif
-#endif
+    nk_handle_init_stage_fs();
 
     nk_linker_init(naut);
     nk_prog_init(naut);
@@ -612,8 +590,7 @@ threaded_init(void) {
     init_syscall_table();
 #endif
  
-    // nk_launch_shell("root-shell",0,script,0);
-    nk_launch_shell("root-shell",0,0,0);
+    nk_handle_init_stage_launch();
 
     runtime_init();
 

@@ -300,9 +300,6 @@ extern void* _bssEnd[];
 extern void* _bssStart[];
 
 
-// The stack switch which happens halfway through "init" makes this needed
-static const char *chardev_name = NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE_NAME;
-
 //#define ROCKCHIP
 
 static int rockchip_io_mapped = 0;
@@ -419,6 +416,7 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
 
   nk_handle_init_stage_boot();
 
+  // Can't go in a "boot" init function because it disables the boot allocator
   nk_kmem_init();
   mm_boot_kmem_init();
 
@@ -505,9 +503,6 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   INIT_DEBUG("virtio pci inited!\n");
 #endif
 
-  nk_fs_init();
-  INIT_DEBUG("FS inited!\n");
-
   global_timer_init();
 
   // Let the secondary processors into their second phase
@@ -537,29 +532,13 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
 
   nk_handle_init_stage_driver();
 
-  nk_handle_init_stage_start();
+  nk_handle_init_stage_fs();
 
 #ifdef NAUT_CONFIG_IPI_STRESS
   ipi_stress_init();
 #endif
 
-  INIT_DEBUG("Starting the virtual console...\n");
-  nk_vc_init();
-
-#ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE
-  nk_vc_start_chardev_console(chardev_name);
-  INIT_DEBUG("chardev console inited!\n");
-#endif 
-
-  /*
-  const char ** script = {
-    "threadtest",
-    "\0",
-    0
-  };
-  */
-  //nk_launch_shell("root-shell",0,script,0);
-  nk_launch_shell("root-shell",0,0,0);
+  nk_handle_init_stage_launch();
 
   INIT_PRINT("Promoting init thread to idle\n");
 

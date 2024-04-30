@@ -28,6 +28,7 @@
 #include <nautilus/testfs.h>
 #include <nautilus/shell.h>
 #include <nautilus/blkdev.h>
+#include <nautilus/init.h>
 
 #define INFO(fmt, args...)  INFO_PRINT("fs: " fmt, ##args)
 #define DEBUG(fmt, args...) DEBUG_PRINT("fs: " fmt, ##args)
@@ -198,6 +199,8 @@ int nk_fs_init(void)
     INFO("inited\n");
     return 0;
 }
+
+nk_declare_subsys_init(nk_fs_init);
 
 int nk_deinit_fs(void) 
 {

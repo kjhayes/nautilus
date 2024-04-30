@@ -1345,6 +1345,20 @@ int nk_fs_ext2_detach(char *fsname)
     }
 }
 
+#ifdef NAUT_CONFIG_EXT2_FILESYSTEM_DRIVER
+#ifdef NAUT_CONFIG_RAMDISK_EMBED
+
+#include<nautilus/init.h>
+
+static int attach_ramdisk_ext2(void) {
+    nk_fs_ext2_attach("ramdisk0", "rootfs", 0);
+    return 0;
+}
+nk_declare_fs_init(attach_ramdisk_ext2);
+
+#endif
+#endif
+
 /*
 size_t ext2_get_size(uint8_t *fs, int inum) {
 	struct ext2_inode *inode = get_inode(fs, inum);	

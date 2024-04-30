@@ -19,9 +19,9 @@
     X(kmem)\
     X(sched)\
     X(subsys)\
-    X(fs)\
     X(driver)\
-    X(start)\
+    X(fs)\
+    X(launch)\
 
 /*
  * silent -> no printk
@@ -30,9 +30,9 @@
  * kmem -> kmem allocator
  * sched -> threads and scheduling are enabled from here on
  * subsys -> kernel subsystems (pci, cxx support, instrumentation)
- * fs -> filesystem initialization
  * driver -> specific device drivers
- * start -> launch threads, mount filesystems, etc.
+ * fs -> filesystem initialization
+ * launch -> launch threads, mount filesystems, etc.
  */
 
 #endif

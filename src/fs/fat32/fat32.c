@@ -763,3 +763,18 @@ int nk_fs_fat32_detach(char *fsname)
         return nk_fs_unregister(fs);
     }
 }
+
+#ifdef NAUT_CONFIG_FAT32_FILESYSTEM_DRIVER
+#ifdef NAUT_CONFIG_RAMDISK_EMBED
+
+#include <nautilus/init.h>
+
+static int attach_ramdisk_fat32(void) {
+    nk_fs_fat32_attach("ramdisk0","rootfs", 0);
+    return 0;
+}
+nk_declare_fs_init(attach_ramdisk_fat32);
+
+#endif
+#endif
+
