@@ -21,10 +21,6 @@ struct sifive_serial
   struct sifive_serial_regs *regs;
 };
 
-#ifdef NAUT_CONFIG_SIFIVE_SERIAL_EARLY_OUTPUT
-int sifive_serial_pre_vc_init(void *fdt);
-#endif
-
 void sifive_serial_init(unsigned long fdt);
 
 void sifive_serial_write(const char *b);

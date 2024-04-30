@@ -79,17 +79,11 @@
 #include <dev/sifive_gpio.h>
 #endif
 
-#ifdef NAUT_CONFIG_OF_8250_UART
-#include <dev/8250/of_8250.h>
-#endif
-
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/trap.h>
 #include <arch/riscv/riscv_idt.h>
 #include <arch/riscv/npb.h>
 #include <arch/riscv/hlic.h>
-
-#include <dev/sifive_serial.h>
 
 #define QUANTUM_IN_NS (1000000000ULL / NAUT_CONFIG_HZ)
 
@@ -238,7 +232,7 @@ __attribute__((noinline)) int do_some_work(int x) {
 #ifdef NAUT_CONFIG_BEANDIP
 __attribute__((annotate("nohook"))) 
 #endif
-void init(unsigned long hartid, unsigned long fdt) {
+void * boot_stack_init(unsigned long hartid, unsigned long fdt) {
 
   if (!fdt) panic("Invalid FDT: %p\n", fdt);
 
@@ -259,21 +253,10 @@ void init(unsigned long hartid, unsigned long fdt) {
   struct naut_info *naut = &nautilus_info;
   nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
-#ifdef NAUT_CONFIG_SIFIVE_SERIAL_EARLY_OUTPUT
-  if(sifive_serial_pre_vc_init((void*)fdt)) {
-    // Nothing we can do
-  }
-#endif
-#ifdef NAUT_CONFIG_OF_8250_UART_EARLY_OUTPUT
-  if(of_8250_pre_vc_init((void*)fdt)) {
-    // Nothing we can do
-  }
-#endif
-
-  printk_init();
-
   naut->sys.bsp_id = hartid;
   naut->sys.dtb = (struct dtb_fdt_header *)fdt;
+
+  nk_handle_init_stage_silent();
 
   /*
   printk("RISCV: hart %d mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
@@ -311,11 +294,7 @@ void init(unsigned long hartid, unsigned long fdt) {
    * allocated in the boot mem allocator are kept reserved */
   mm_boot_kmem_init();
 
-  // KJH - Not sure what this is
-  //riscv_setup_idt();
-  
-  // We now have serial output without SBI
-  //sifive_serial_init(fdt);
+  nk_handle_init_stage_kmem();
 
 #ifdef NAUT_CONFIG_SIFIVE_GPIO
   sifive_gpio_init(fdt);
@@ -326,9 +305,6 @@ void init(unsigned long hartid, unsigned long fdt) {
   //sbi_init();
 
   sysinfo_init(&(naut->sys));
-
-  printk("of_init(dtb=%p)\n");
-  of_init((void*)fdt);
 
   nk_gpio_init();
 
@@ -343,10 +319,17 @@ void init(unsigned long hartid, unsigned long fdt) {
   nk_group_sched_init();
 
   /* we now switch away from the boot-time stack */
-  naut = smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, naut);
+  return get_cur_thread()->rsp;
+}
+
+void threaded_init(void) {
+
   nk_thread_name(get_cur_thread(), "init");
 
   printk("Swapped stacks\n");
+
+  struct naut_info *naut = nk_get_nautilus_info();
+  unsigned long hartid = per_cpu_get(hartid);
 
   /* mm_boot_kmem_cleanup(); */
 
@@ -378,12 +361,15 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   nk_sched_start();
 
-  //nk_dump_all_irq();
+  nk_handle_init_stage_sched();
+
+  nk_handle_init_stage_subsys();
 
   nk_handle_init_stage_driver();
 
-  nk_fs_init();
+  nk_handle_init_stage_fs();
 
+  nk_dump_all_irq();
   // // nk_linker_init(naut);
   // // nk_prog_init(naut);
 
@@ -400,36 +386,13 @@ void init(unsigned long hartid, unsigned long fdt) {
   // // sifive_test();
   // /* my_monitor_entry(); */
 
-//  nk_launch_shell("root-shell",0,0,0);
-  //execute_threading(NULL);
-
-  // printk("%d\n", 5.0 / 0);
-  
-  printk("Nautilus boot thread yielding (indefinitely)\n");
-
 #ifdef NAUT_CONFIG_BEANDIP
   nk_time_hook_start();
 #endif
 
   printk("Current CPU: %d\n", my_cpu_id());
 
-  printk("Starting the virtual console...\n");
-  nk_vc_init();
-
-#ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE
-  nk_vc_start_chardev_console(chardev_name);
-  printk("chardev console inited!\n");
-#endif 
-
-  /*
-  const char ** script = {
-    "interrupts",
-    "\0",
-    0
-  };
-  */
-  //nk_launch_shell("root-shell",0,script,0);
-  nk_launch_shell("root-shell",0,0,0);
+  nk_handle_init_stage_launch();
 
   printk("Promoting init thread to idle\n");
 

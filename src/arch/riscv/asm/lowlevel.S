@@ -87,16 +87,25 @@ GLOBAL(nautilus_entry)
     or      t0, t0, SIE_SSIE
     csrs    sie, t0
 
-    la      t0, main_ptr
-    REG_L   t0, 0(t0)
+    ld t0, boot_stack_init_ptr
+    jalr t0
 
-    jr      t0
+    mv fp, a0            // set our new frame pointer
+    mv sp, a0            // switch stacks
+
+    ld t0, threaded_init_ptr
+    jalr t0
+
+    // We should never get here
+    j .
+
+.balign 8
+boot_stack_init_ptr: .quad boot_stack_init
+.balign 8
+threaded_init_ptr: .quad threaded_init
 
 .balign 8
 boot_stack_start_ptr: .quad boot_stack_start
-
-.balign 8
-main_ptr: .quad main
 
 .balign 8
 bss_start_ptr: .quad _bssStart
@@ -157,7 +166,7 @@ GLOBAL(kernel_vec)
     beq t0, a0, after_switch
 
     # We need to do a thread switch
-    call nk_thread_switch
+    call nk_thread_switch_intr_entry
 
 after_switch:
     REG_L t0, ROFF(0, sp)

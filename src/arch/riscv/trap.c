@@ -78,6 +78,8 @@ int riscv_set_root_irq_dev(struct nk_irq_dev *dev) {
 /* Supervisor Trap Function */
 void * kernel_trap(struct nk_regs *regs, struct trap_regs *tregs) {
 
+  nk_get_cpu(my_cpu_id())->interrupt_nesting_level += 1;
+
   // if it was an interrupt, the top bit it set.
   int interrupt = (tregs->cause >> 63);
   // the type of trap is the rest of the bits.
@@ -149,5 +151,6 @@ void * kernel_trap(struct nk_regs *regs, struct trap_regs *tregs) {
     thread = nk_sched_need_resched();
   }
 
+  nk_get_cpu(my_cpu_id())->interrupt_nesting_level -= 1;
   return thread;
 }

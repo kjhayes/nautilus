@@ -78,8 +78,10 @@ int sifive_serial_fdt_init(const void *fdt, int offset, struct sifive_serial *si
     return 0;
 }
 
-int sifive_serial_pre_vc_init(void *fdt) 
+int sifive_serial_pre_vc_init(void) 
 {
+  void *fdt = nk_get_nautilus_info()->sys.dtb;
+
   memset(&pre_vc_sifive, 0, sizeof(struct sifive_serial));
   int offset = fdt_node_offset_by_compatible((void*)fdt, offset, "sifive,uart0");
 
@@ -99,6 +101,9 @@ int sifive_serial_pre_vc_init(void *fdt)
 
   return nk_pre_vc_register(pre_vc_sifive_putchar, NULL);
 }
+
+nk_declare_silent_init(sifive_serial_pre_vc_init);
+
 #endif
 
 static struct sifive_serial_regs * regs;

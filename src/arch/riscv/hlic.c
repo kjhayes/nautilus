@@ -34,6 +34,7 @@
 #include <nautilus/naut_types.h>
 #include <nautilus/endian.h>
 #include <nautilus/of/dt.h>
+#include <nautilus/errno.h>
 
 #include <arch/riscv/trap.h>
 #include <arch/riscv/sbi.h>
@@ -190,15 +191,15 @@ static int hlic_dev_send_ipi(void *state, nk_hwirq_t hwirq, cpu_id_t cpu) {
     if(ret) {
         // Implementation specific error codes from sbi call
         switch(ret) {
-            case -1: HLIC_INFO("FAILED\n"); break;
-            case -2: HLIC_INFO("NOT_SUPPORTED\n"); break;
-            case -3: HLIC_INFO("INVALID_PARAM\n"); break;
-            case -4: HLIC_INFO("DENIED\n"); break;
-            case -5: HLIC_INFO("INVALID_ADDRESS\n"); break;
-            case -6: HLIC_INFO("ALREADY_AVAILABLE\n"); break;
-            case -7: HLIC_INFO("ALREADY_STARTED\n"); break;
-            case -8: HLIC_INFO("ALREADY_STOPPED\n"); break;
-            default: HLIC_INFO("N/A\n"); break;
+            case -1: HLIC_INFO("HLIC Failed to send IPI (Reason: FAILED)\n"); break;
+            case -2: HLIC_INFO("HLIC Failed to send IPI (Reason: NOT_SUPPORTED)\n"); break;
+            case -3: HLIC_INFO("HLIC Failed to send IPI (Reason: INVALID_PARAM)\n"); break;
+            case -4: HLIC_INFO("HLIC Failed to send IPI (Reason: DENIED)\n"); break;
+            case -5: HLIC_INFO("HLIC Failed to send IPI (Reason: INVALID_ADDRESS)\n"); break;
+            case -6: HLIC_INFO("HLIC Failed to send IPI (Reason: ALREADY_AVAILABLE)\n"); break;
+            case -7: HLIC_INFO("HLIC Failed to send IPI (Reason: ALREADY_STARTED)\n"); break;
+            case -8: HLIC_INFO("HLIC Failed to send IPI (Reason: ALREADY_STOPPED)\n"); break;
+            default: HLIC_INFO("HLIC Failed to send IPI (Reason: N/A)\n"); break;
         }
         return IRQ_IPI_ERROR_UNKNOWN;
     }
@@ -262,10 +263,16 @@ static int hlic_init_dev_info(struct nk_dev_info *info)
 {
   if(info->type != NK_DEV_INFO_OF) {
     HLIC_ERROR("Currently only support device tree initialization!\n");
-    return -1;
+    return -EINVAL;
   }
 
-  return nk_dev_info_set_device(info, hlic_init_dev_info_dev_ptr);
+  int err = nk_dev_info_set_device(info, hlic_init_dev_info_dev_ptr);
+  if(err) {
+      HLIC_ERROR("Failed to associate the HLIC with it's device tree node!\n");
+      return err;
+  }
+
+  return 0;
 }
 
 static const char * hlic_properties_names[] = {
@@ -307,6 +314,7 @@ int hlic_percpu_init(void) {
 
 int hlic_init(void) 
 { 
+  int err = -EINVAL;
   int did_alloc = 0;
   int did_register = 0;
 
@@ -316,6 +324,7 @@ int hlic_init(void)
   if(hlic == NULL) 
   {
     HLIC_ERROR("Failed to allocate HLIC struct!\n");
+    err = -ENOMEM;
     goto err_exit;
   }
   did_alloc = 1;
@@ -326,12 +335,14 @@ int hlic_init(void)
 
   if(dev == NULL) {
     HLIC_ERROR("Failed to register IRQ device!\n");
+    err = -EINVAL;
     goto err_exit;
   } else {
     did_register = 1;
   }
 
-  if(nk_request_irq_range(HLIC_NUM_IRQ, &hlic->irq_base)) {
+  err = nk_request_irq_range(HLIC_NUM_IRQ, &hlic->irq_base);
+  if(err) {
     HLIC_ERROR("Failed to get IRQ numbers for interrupts!\n");
     goto err_exit;
   }
@@ -339,18 +350,21 @@ int hlic_init(void)
   hlic->irq_descs = nk_alloc_irq_descs(HLIC_NUM_IRQ, HLIC_BASE_HWIRQ, NK_IRQ_DESC_FLAG_PERCPU, dev);
   if(hlic->irq_descs == NULL) {
     HLIC_ERROR("Failed to allocate IRQ descriptors!\n");
+    err = -ENOMEM;
     goto err_exit;
   }
 
   // Mark the Supervisor Software Interrupt Descriptor as an IPI
   hlic->irq_descs[1].flags |= NK_IRQ_DESC_FLAG_IPI;
 
-  if(nk_assign_irq_descs(HLIC_NUM_IRQ, hlic->irq_base, hlic->irq_descs)) {
+  err = nk_assign_irq_descs(HLIC_NUM_IRQ, hlic->irq_base, hlic->irq_descs);
+  if(err) {
     HLIC_ERROR("Failed to assign IRQ descriptors for interrupts!\n");
     goto err_exit;
   }
 
-  if(riscv_set_root_irq_dev(dev)) {
+  err = riscv_set_root_irq_dev(dev);
+  if(err) {
     HLIC_ERROR("Failed to set the HLIC as the root IRQ device!\n");
     goto err_exit;
   }
@@ -359,7 +373,8 @@ int hlic_init(void)
 
   hlic_init_dev_info_dev_ptr = (struct nk_dev*)dev;
 
-  if(of_for_each_match(&hlic_of_dev_match, hlic_init_dev_info)) {
+  err = of_for_each_match(&hlic_of_dev_match, hlic_init_dev_info);
+  if(err) {
     HLIC_ERROR("Failed to assign HLIC to all device tree entries!\n");
     goto err_exit;
   }
@@ -367,7 +382,8 @@ int hlic_init(void)
   // Set up the timer interrupt
   if(CLINT(hlic)) {
     hlic->clint_timer_irq = NK_NULL_IRQ;
-    if(hlic_dev_revmap(hlic, 5, &hlic->clint_timer_irq)) {
+    err = hlic_dev_revmap(hlic, 5, &hlic->clint_timer_irq);
+    if(err) {
       HLIC_ERROR("Could not revmap the riscv timer IRQ!\n");
       goto err_exit;
     }
@@ -377,9 +393,11 @@ int hlic_init(void)
         0,&timer_ops,0);
     if(timer_dev == NULL) {
       HLIC_ERROR("Failed to register timer dev!\n");
+      err = -EINVAL;
       goto err_exit;
     }
-    if(nk_irq_add_handler_dev(hlic->clint_timer_irq, arch_timer_handler, NULL, (struct nk_dev*)timer_dev)) {
+    err = nk_irq_add_handler_dev(hlic->clint_timer_irq, arch_timer_handler, NULL, (struct nk_dev*)timer_dev);
+    if(err) {
       HLIC_ERROR("Failed to set arch timer handler!\n");
       goto err_exit;
     }
@@ -399,7 +417,7 @@ err_exit:
   if(did_register) {
     nk_irq_dev_unregister(dev);
   }
-  return -1;
+  return -EINVAL;
 }
 
 

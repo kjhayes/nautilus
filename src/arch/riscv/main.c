@@ -24,9 +24,3 @@
 
 #include <arch/riscv/init.h>
 
-void
-main (unsigned long hartid,
-      unsigned long fdt)
-{
-    init(hartid, fdt);
-}
