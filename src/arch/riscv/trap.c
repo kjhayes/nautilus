@@ -24,15 +24,20 @@ void trap_init(void) { write_csr(stvec,(uint64_t)kernel_vec); }
 static void print_regs(struct nk_regs *r) {
   int i = 0;
 
-  if(r_tp() == NULL) {
+  if((void*)r_tp() == NULL) {
     printk("Occurred before percpu system is active!\n");
   }
   else {
     printk("CPU = %u\n", my_cpu_id());
-    printk("Current Thread=0x%x (%p) \"%s\"\n",
-      get_cur_thread() ? get_cur_thread()->tid : -1,
-      get_cur_thread() ? (void*)get_cur_thread() :  NULL,
-      !get_cur_thread() ? "NONE" : get_cur_thread()->is_idle ? "*idle*" : get_cur_thread()->name);
+    struct nk_thread *thread = get_cur_thread();
+    printk("Current Thread=0x%x (%p) \"%s\" (stack condition: %s)\n",
+      thread ? thread->tid : -1,
+      thread ? (void*)thread :  NULL,
+      !thread ? "NONE" : thread->is_idle ? "*idle*" : thread->name,
+      !thread ? "UNKNOWN" : 
+      r->sp > (uintptr_t)thread->stack ? "UNDERRUN" :
+      r->sp < (uintptr_t)thread->stack - thread->stack_size ? "OVERRUN" :
+      "INBOUNDS");
   }
 
   //printk("[-------------- Register Contents --------------]\n");
@@ -56,12 +61,13 @@ static void print_regs(struct nk_regs *r) {
 
 static void kernel_unhandled_trap(struct nk_regs *regs, struct trap_regs *tregs, const char *type) 
 {
-  printk("===========================================================================================\n");
-  printk("+++ Unhandled Trap: %s +++\n", type);
-  printk("SEPC:   %016lx CAUSE:   %016lx TVAL: %016lx\n", tregs->sepc, tregs->cause, tregs->tval);
-  printk("STATUS: %016lx SCRATCH: %016lx BADADDR: %016lx\n", tregs->status, tregs->sscratch, tregs->badaddr);
+  cpu_id_t cpuid = my_cpu_id();
+  printk("(%u)===========================================================================================\n", cpuid);
+  printk("(%u)+++ Unhandled Trap: %s +++\n", cpuid, type);
+  printk("(%u)SEPC:   %016lx CAUSE:   %016lx TVAL: %016lx\n", cpuid, tregs->sepc, tregs->cause, tregs->tval);
+  printk("(%u)STATUS: %016lx SCRATCH: %016lx BADADDR: %016lx\n", cpuid, tregs->status, tregs->sscratch, tregs->badaddr);
   print_regs(regs);
-  printk("===========================================================================================\n");
+  printk("(%u)===========================================================================================\n", cpuid);
   panic("Halting hart!\n");
 }
 

@@ -123,15 +123,16 @@ int arch_numa_init(struct sys_info *sys) {
 
 void arch_print_regs(struct nk_regs * r) {
 
-    printk("RA:  %016lx SP:  %016lx\n", r->ra, r->sp);
+    cpu_id_t cpuid = my_cpu_id();
+    printk("(%u) RA:  %016lx SP:  %016lx\n", cpuid, r->ra, r->sp);
     //printk("GP:  %016lx TP:  %016lx\n", r->gp, r->tp);
-    printk("A00: %016lx A01: %016lx A02: %016lx\n", r->a0, r->a1, r->a2);
-    printk("A03: %016lx A04: %016lx A05: %016lx\n", r->a3, r->a4, r->a5);
-    printk("A06: %016lx A07: %016lx\n", r->a6, r->a7);
-    printk("T00: %016lx T01: %016lx T02: %016lx\n", r->t0, r->t1, r->t2);
-    printk("T03: %016lx T04: %016lx T05: %016lx\n", r->t4, r->t5, r->t6);
-    printk("T06: %016lx T07: %016lx\n", r->t6, r->t7);
-    printk("ZERO: %016lx\n", r->__zero);
+    printk("(%u) A00: %016lx A01: %016lx A02: %016lx\n", cpuid, r->a0, r->a1, r->a2);
+    printk("(%u) A03: %016lx A04: %016lx A05: %016lx\n", cpuid, r->a3, r->a4, r->a5);
+    printk("(%u) A06: %016lx A07: %016lx\n", cpuid, r->a6, r->a7);
+    printk("(%u) T00: %016lx T01: %016lx T02: %016lx\n", cpuid, r->t0, r->t1, r->t2);
+    printk("(%u) T03: %016lx T04: %016lx T05: %016lx\n", cpuid, r->t4, r->t5, r->t6);
+    printk("(%u) T06: %016lx T07: %016lx\n", cpuid, r->t6, r->t7);
+    printk("(%u) ZERO: %016lx\n", cpuid, r->__zero);
 }
 
 void * arch_read_sp(void) {
