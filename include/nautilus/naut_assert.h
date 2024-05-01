@@ -43,10 +43,24 @@ do {                            \
        ;                        \
     }                           \
 } while (0)
+
+
+#define ASSERT_ALIGNED(ptr)\
+    do {\
+        if(((uintptr_t)(void*)(ptr) % (uintptr_t)(void*)__alignof__(typeof(*ptr))) != 0) {\
+            panic("Failed alignment assertion in %s: pointer \"%s\" at %s, line %d, RA=%lx\n"\
+                  "(%s = %p, alignof(%s) = %u)\n",\
+                    __func__, #ptr, __FILE__, __LINE__,\
+                    (ulong_t) __builtin_return_address(0),\
+                    #ptr, ptr, #ptr, __alignof__(typeof(*ptr))\
+                    );\
+            while(1);\
+        }\
+    } while(0)
 #else 
 #define ASSERT(cond)
+#define ASSERT_ALIGNED(ptr)
 #endif
-
 #ifdef __cplusplus
 }
 #endif

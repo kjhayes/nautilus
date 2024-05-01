@@ -57,6 +57,8 @@ static struct list_head wq_list;
 nk_wait_queue_t *nk_wait_queue_create(char *name)
 {
     nk_wait_queue_t *q = malloc(sizeof(*q));
+    ASSERT_ALIGNED(q);
+
     if (q) {
 	STATE_LOCK_CONF;
 	memset(q,0,sizeof(*q));

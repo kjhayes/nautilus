@@ -191,10 +191,14 @@ _nk_thread_init (nk_thread_t * t,
 
     if (!t->waitq) {
 	t->waitq = nk_wait_queue_create(0);
+
 	if (!t->waitq) {
 	    THREAD_ERROR("Could not create thread's wait queue\n");
 	    return -EINVAL;
 	}
+
+    ASSERT_ALIGNED(t->waitq);
+
     }
 
     // update the wait queue name given the current thread id
