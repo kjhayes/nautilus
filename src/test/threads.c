@@ -65,6 +65,7 @@ do {									\
 #define NUM_PASSES 10
 #define NUM_THREADS 512
 #define DEPTH 8
+#define TEST_THREAD_STACK_SIZE 0x4000
 
 struct test_arg {
     int pass;
@@ -105,7 +106,7 @@ static int test_create_join(int nump, int numt)
 				arg,
 				0,
 				0,
-				PAGE_SIZE_4KB,
+				TEST_THREAD_STACK_SIZE,
 				NULL,
 				(int)-1);
             if(res) { 

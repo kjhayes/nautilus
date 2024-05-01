@@ -56,6 +56,9 @@
 #define VC_HEIGHT 1000
 #endif
 
+#define CHARDEV_CONSOLE_STACK_SIZE 0x4000
+#define VC_LIST_STACK_SIZE 0x4000
+
 #ifdef NAUT_CONFIG_ARCH_X86
 #define INTERRUPT __attribute__((target("no-sse")))
 #else
@@ -1514,7 +1517,7 @@ static int start_list()
                       0,
                       0,
                       1,
-                      PAGE_SIZE_4KB,
+                      VC_LIST_STACK_SIZE,
                       &list_tid,
 #if defined(NAUT_CONFIG_ARCH_RISCV) || defined(NAUT_CONFIG_ARCH_ARM64)
                       my_cpu_id()
@@ -1875,7 +1878,7 @@ int nk_vc_start_chardev_console(const char *chardev)
     // make sure everyone sees this is zeroed...
     atomic_and(c->inited,0);
 
-    if (nk_thread_start(chardev_console, c, 0, 1, PAGE_SIZE_4KB, &c->tid, 0)) {
+    if (nk_thread_start(chardev_console, c, 0, 1, CHARDEV_CONSOLE_STACK_SIZE, &c->tid, 0)) {
 	ERROR("Failed to launch chardev console handler for %s\n",c->name);
 	free(c);
 	return -1;
