@@ -593,54 +593,63 @@ static void print_thread(rt_thread *r, void *priv)
 
     if (cpu==t->current_cpu || cpu<0) { 
 
-	nk_vc_printf("%llut %lur %dc%s %s %s %s %llus %lluc %llur %llud %llue", 
-		     t->tid, 
-		     t->refcount,
-		     t->current_cpu,
-		     t->bound_cpu>=0 ? "b" : "",
+#define PREFIX "    "
+
+	printk("%s id=%llu %sCPU(%d)\n", 
 		     t->is_idle ? "(idle)" : t->name[0]==0 ? "(noname)" : t->name,
-		     t->status==NK_THR_INIT ? "ini" :
-		     t->status==NK_THR_RUNNING ? "RUN" :
-		     t->status==NK_THR_WAITING ? "wai" :
-		     t->status==NK_THR_SUSPENDED ? "sus" :
-		     t->status==NK_THR_EXITED ? "exi" : "UNK",
-		     r->status==ARRIVED ? "arr" :
-		     r->status==ADMITTED ? "adm" :
-		     r->status==CHANGING ? "cha" :
-		     r->status==YIELDING ? "yie" :
-		     r->status==EXITING ? "exi" :
-		     r->status==SLEEPING ? "sle" :
-		     r->status==DENIED ? "den" :
-		     r->status==REAPABLE ? "rea" : "UNK",
+		     t->tid, 
+		     t->bound_cpu>=0 ? "BOUND-" : "",
+		     t->current_cpu);
+
+    printk(PREFIX"[status: \"%s\", rt_status: \"%s\"]\n",
+		     t->status==NK_THR_INIT ? "init" :
+		     t->status==NK_THR_RUNNING ? "running" :
+		     t->status==NK_THR_WAITING ? "waiting" :
+		     t->status==NK_THR_SUSPENDED ? "suspended" :
+		     t->status==NK_THR_EXITED ? "exited" : "UNKNOWN",
+		     r->status==ARRIVED ? "arrived" :
+		     r->status==ADMITTED ? "admitted" :
+		     r->status==CHANGING ? "changing" :
+		     r->status==YIELDING ? "yielding" :
+		     r->status==EXITING ? "exiting" :
+		     r->status==SLEEPING ? "sleeping" :
+		     r->status==DENIED ? "denied" :
+		     r->status==REAPABLE ? "reapable" : "UNKNOWN");
+
+    printk(PREFIX"[start_time=%llu, cur_run_time=%llu, run_time=%llu deadline=%llu exit_time=%llu]\n",
 		     CO(r->start_time),
 		     CO(r->cur_run_time),
 		     CO(r->run_time),
 		     CO(r->deadline),
 		     CO(r->exit_time));
-	
-	switch (r->constraints.type) {
-	case APERIODIC:
-	    nk_vc_printf(" aperiodic(%utp, %llu)", r->constraints.interrupt_priority_class,CO(r->constraints.aperiodic.priority));
-	    break;
-	case SPORADIC:
-	    nk_vc_printf(" sporadic(%utp, %llu)", r->constraints.interrupt_priority_class,CO(r->constraints.sporadic.size));
-	    break;
-	case PERIODIC:
-	    nk_vc_printf(" periodic(%utp, %llu,%llu)", r->constraints.interrupt_priority_class,CO(r->constraints.periodic.period), CO(r->constraints.periodic.slice));
-	    break;
-	}
 
-	nk_vc_printf(" stats: %llua %llure %llurl %llusw %llum",
+	printk(PREFIX"[arrivals=%llu rescheds=%llu resched_longs=%llu switch_ins=%llu misses=%llu]\n",
 		     r->arrival_count,
 		     r->resched_count,
 		     r->resched_long_count,
 		     r->switch_in_count,
 		     r->miss_count);
 
-	nk_vc_printf(" [%s]", r->thread->aspace ? r->thread->aspace->name : "default");
+    printk(PREFIX"[ref-count=%llu]\n",
+            t->refcount
+            );
 	
-	nk_vc_printf("\n");
+	switch (r->constraints.type) {
+	case APERIODIC:
+	    printk(PREFIX"[aperiodic(irq_priority=%u, priority=%llu)]\n", r->constraints.interrupt_priority_class,CO(r->constraints.aperiodic.priority));
+	    break;
+	case SPORADIC:
+	    printk(PREFIX"[sporadic(irq_priority=%u, size=%llu)]\n", r->constraints.interrupt_priority_class,CO(r->constraints.sporadic.size));
+	    break;
+	case PERIODIC:
+	    printk(PREFIX"[periodic(irq_priority=%u, period=%llu, slice=%llu)]\n", r->constraints.interrupt_priority_class,CO(r->constraints.periodic.period), CO(r->constraints.periodic.slice));
+	    break;
+	}
 
+	printk(PREFIX"[aspace: \"%s\"]\n", r->thread->aspace ? r->thread->aspace->name : "default");
+
+#undef PREFIX
+	
     }
 }
 
@@ -1153,7 +1162,7 @@ struct nk_thread *nk_sched_reanimate(nk_stack_size_t min_stack_size,
     rt_node *cur = global_sched_state.thread_list->head;
 
     uint64_t count = 0;
-    
+ 
     while (cur &&
 	   !(cur->thread->status == REAPABLE &&
 	     cur->thread->thread->status==NK_THR_EXITED &&
@@ -1166,8 +1175,8 @@ struct nk_thread *nk_sched_reanimate(nk_stack_size_t min_stack_size,
 	      cur->thread->thread->is_idle ? "*idle*" :
 	      cur->thread->thread->name[0] ? cur->thread->thread->name : "(no name)");
           */
-	cur=cur->next;
-	count++;
+	  cur=cur->next;
+	  count++;
     }
     
     
@@ -2096,9 +2105,11 @@ static inline void set_interrupt_priority(rt_thread *t)
 	      t->rsp, t->stack, t->stack+t->stack_size);		\
 	BACKTRACE(ERROR,4); \
 	if (p) {							\
-	   panic("This thread (%p, tid=%u) has run off the end (or beginning) of its stack! (start=%p, rsp=%p, start size=%lx)\n", \
+	   panic("This thread (%p, tid=%u, func=%p, name=\"%s\") has run off the end (or beginning) of its stack! (start=%p, rsp=%p, start size=%lx)\n", \
 	      (void*)t,							\
 	      t->tid,							\
+          t->fun,\
+          t->name != NULL ? t->name : "",\
 	      t->stack,							\
 	      (void*)t->rsp,						\
 	      t->stack_size);						\
@@ -4538,7 +4549,10 @@ static int shared_init(struct cpu *my_cpu, struct nk_sched_config *cfg)
     // *same* stack throughout.  The result is tha we could underrun the new stack
     // and corrupt adjacent memory at a higher address.
     // We guard against this by padding the stack pointer 
-    main->rsp -= 1024;
+    //
+
+    // Unnecessary now that "init" is split into two functions at the stack switch
+    //main->rsp -= 1024;
 
     main->bound_cpu = my_cpu_id(); // idle threads cannot move
     main->current_cpu = main->bound_cpu;
