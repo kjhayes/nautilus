@@ -11,3 +11,8 @@ do
     opt -load-pass-plugin=$PASS_PLUGIN $1 -S -o $1.tmp
     mv $1.tmp $1
 done < $4
+while IFS="" read -r PASS_PLUGIN || [ -n "$PASS_PLUGIN" ]
+do
+    clang -Xclang -fpass-plugin=$PASS_PLUGIN -c -emit-llvm $1 -o $1.tmp
+    mv $1.tmp $1
+done < $5

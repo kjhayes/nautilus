@@ -9,7 +9,7 @@ $(NAUT_LL): $(NAUT_OBJ)
 
 $(NAUT_BIN): $(NAUT_LL) $(LD_SCRIPT)
 	$(call quiet-cmd,TRANSFORM,$(call rel-file,$(NAUT_LL),$(ROOT_DIR)))
-	bash $(TOOLCHAIN_SCRIPTS_DIR)/apply_passes.sh $(NAUT_LL) $(LLVM_PASS_DIR) $(LLVM_PASS_LIST) $(LLVM_PASS_PLUGIN_LIST)
+	bash $(TOOLCHAIN_SCRIPTS_DIR)/apply_passes.sh $(NAUT_LL) $(LLVM_PASS_DIR) $(LLVM_PASS_LIST) $(LLVM_PASS_PLUGIN_LIST) $(CLANG_PASS_PLUGIN_LIST)
 	$(call quiet-cmd,CLANG,.nautilus.o)
 	$(Q)clang $(CFLAGS) -Wno-unused-command-line-argument -c $(NAUT_LL) -o .nautilus.o
 	$(call quiet-cmd,LD,$(call rel-file,$(NAUT_BIN),$(ROOT_DIR)))

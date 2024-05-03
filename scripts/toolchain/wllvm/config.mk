@@ -6,6 +6,8 @@ $(shell rm -f $(LLVM_PASS_LIST))
 $(shell touch $(LLVM_PASS_LIST))
 $(shell rm -f $(LLVM_PASS_PLUGIN_LIST))
 $(shell touch $(LLVM_PASS_PLUGIN_LIST))
+$(shell rm -f $(CLANG_PASS_PLUGIN_LIST))
+$(shell touch $(CLANG_PASS_PLUGIN_LIST))
 
 CC := gclang
 CXX := gclang++
@@ -46,6 +48,9 @@ define add_llvm_pass =
 endef
 define add_llvm_pass_plugin =
     $(Q)echo "$$(1)" >> $(LLVM_PASS_PLUGIN_LIST)
+endef
+define add_clang_pass_plugin =
+    $(Q)echo "$$(1)" >> $(CLANG_PASS_PLUGIN_LIST)
 endef
 
 OVERRIDE_LINK_RULE := y
