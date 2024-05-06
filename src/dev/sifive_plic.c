@@ -72,8 +72,11 @@ struct sifive_plic_context
   struct sifive_plic *plic;
   int ctx_num;
 
+  int exists;
+
   uint32_t hartid;
-  nk_irq_t hwirq;
+  nk_irq_t irq;
+  nk_hwirq_t hwirq;
 };
 
 struct sifive_plic 
@@ -452,10 +455,16 @@ static int plic_init_dev_info(struct nk_dev_info *info)
     }
 
     nk_irq_t ctx_irq = nk_dev_info_read_irq(info, i);
+    plic->contexts[i].irq = ctx_irq;
 
     if(ctx_irq == NK_NULL_IRQ) {
+      plic->contexts[i].exists = 0;
       PLIC_ERROR("Context (%u) does not exist\n", i);
       continue;
+    } else {
+      plic->contexts[i].exists = 1;
+      PLIC_DEBUG("Context (%u) has nk_irq_t (%u)\n", i, ctx_irq);
+      nk_dump_irq(ctx_irq);
     }
 
     struct nk_irq_desc *desc = nk_irq_to_desc(ctx_irq);
