@@ -56,7 +56,7 @@
 
 // turn this on to have a sanity check run before and after each
 // malloc and free
-#define SANITY_CHECK_PER_OP 0
+#define SANITY_CHECK_PER_OP 1
 
 #define KMEM_DEBUG(fmt, args...) DEBUG_PRINT("KMEM: " fmt, ##args)
 #define KMEM_ERROR(fmt, args...) ERROR_PRINT("KMEM: " fmt, ##args)
@@ -66,16 +66,16 @@
 #ifndef NAUT_CONFIG_DEBUG_KMEM
 #define KMEM_DEBUG_BACKTRACE()
 #else
-#ifdef NAUT_CONFIG_ARCH_ARM64
+#if defined(NAUT_CONFIG_ARCH_ARM64) || defined(NAUT_CONFIG_ARCH_RISCV)
 // The generic backtraces don't work on systems where physical memory doesn't start at zero
-#define KMEM_DEBUG_BACKTRACE() WARN_PRINT("No backtrace possible on ARM64\n")
+#define KMEM_DEBUG_BACKTRACE() WARN_PRINT("No backtrace possible on ARM64 or RISCV\n")
 #else
 #define KMEM_DEBUG_BACKTRACE() BACKTRACE(KMEM_DEBUG,3)
 #endif
 #endif	
 
-#ifdef NAUT_CONFIG_ARCH_ARM64
-#define KMEM_ERROR_BACKTRACE() ERROR_PRINT("No backtrace possible on ARM64\n")
+#if defined(NAUT_CONFIG_ARCH_ARM64) || defined(NAUT_CONFIG_ARCH_RISCV)
+#define KMEM_ERROR_BACKTRACE() ERROR_PRINT("No backtrace possible on ARM64 or RISCV\n")
 #else
 #define KMEM_ERROR_BACKTRACE() BACKTRACE(KMEM_ERROR,3)
 #endif
@@ -442,7 +442,7 @@ nk_kmem_init (void)
             list_for_each_entry(rem_reg, &rem_dom->regions, entry) {
                 struct mem_reg_entry * newent = mm_boot_alloc(sizeof(struct mem_reg_entry));
                 if (!newent) {
-                    ERROR_PRINT("Could not allocate mem region entry\n");
+                    KMEM_ERROR("Could not allocate mem region entry\n");
                     return -ENOMEM;
                 }
                 newent->mem = rem_reg;
@@ -979,7 +979,7 @@ int kmem_sanity_check()
     list_for_each_entry(reg, &(my_kmem->ordered_regions), mem_ent) {
 	struct buddy_mempool * zone = reg->mem->mm_state;
 	if (buddy_sanity_check(zone)) { 
-	    ERROR_PRINT("buddy memory pool %p is insane\n", zone);
+	    KMEM_ERROR("buddy memory pool %p is insane\n", zone);
 	    rc|=-1;
 	}
     }
