@@ -22,6 +22,8 @@ SCRIPTS_DIR:=$(ROOT_DIR)/scripts
 SETUPS_DIR:=$(ROOT_DIR)/setups
 LINK_DIR:=$(ROOT_DIR)/link
 
+COMMON_FLAGS += -fno-inline
+
 # Config dependency
 PYTHON=python3
 
@@ -76,9 +78,8 @@ LD_SCRIPT = $(LINK_DIR)/link.ld
 
 COMMON_FLAGS += -fno-omit-frame-pointer \
 			   -ffreestanding \
-			   -fno-stack-protector \
 			   -fno-strict-aliasing \
-                           -fno-strict-overflow \
+               -fno-strict-overflow \
 
 COMMON_FLAGS += -Wno-int-conversion
 
@@ -170,6 +171,8 @@ $(LD_SCRIPT): $(LD_SCRIPT_SRC) $(AUTOCONF)
 -include $(SCRIPTS_DIR)/extra/objdump.mk
 # Extra rules for running QEMU
 -include $(SCRIPTS_DIR)/extra/qemu.mk
+# Configuration for enabling stack protection with GCC
+-include $(SCRIPTS_DIR)/extra/stack_prot.mk
 
 # Include clean.mk files found recursively in the scripts dir
 # (Regardless of the Kconfig, we want to clean everything we can on make clean,
