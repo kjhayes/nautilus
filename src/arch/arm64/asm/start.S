@@ -116,7 +116,13 @@ bsp_entry:  # We're on the main core!
 
     # restore DTB 
     mov x0, x20
-    bl      init
+    bl      init_boot_stack
+    
+    mov sp, x0
+    mov x29, x0
+
+    bl      init_threaded
+
     # In case it does return, halt the master core too
     # Load a obvious value into x29 so it will be clear to the debugger
     ldr x1, =0xCAFEBABE
@@ -138,7 +144,13 @@ secondary_start:
 
     bl install_iv_tables_el1
 
-    bl secondary_init
+    bl secondary_init_boot_stack
+
+    # Swap stacks
+    mov sp, x0
+    mov x29, x0
+
+    bl secondary_init_threaded
 
     ldr x1, =0xCAFEBABE
     b .

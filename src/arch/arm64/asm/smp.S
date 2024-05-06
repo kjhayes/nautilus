@@ -72,10 +72,6 @@ smp_ap_stack_switch:
   b 1b
 2:
 
-  mov sp, x0
-  // We have -fomit-frame-pointer on so this is just a GP register
-  //mov x29, x1
-
   mov x0, x2
   ret
 

@@ -25,10 +25,6 @@ ENTRY(nk_thread_switch)
 
         SAVE_CALLER_GPRS()
 
-	lwu t0, 8(tp)               # increment interrupt nesting level
-	addi t0, t0, 1              # pretend we are doing an interrupt-driven switch
-	sw  t0, 8(tp)               # to make the sums work out
-
         # Zero ra so we know if we entered through thread_switch_intr_entry or thread_switch
         add ra, x0, x0
 
@@ -57,10 +53,6 @@ ENTRY(nk_thread_switch_on_exit)
 	# load the stack pointer from the current (new) thread
 	REG_L sp,  ROFF(0, a0)
 
-	lwu t0, 8(tp)                // decrement interrupt nesting level
-	addi t0, t0, -1              // we may now be leaving interrupt context
-	sw  t0, 8(tp)
-
         RESTORE_CALLEE_GPRS()
 
         REG_L ra, ROFF(0, sp)
@@ -87,14 +79,14 @@ __non_intr_return:
 
 	ret                          // and off we go
 
-// rdi = new thread
-// rsi = target address to write
-// edx = value to write (as 4 bytes)
+// a0 = new thread
+// a1 = target address to write
+// a2 = value to write (as 4 bytes)
 ENTRY(nk_thread_switch_exit_helper)
+
 	// reset interrupt nesting
-	// the context switch will decrement it to zero
-	li t0, 1
-	sw t0, 8(tp)
+	//li t0, 0
+	//sw t0, 8(tp)
 
 	// reset preemption disable level
 	li t0, 0

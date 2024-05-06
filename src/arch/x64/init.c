@@ -527,6 +527,8 @@ threaded_init(void) {
 #endif
     
     arch_enable_ints();
+
+    nk_handle_init_stage_sched();
     
     //nk_dump_all_irq();
 

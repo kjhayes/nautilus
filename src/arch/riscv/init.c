@@ -127,7 +127,7 @@ out_err:
   "+===============================================+  \n\n"
 
 extern uint8_t  init_smp_boot[];
-extern uint64_t secondary_core_stack;
+extern void * secondary_core_stack;
 extern uint64_t _bssStart[];
 extern uint64_t _bssEnd[];
 
@@ -139,7 +139,7 @@ extern struct naut_info *smp_ap_stack_switch(uint64_t, uint64_t,
 
 bool_t second_done = false;
 
-void secondary_entry(int hartid) 
+void * secondary_entry_boot_stack(int hartid) 
 {
   w_tp(0);
 
@@ -178,9 +178,17 @@ void secondary_entry(int hartid)
   // sbi_legacy_set_timer(rv::get_time() + TICK_INTERVAL);
   sbi_legacy_set_timer(read_csr(time) + TICK_INTERVAL);
 
+  // We need to stop using our stack at this point because 
+  // it might be being used by another core or freed after
   second_done = true;
 
-  naut = smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, naut);
+  return get_cur_thread()->rsp;
+}
+
+void secondary_entry_threaded(void) {
+  
+  uint32_t hartid = per_cpu_get(hartid);
+
   printk("hart %u swapped stacks\n", hartid);
 
   nk_sched_start();
@@ -190,15 +198,17 @@ void secondary_entry(int hartid)
   arch_enable_ints();
 
   printk("hart %u idling...\n", hartid);
+
   idle(NULL, NULL);
 }
 
 int start_secondary(struct sys_info *sys) {
+
+  secondary_core_stack = (uint64_t)malloc(PAGE_SIZE_2MB);
+  secondary_core_stack += PAGE_SIZE_2MB;
+
   for (int i = 0; i < NAUT_CONFIG_MAX_CPUS; i++) {
     if (i == my_cpu_id() || !sys->cpus[i] || !sys->cpus[i]->enabled) continue;
-
-    secondary_core_stack = (uint64_t)malloc(2 * 4096);
-    secondary_core_stack += 2 * 4096;
 
     second_done = false;
     __sync_synchronize();
@@ -217,6 +227,8 @@ int start_secondary(struct sys_info *sys) {
     printk("RISCV: hart %d successfully started hart %d\n", my_cpu_id(), i);
   }
 
+  // Every core has been started
+  free(secondary_core_stack);
   return 0;
 }
 
@@ -361,9 +373,9 @@ void threaded_init(void) {
 
   nk_sched_start();
 
-  nk_handle_init_stage_sched();
-
   nk_handle_init_stage_subsys();
+
+  nk_handle_init_stage_sched();
 
   nk_handle_init_stage_driver();
 

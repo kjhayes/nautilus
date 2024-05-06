@@ -18,13 +18,24 @@ ENTRY(init_smp_boot)
     li      t0, SIE_SEIE | SIE_STIE | SIE_SSIE
     csrs    sie, t0
 
-    la      t0, second_entry_ptr
-    REG_L   t0, 0(t0)
+    ld t0, second_entry_boot_ptr
+    jalr t0
 
-    jr      t0
+    mv fp, a0            // set our new frame pointer
+    mv sp, a0            // switch stacks
+
+    ld t0, second_entry_thread_ptr
+    jalr t0
+
+    // We should never return
+    j .
 
 .balign 8
-second_entry_ptr: .quad secondary_entry
+second_entry_boot_ptr: .quad secondary_entry_boot_stack
+
+.balign 8
+second_entry_thread_ptr: .quad secondary_entry_threaded
+
 
 .globl end_smp_boot
 end_smp_boot:

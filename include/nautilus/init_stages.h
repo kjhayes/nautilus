@@ -17,8 +17,8 @@
     X(static)\
     X(boot)\
     X(kmem)\
-    X(sched)\
     X(subsys)\
+    X(sched)\
     X(driver)\
     X(fs)\
     X(launch)\
@@ -28,8 +28,8 @@
  * static -> no memory allocator
  * boot -> boot memory allocator
  * kmem -> kmem allocator
- * sched -> threads and scheduling are enabled from here on
  * subsys -> kernel subsystems (pci, cxx support, instrumentation)
+ * sched -> threads and scheduling are enabled from here on
  * driver -> specific device drivers
  * fs -> filesystem initialization
  * launch -> launch threads, mount filesystems, etc.

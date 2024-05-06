@@ -141,7 +141,6 @@ GLOBAL(kernel_vec)
     # save the registers.
     SAVE_CALLER_GPRS()
 
-    # call the C trap handler in idt.c
     move a0, sp /* arg0 <- nk_regs */
 
     # Save trap registers (so they can be restored if we swap threads)
@@ -160,7 +159,16 @@ GLOBAL(kernel_vec)
     REG_S t0, ROFF(5, sp)
     move a1, sp /* arg1 <- tregs */
 
+	lwu t0, 8(tp)               # increment interrupt nesting level
+	addi t0, t0, 1
+	sw  t0, 8(tp)
+
+    # call the C trap handler in trap.c
     call kernel_trap
+
+	lwu t0, 8(tp)                // decrement interrupt nesting level
+	addi t0, t0, -1              // we may now be leaving interrupt context
+	sw  t0, 8(tp)
 
     li t0, 0
     beq t0, a0, after_switch

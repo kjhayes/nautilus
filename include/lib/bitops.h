@@ -25,6 +25,8 @@
 #ifndef __BITOPS_H__
 #define __BITOPS_H__
 
+#include <nautilus/naut_types.h>
+
 #define __ALIGN_KERNEL_MASK(x, mask)    (((x) + (mask)) & ~(mask))
 #define __ALIGN_MASK(x, mask)   __ALIGN_KERNEL_MASK((x), (mask))
 

@@ -154,7 +154,7 @@ static inline int init_core_barrier(struct sys_info *sys) {
 volatile static uint8_t __secondary_init_first_phase_complete = 0;
 volatile static uint8_t __secondary_init_second_phase_token = 0;
 
-void secondary_init(void) {
+void * secondary_init_boot_stack(void) {
 
   fpu_init_percpu(&nautilus_info);
 
@@ -203,7 +203,10 @@ void secondary_init(void) {
 
   // nk_sched_init_ap should have allocated us a stack, so we need to switch to it
   // (previously we should have been using the shared boot stack)
-  smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, &nautilus_info);
+  return get_cur_thread()->rsp;
+}
+
+void secondary_init_threaded(void) {
   nk_thread_name(get_cur_thread(), "secondary_init");
 
   INIT_PRINT("ARM64: successfully started CPU %d\n", my_cpu_id()); 
@@ -371,7 +374,7 @@ int rockchip_halt_and_flash(int val0, int val1, int fast) {
 #ifdef NAUT_CONFIG_BEANDIP
 __attribute__((annotate("nohook")))
 #endif
-void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x3) {
+void * init_boot_stack(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x3) {
 
   // Zero out .bss
   nk_low_level_memset((void*)_bssStart, 0, (uint64_t)_bssEnd - (uint64_t)_bssStart);
@@ -452,12 +455,13 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
 
   init_core_barrier(&(nautilus_info.sys));
 
-  smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, &nautilus_info);
+  return get_cur_thread()->rsp;
+}
+
+void init_threaded(void) {
   INIT_DEBUG("Swapped to the thread stack!\n");
 
   nk_thread_name(get_cur_thread(), "init");
-
-  nk_handle_init_stage_sched();
 
   nk_handle_init_stage_subsys();
 
@@ -525,6 +529,8 @@ void init(unsigned long dtb, unsigned long x1, unsigned long x2, unsigned long x
   percpu_timer_init();
   arch_set_timer(arch_realtime_to_cycles(sched_cfg.aperiodic_quantum));
  
+  nk_handle_init_stage_sched();
+
   // Enable interrupts
   arch_enable_ints(); 
 
