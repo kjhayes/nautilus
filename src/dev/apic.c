@@ -460,6 +460,7 @@ apic_bcast_sipi (struct apic_dev * apic, uint8_t target)
 static void calibrate_apic_timer(struct apic_dev *apic);
 int apic_timer_handler(struct nk_irq_action *action, struct nk_regs *regs, void *state);
 
+static int registered_apic_timer_handler = 0;
 
 static void
 apic_timer_setup (struct apic_dev * apic, uint32_t quantum_ms, struct nk_dev *dev)
@@ -483,12 +484,16 @@ apic_timer_setup (struct apic_dev * apic, uint32_t quantum_ms, struct nk_dev *de
 	       x2apic, tscdeadline, arat);
 
     // Note that no state is used here since APICs are per-CPU
-    nk_irq_t timer_irq = x86_vector_to_irq(APIC_TIMER_INT_VEC);
-    if (timer_irq == NK_NULL_IRQ || 
-        nk_irq_add_handler_dev(timer_irq,
-			     apic_timer_handler,
-			     NULL, (struct nk_dev*)dev) != 0) {
-        panic("Could not register APIC timer handler\n");
+    if(!registered_apic_timer_handler) {
+      nk_irq_t timer_irq = x86_vector_to_irq(APIC_TIMER_INT_VEC);
+      if (timer_irq == NK_NULL_IRQ || 
+          nk_irq_add_handler_dev(timer_irq,
+	  		     apic_timer_handler,
+	  		     NULL, (struct nk_dev*)dev) != 0) {
+          panic("Could not register APIC timer handler\n");
+      } else {
+          registered_apic_timer_handler = 1;
+      }
     }
 
     calibrate_apic_timer(apic);
