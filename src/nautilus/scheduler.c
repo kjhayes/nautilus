@@ -107,7 +107,7 @@
 
 #define INFO(fmt, args...) INFO_PRINT("Scheduler: " fmt, ##args)
 #define ERROR(fmt, args...) ERROR_PRINT("Scheduler: " fmt, ##args)
-
+#define WARN(fmt, args...) WARN_PRINT("Scheduler: " fmt, ##args)
 
 #define DEBUG(fmt, args...)
 #define DEBUG_DUMP(rt,pre)
@@ -1162,8 +1162,9 @@ struct nk_thread *nk_sched_reanimate(nk_stack_size_t min_stack_size,
     rt_node *cur = global_sched_state.thread_list->head;
 
     uint64_t count = 0;
- 
+
     while (cur &&
+          cur->thread &&
 	   !(cur->thread->status == REAPABLE &&
 	     cur->thread->thread->status==NK_THR_EXITED &&
 	     !cur->thread->thread->refcount &&
@@ -1178,8 +1179,7 @@ struct nk_thread *nk_sched_reanimate(nk_stack_size_t min_stack_size,
 	  cur=cur->next;
 	  count++;
     }
-    
-    
+     
     rt_thread *rt = 0;
     
     
@@ -2099,6 +2099,10 @@ static inline void set_interrupt_priority(rt_thread *t)
 #define stack_check(rt,p)						\
 {									\
     struct nk_thread *t = rt->thread;					\
+    if(t == NULL) {\
+        ERROR("stack_check on rt_thread with NULL nk_thread!\n");\
+        BACKTRACE(ERROR,4);\
+    }\
     if ((t->rsp < (uint64_t)(t->stack)) || t->rsp >= (uint64_t)(t->stack+t->stack_size)) { \
 	ERROR("STACK OVERRUN : thread %p (%u, \"%s\") rsp=%p  stack=[%p, %p)\n", \
 	      t, t->tid, t->is_idle ? "*idle*" : !t->name[0] ? "*unnamed*" : t->name, \
@@ -5068,7 +5072,7 @@ launch_aperiodic_burner (char * name,
     a->constraints.interrupt_priority_class = (uint8_t) tpr;
     a->constraints.aperiodic.priority       = priority;
 
-    if (nk_thread_start(burner, (void*)a , NULL, 1, PAGE_SIZE_4KB, &tid, 1)) { 
+    if (nk_thread_start(burner, (void*)a , NULL, 1, TSTACK_DEFAULT, &tid, 1)) { 
         free(a);
         return -1;
     } else {
@@ -5104,7 +5108,7 @@ launch_sporadic_burner (char * name,
     a->constraints.sporadic.deadline           = deadline;
     a->constraints.sporadic.aperiodic_priority = aperiodic_priority;
 
-    if (nk_thread_start(burner, (void*)a , NULL, 1, PAGE_SIZE_4KB, &tid, 1)) {
+    if (nk_thread_start(burner, (void*)a , NULL, 1, TSTACK_DEFAULT, &tid, 1)) {
         free(a);
         return -1;
     } else {
@@ -5138,7 +5142,7 @@ launch_periodic_burner (char * name,
     a->constraints.periodic.period          = period;
     a->constraints.periodic.slice           = slice;
 
-    if (nk_thread_start(burner, (void*)a , NULL, 1, PAGE_SIZE_4KB, &tid, 1)) {
+    if (nk_thread_start(burner, (void*)a , NULL, 1, TSTACK_DEFAULT, &tid, 1)) {
         free(a);
         return -1;
     } else {

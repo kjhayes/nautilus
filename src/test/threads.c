@@ -202,7 +202,7 @@ static void _test_recursive_create_join(void *in, void **out)
 			    (void*)(depth+1),
 			    0,
 			    0,
-			    PAGE_SIZE_4KB,
+			    TEST_THREAD_STACK_SIZE,
 			    NULL,
 			    -1)) { 
 	    PRINT("Failed to launch left thread at depth %lu\n", depth);
@@ -214,7 +214,7 @@ static void _test_recursive_create_join(void *in, void **out)
 			    (void*)(depth+1),
 			    0,
 			    0,
-			    PAGE_SIZE_4KB,
+			    TEST_THREAD_STACK_SIZE,
 			    NULL,
 			    -1)) { 
 	    PRINT("Failed to launch right thread at depth %lu\n", depth);

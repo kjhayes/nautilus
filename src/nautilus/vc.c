@@ -56,8 +56,8 @@
 #define VC_HEIGHT 1000
 #endif
 
-#define CHARDEV_CONSOLE_STACK_SIZE 0x4000
-#define VC_LIST_STACK_SIZE 0x4000
+#define CHARDEV_CONSOLE_STACK_SIZE PAGE_SIZE_2MB
+#define VC_LIST_STACK_SIZE PAGE_SIZE_2MB
 
 #ifdef NAUT_CONFIG_ARCH_X86
 #define INTERRUPT __attribute__((target("no-sse")))
@@ -138,7 +138,8 @@ struct nk_virtual_console {
     nk_keycode_t k_queue[Keycode_QUEUE_SIZE];
   } keyboard_queue;
   uint16_t BUF[VC_WIDTH * VC_HEIGHT];
-  uint8_t cur_x, cur_y, cur_attr, fill_attr;
+  uint16_t cur_x, cur_y;
+  uint8_t cur_attr, fill_attr;
   uint16_t head, tail;
   struct nk_vc_ops *ops;
   void *ops_priv;
@@ -475,7 +476,7 @@ int nk_vc_scrollup()
   return rc;
 }
 
-static int _vc_display_char_specific(struct nk_virtual_console *vc, uint8_t c, uint8_t attr, uint8_t x, uint8_t y)
+static int _vc_display_char_specific(struct nk_virtual_console *vc, uint8_t c, uint8_t attr, uint16_t x, uint16_t y)
 {
   if (!vc) {
     return 0;
@@ -1520,7 +1521,7 @@ static int start_list()
                       VC_LIST_STACK_SIZE,
                       &list_tid,
 #if defined(NAUT_CONFIG_ARCH_RISCV) || defined(NAUT_CONFIG_ARCH_ARM64)
-                      my_cpu_id()
+                      -1
 #else
                       0
 #endif
@@ -1878,7 +1879,7 @@ int nk_vc_start_chardev_console(const char *chardev)
     // make sure everyone sees this is zeroed...
     atomic_and(c->inited,0);
 
-    if (nk_thread_start(chardev_console, c, 0, 1, CHARDEV_CONSOLE_STACK_SIZE, &c->tid, 0)) {
+    if (nk_thread_start(chardev_console, c, 0, 1, CHARDEV_CONSOLE_STACK_SIZE, &c->tid, -1)) {
 	ERROR("Failed to launch chardev console handler for %s\n",c->name);
 	free(c);
 	return -1;
@@ -1980,7 +1981,10 @@ int nk_vc_init(void)
   DEBUG("Copied display to vc\n");
 
 #ifdef NAUT_CONFIG_X86_64_HOST
-  vga_get_cursor(&(cur_vc->cur_x),&(cur_vc->cur_y));
+  uint8_t vga_x, vga_y;
+  vga_get_cursor(&vga_x,&vga_y);
+  cur_vc->cur_x = vga_x;
+  cur_vc->cur_y = vga_y;
   vga_init_screen();
   vga_set_cursor(cur_vc->cur_x,cur_vc->cur_y);
 #elif NAUT_CONFIG_XEON_PHI
@@ -2017,7 +2021,7 @@ int nk_vc_deinit()
   return 0;
 }
 
-nk_declare_subsys_init(nk_vc_init);
+nk_declare_sched_init(nk_vc_init);
 
 #ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE
 

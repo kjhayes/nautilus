@@ -58,6 +58,7 @@ typedef uint64_t nk_stack_size_t;
 
 /* common thread stack sizes */
 #define TSTACK_DEFAULT 0  // will be 4K
+#define TSTACK_DEFAULT_SIZE PAGE_SIZE_4KB
 #define TSTACK_4KB     0x001000
 #define TSTACK_1MB     0x100000
 #define TSTACK_2MB     0x200000

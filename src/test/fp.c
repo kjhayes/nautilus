@@ -100,7 +100,7 @@ static int test_fp_register_volatility(void) {
  
   wait_to_be_annoying = 1;
   has_been_annoying = 0;
-  if(nk_thread_start(annoying_func, NULL, 0, 0, 4096, NULL, my_cpu_id())) {
+  if(nk_thread_start(annoying_func, NULL, 0, 0, TSTACK_DEFAULT, NULL, my_cpu_id())) {
     ERROR_PRINT("Failed to launch annoying thread!\n");
   }
 
