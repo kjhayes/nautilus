@@ -3,7 +3,7 @@
 #include<nautilus/interrupt.h>
 #include<arch/x64/irq.h>
 
-void arch_enable_ints(void)  { asm volatile ("sti" : : : "memory"); }
+void arch_enable_ints(void)  { asm volatile ("sti;nop" : : : "memory"); }
 void arch_disable_ints(void) { asm volatile ("cli" : : : "memory"); }
 int  arch_ints_enabled(void) {
     uint64_t rflags = 0;

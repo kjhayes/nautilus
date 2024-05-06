@@ -160,17 +160,9 @@ void arch_enable_ints(void);
 void arch_disable_ints(void);
 int arch_ints_enabled(void);
 
-// Do not directly use these functions or sti/cli unless you know
-// what you are doing...  
-// Instead, use irq_disable_save and a matching irq_enable_restore
-#define enable_irqs() arch_enable_ints()
-#define disable_irqs() arch_disable_ints()
-
 static inline uint8_t irqs_enabled (void)
 {
     return arch_ints_enabled();
-    // uint64_t rflags = read_rflags();
-    // return (rflags & RFLAGS_IF) != 0;
 }
 
 static inline uint8_t irq_disable_save (void)
@@ -180,8 +172,7 @@ static inline uint8_t irq_disable_save (void)
     uint8_t enabled = irqs_enabled();
 
     if (enabled) {
-	arch_disable_ints();
-        // disable_irqs();
+	    arch_disable_ints();
     }
 
     preempt_enable();
@@ -194,8 +185,7 @@ static inline void irq_enable_restore (uint8_t iflag)
 {
     if (iflag) {
         /* Interrupts were originally enabled, so turn them back on */
-	arch_enable_ints();
-        // enable_irqs();
+        arch_enable_ints();
     }
 }
 
