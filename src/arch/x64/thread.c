@@ -40,7 +40,7 @@ __thread_fork (void)
 
    rsp = (uint64_t) arch_read_sp();
 
-   printk("thread fork rsp = %p\n", rsp);
+   DEBUG_PRINT("thread fork rsp = %p\n", rsp);
 
 #ifdef NAUT_CONFIG_ENABLE_STACK_CHECK
    // now check again after update to see if we didn't overrun/underrun the stack in the parent...
