@@ -138,7 +138,7 @@ int pc_8250_init(void)
   nk_irq_t com1_3 = NK_NULL_IRQ;
   nk_irq_t com2_4 = NK_NULL_IRQ;
 
-  struct nk_irq_dev *ioapic = ioapic_get_dev_by_id(0);
+  struct nk_irq_dev *ioapic = ioapic_get_dev_by_index(0);
   if(ioapic == NULL) {
     ERROR("Could not get IOAPIC device to get PC 8250 IRQ's!\n");
     return -1;

@@ -84,6 +84,14 @@ ioapic_dev_mask_irq(void *state, nk_irq_t irq)
   return 0;
 }
 
+struct nk_irq_dev * ioapic_get_dev_by_index(size_t index) {
+  int num_ioapics = nk_get_nautilus_info()->sys.num_ioapics;
+  if(index >= num_ioapics) {
+      return NULL;
+  }
+  return nk_get_nautilus_info()->sys.ioapics[index]->dev;
+}
+
 struct nk_irq_dev * ioapic_get_dev_by_id(uint8_t id) 
 {  
   int num_ioapics = nk_get_nautilus_info()->sys.num_ioapics;
@@ -413,7 +421,7 @@ ioapic_init (struct sys_info * sys)
 
     for (i = 0; i < sys->num_ioapics; i++) {
         char n[32];
-	snprintf(n,32,"ioapic%u",i);
+	snprintf(n,32,"ioapic%u",sys->ioapics[i]->id);
 	struct nk_irq_dev * dev = nk_irq_dev_register(n,0,&ops,sys->ioapics[i]);
         if (__ioapic_init(sys->ioapics[i], dev, i) < 0) {
             ERROR_PRINT("Couldn't initialize IOAPIC\n");

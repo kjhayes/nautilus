@@ -171,7 +171,7 @@ i8254_init (struct naut_info * naut)
 
     struct nk_dev *dev = nk_dev_register("i8254",NK_DEV_TIMER,0,&ops,0);
     
-    struct nk_irq_dev * ioapic = ioapic_get_dev_by_id(0);
+    struct nk_irq_dev * ioapic = ioapic_get_dev_by_index(0);
     if(ioapic == NULL) {
       ERROR_PRINT("Could not get IOAPIC device to get correct PIT_TIMER_IRQ!\n");
       return -1;

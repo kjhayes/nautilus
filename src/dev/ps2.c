@@ -768,7 +768,7 @@ int ps2_init(struct naut_info * naut)
   if (rc==HAVE_NO_KEYBOARD) { 
     return -1;
   } else {
-    struct nk_irq_dev *ioapic = ioapic_get_dev_by_id(0);
+    struct nk_irq_dev *ioapic = ioapic_get_dev_by_index(0);
     if(ioapic == NULL) {
       ERROR("Could not get IOAPIC device to get PS2 IRQ's!\n");
       return -1;
