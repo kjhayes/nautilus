@@ -2079,6 +2079,7 @@ static void set_timer(rt_scheduler *scheduler, rt_thread *thread, uint64_t now)
 static inline void set_interrupt_priority(rt_thread *t)
 {    
 #ifdef NAUT_CONFIG_INTERRUPT_THREAD
+#ifdef NAUT_CONFIG_ARCH_X86
     // if we are using the interrupt thread model
     // then if we are the interrupt thread (or an interrupt-enabled idle thread)
     if (t->is_intr) {
@@ -2088,10 +2089,13 @@ static inline void set_interrupt_priority(rt_thread *t)
 	// block all but scheduling-related interrupts
 	write_cr8(0xe);
     }
+#endif
 #else
     // if we are not using the interrupt thread model, then use the 
     // interrupt priority class selected by the thread itself
-    // write_cr8((uint64_t)t->constraints.interrupt_priority_class);
+#ifdef NAUT_CONFIG_ARCH_X86
+    write_cr8((uint64_t)t->constraints.interrupt_priority_class);
+#endif
 #endif
 }
 
