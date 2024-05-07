@@ -788,7 +788,6 @@ init_ap_area (struct ap_init_area * ap_area,
     ap_area->stack   = boot_stack_ptr;
     ap_area->cpu_ptr = naut->sys.cpus[core_num];
 
-#ifdef NAUT_CONFIG_ARCH_X86
     /* protected mode temporary GDT */
     ap_area->gdt[2]      = 0x0000ffff;
     ap_area->gdt[3]      = 0x00cf9a00;
@@ -804,7 +803,6 @@ init_ap_area (struct ap_init_area * ap_area,
 
     /* pointer to BSP's PML4 */
     ap_area->cr3         = read_cr3();
-#endif
 
     /* pointer to our entry routine */
     ap_area->boot_entry       = smp_ap_entry_boot_stack;
@@ -849,7 +847,6 @@ smp_bringup_aps (struct naut_info * naut)
         return 0;
     }
 
-    #ifdef NAUT_CONFIG_ARCH_X86
     maxlvt = apic_get_maxlvt(apic);
 
     SMP_DEBUG("Passing target page num %x to SIPI\n", target_vec);
@@ -859,7 +856,6 @@ smp_bringup_aps (struct naut_info * naut)
         apic_write(apic, APIC_REG_ESR, 0);
     }
     apic_read(apic, APIC_REG_ESR);
-    #endif
 
     SMP_DEBUG("Copying in page for SMP boot code at (%p)...\n", (void*)ap_trampoline);
     memcpy((void*)ap_trampoline, (void*)boot_target, smp_code_sz);
@@ -890,22 +886,18 @@ smp_bringup_aps (struct naut_info * naut)
             return -1;
         }
 
-
-        #ifdef NAUT_CONFIG_ARCH_X86
         /* Send the INIT sequence */
         SMP_DEBUG("sending INIT to remote APIC (0x%x)\n", naut->sys.cpus[i]->lapic_id);
         apic_send_iipi(apic, naut->sys.cpus[i]->lapic_id);
 
         /* wait for status to update */
         status = apic_wait_for_send(apic);
-        #endif
 
         mbarrier();
 
         /* 10ms delay */
         udelay(10000);
 
-        #ifdef NAUT_CONFIG_ARCH_X86
         /* deassert INIT IPI (level-triggered) */
         apic_deinit_iipi(apic, naut->sys.cpus[i]->lapic_id);
 
@@ -938,7 +930,6 @@ smp_bringup_aps (struct naut_info * naut)
             }
 
         }
-        #endif
 
         if (status) {
             ERROR_PRINT("APIC wasn't delivered!\n");
@@ -1095,7 +1086,6 @@ extern void nk_rand_init(struct cpu*);
 static void
 smp_ap_finish (struct cpu * core)
 {
-#ifdef NAUT_CONFIG_ARCH_X86
     nk_rand_init(core);
 
     nk_cpu_topo_discover(core);
@@ -1131,7 +1121,6 @@ smp_ap_finish (struct cpu * core)
 
 #ifdef NAUT_CONFIG_PROFILE
     nk_instrument_calibrate(INSTR_CAL_LOOPS);
-#endif
 #endif
 }
 

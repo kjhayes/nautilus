@@ -164,6 +164,7 @@ ENTRY(init_smp_boot)
     // Begin using the much larger bsp boot stack
     // (Otherwise we overrun the 1KB stack with -O0 set)
     movq $boot_stack_end, %rsp
+    movq $boot_stack_end, %rbp
 
     // Fetch the desired C entry point and argument from the information
     // passed by the BSP
