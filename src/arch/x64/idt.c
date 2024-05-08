@@ -89,11 +89,9 @@ struct idt_desc idt_descriptor =
 };
 
 
-
-
 int 
 null_excp_handler (
-    struct nk_irq_action *action,
+    struct nk_irq_desc *desc,
     struct nk_regs *regs,
     void *state)
 {
@@ -107,17 +105,17 @@ null_excp_handler (
     
     printk("\n+++ UNHANDLED EXCEPTION +++\n");
     
-    if (action->desc->hwirq < 32) {
+    if (desc->hwirq < 32) {
         printk("[%s] (0x%x) error=0x%x <%s>\n    RIP=%p      (core=%u, thread=%u)\n", 
-	       excp_codes[action->desc->hwirq][EXCP_NAME],
-                action->desc->hwirq,
+	       excp_codes[desc->hwirq][EXCP_NAME],
+                desc->hwirq,
 	       regs->error_code,
-	       excp_codes[action->desc->hwirq][EXCP_MNEMONIC],
+	       excp_codes[desc->hwirq][EXCP_MNEMONIC],
 	       (void*)regs->rip, 
 	       cpu_id, tid);
     } else {
         printk("[Unknown Exception] (vector=0x%x)\n    RIP=(%p)     (core=%u)\n", 
-	       action->desc->hwirq,
+	       desc->hwirq,
 	       (void*)regs->rip,
 	       cpu_id);
     }
@@ -137,7 +135,7 @@ null_excp_handler (
 
 
 int
-null_irq_handler (struct nk_irq_action *action,
+null_irq_handler (struct nk_irq_desc *desc,
                   struct nk_regs *regs,
 		  void       *state)
 {
@@ -148,7 +146,7 @@ null_irq_handler (struct nk_irq_action *action,
 #else
     
     printk("[Unhandled IRQ] (vector=0x%x)\n    RIP=(%p)     (core=%u)\n", 
-            action->desc->hwirq,
+            desc->hwirq,
             (void*)regs->rip,
             my_cpu_id());
 
@@ -345,10 +343,8 @@ int nmi_handler (struct nk_irq_action *action,
 	   (void*)regs->rip, 
 	   cpu_id, tid);
 
-#ifdef NAUT_CONFIG_ARCH_X86
     nk_print_regs(regs);
     backtrace(regs->rbp);
-#endif
 
     panic("+++ HALTING +++\n");
 
@@ -365,10 +361,19 @@ int route_interrupt_vector(struct nk_regs *regs, nk_hwirq_t vec)
   int ret = 1;
   if(vec >= 32) {
       // It's an LAPIC interrupt (we need to signal EOI)
+      if(desc->num_actions < 1) {
+          // Unhandled interrupt! (we should still EOI it though)
+          null_irq_handler(desc, regs, NULL);
+      }
       ret = nk_handle_interrupt_generic_no_ack(NULL, regs, desc); 
   } else {
       // It's an exception, so no IRQ device
-      ret = nk_handle_irq_actions(desc, regs);
+      if(desc->num_actions < 1) {
+          // Unhandled exception!
+          null_excp_handler(desc, regs, NULL);
+      } else {
+          ret = nk_handle_irq_actions(desc, regs);
+      }
   }
 
   if(ret) {
@@ -421,7 +426,6 @@ int idt_find_and_reserve_range(ulong_t numentries, int aligned, ulong_t *first)
 }
 */
 
-#ifdef NAUT_CONFIG_ARCH_X86
 extern void early_irq_handlers(void);
 extern void early_excp_handlers(void);
 
@@ -484,4 +488,4 @@ setup_idt (void)
 
     return 0;
 }
-#endif
+

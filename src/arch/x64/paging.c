@@ -392,7 +392,7 @@ nk_gpf_handler (struct nk_irq_action *action,
 
     // if monitor is active, we will fall through to it
     // by calling null_excp_handler
-    return null_excp_handler(action,regs,state);
+    return null_excp_handler(action->desc,regs,state);
 }
 
 

@@ -128,8 +128,11 @@ int setup_idt(void);
 
 //int idt_find_and_reserve_range(ulong_t numentries, int aligned, ulong_t *first);
 
-int null_excp_handler(struct nk_irq_action*, struct nk_regs*, void * state_addr);
-int null_irq_handler(struct nk_irq_action*, struct nk_regs*, void * state_addr);
+// Note: These aren't handlers which can be passed to "nk_irq_add_handler", because they
+// take an nk_irq_desc* not an nk_irq_action*, these should instead be called by other handlers,
+// or by the root exception handling code itself if it can't find an action to invoke
+int null_excp_handler(struct nk_irq_desc*, struct nk_regs*, void * state_addr);
+int null_irq_handler(struct nk_irq_desc*, struct nk_regs*, void * state_addr);
 
 #ifdef NAUT_CONFIG_ARCH_X86
 static inline void
