@@ -164,16 +164,19 @@ ENTRY(init_smp_boot)
     // Begin using the much larger bsp boot stack
     // (Otherwise we overrun the 1KB stack with -O0 set)
     movq $boot_stack_end, %rsp
-    movq $boot_stack_end, %rbp
+    movq %rsp, %rbp
 
     // Fetch the desired C entry point and argument from the information
     // passed by the BSP
     movq $AP_INFO_AREA, %rdx
     movq 82(%rdx), %rdi
-
+   
     // save thread_entry for later
     movq 98(%rdx), %rsi
     pushq %rsi
+ 
+    // Subtract 8 bytes to keep the stack 16-byte aligned
+    subq $8, %rsp
 
     // boot_entry
     movq 90(%rdx), %rsi
@@ -181,12 +184,15 @@ ENTRY(init_smp_boot)
     // Enter the C code with our argument
     callq *%rsi
 
+    // Re-align the stack
+    addq $8, %rsp
+
     // restore thread_entry
     popq %rsi
 
     // %rax should now have our threaded stack
     movq %rax, %rsp
-    movq %rax, %rbp
+    movq %rsp, %rbp
 
     // Enter C again with our new stack
     callq *%rsi

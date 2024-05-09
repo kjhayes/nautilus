@@ -998,6 +998,7 @@ menu "Optimizations"
     config FPU_SAVE
       bool "Save FPU state on all context switches"
       default y
+      select XSAVE_SUPPORT
       help
         Compiles the kernel to save FPU state on every context switch. 
         This is not strictly necessary if processors are not virtualized 
@@ -1006,6 +1007,7 @@ menu "Optimizations"
     config FPU_SAVE_IRQ_EXCP
       bool "Save FPU state on all interrupts and exceptions"
       default y
+      select XSAVE_SUPPORT
       help
         Compiles the kernel to save FPU state on every exception and interrupt.
 	This is necessary if it is possible for the compiler to use

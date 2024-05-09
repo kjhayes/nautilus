@@ -105,7 +105,9 @@ GLOBAL(nautilus_entry)
     movw %ax, %fs
     movw %ax, %gs
 
+    // This needs to be at least 16-byte aligned
     movq $boot_stack_end, %rsp
+    movq %rsp, %rbp
 
     /* multiboot info is still in rdi and rsi */
     movq $boot_stack_init, %rax
@@ -113,8 +115,8 @@ GLOBAL(nautilus_entry)
 
     // %rax should now contain our dynamically allocated thread stack
     movq %rax, %rsp
-    movq %rax, %rbp
-    
+    movq %rsp, %rbp
+
     movq $threaded_init, %rax
     callq *%rax
 

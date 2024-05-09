@@ -470,6 +470,11 @@ nk_thread_create (nk_thread_fun_t fun,
 
 	t->stack = (void*)malloc_specific(required_stack_size,placement_cpu);
 
+#ifdef NAUT_CONFIG_ARCH_X86
+    // Make sure our stack is 16-byte aligned
+    ASSERT(((uintptr_t)get_cur_thread()->rsp & 0xf) == 0);
+#endif
+
 	if (!t->stack) {
 
 	    THREAD_ERROR("Failed to allocate a stack\n");

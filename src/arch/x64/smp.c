@@ -1147,12 +1147,7 @@ smp_ap_entry_boot_stack (struct cpu * core)
     // switch from boot stack to my new stack (allocated in thread_init)
     nk_thread_t * cur = get_cur_thread();
 
-    /* 
-     * we have to call into assembly since GCC 
-     * wont let us clobber rbp. Note how we reassign
-     * my_cpu. This is so we don't lose it in the
-     * switch (it's sitting on the stack!)
-     */
+    // Return to assembly to swap stacks
     return cur->rsp;
 }
 
@@ -1160,6 +1155,7 @@ void
 smp_ap_entry_threaded(void) 
 {
     struct cpu *my_cpu = get_cpu();
+    SMP_PRINT("swapped stacks\n");
 
     // wait for the other cores and turn on interrupts
     smp_ap_finish(my_cpu);
