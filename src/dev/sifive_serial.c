@@ -73,7 +73,7 @@ int sifive_serial_fdt_init(const void *fdt, int offset, struct sifive_serial *si
     int lenp = 0;
     sifive->regs = (struct sifive_serial_regs*)fdt_getreg_address(fdt, offset);
     if(sifive->regs == NULL) {
-      return -1;
+      return -ENXIO;
     }
     return 0;
 }
@@ -86,7 +86,7 @@ int sifive_serial_pre_vc_init(void)
   int offset = fdt_node_offset_by_compatible((void*)fdt, offset, "sifive,uart0");
 
   if(offset < 0) {
-    return -1;
+    return -ENXIO;
   }
 
   pre_vc_sifive_serial_dtb_offset = offset;
@@ -139,9 +139,13 @@ static int sifive_init_one(struct nk_dev_info *info)
   int did_alloc = 0;
   int did_register = 0;
 
+  int res = -EINVAL;
+
   struct nk_dev *existing_device = nk_dev_info_get_device(info);
   if(existing_device != NULL) {
     ERROR("Trying to initialize a device node (%s) as SiFive Serial device when it already has a device: %s\n", nk_dev_info_get_name(info), existing_device->name); 
+    res = -EEXIST;
+    goto err_exit;
   }
 
 #ifdef NAUT_CONFIG_SIFIVE_SERIAL_EARLY_OUTPUT
@@ -157,9 +161,16 @@ static int sifive_init_one(struct nk_dev_info *info)
   did_alloc = 1;
 #endif
 
+  if(sifive == NULL) {
+      ERROR("Failed to allocate sifive_serial struct!\n");
+      res = -ENOMEM;
+      goto err_exit;
+  }
+
   void *mmio_base;
   size_t mmio_size;
-  if(nk_dev_info_read_register_block(info, &mmio_base, &mmio_size)) {
+  res = nk_dev_info_read_register_block(info, &mmio_base, &mmio_size);
+  if(res) {
     ERROR("init_one: Failed to read register block!\n");
     goto err_exit;
   }
@@ -170,7 +181,8 @@ static int sifive_init_one(struct nk_dev_info *info)
   sifive->regs->rxctrl = UART_RXCTRL_RXEN;
   sifive->regs->ie = 0b10;
 
-  if(nk_dev_info_read_irq(info, &sifive->irq)) {
+  res = nk_dev_info_read_irq(info, 0, &sifive->irq);
+  if(res) {
     ERROR("init_one: Failed to read IRQ!\n");
     goto err_exit;
   }
@@ -182,6 +194,7 @@ static int sifive_init_one(struct nk_dev_info *info)
 
   if(sifive->dev == NULL) {
     ERROR("init_one: Failed to register device!\n");
+    res = -ENOMEM;
     goto err_exit;
   } else {
     did_register = 1;
@@ -205,7 +218,7 @@ err_exit:
     free(sifive);
   }
 
-  return -1;
+  return res;
 }
 
 void sifive_serial_write(const char *b) {

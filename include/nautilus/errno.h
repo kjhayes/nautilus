@@ -60,7 +60,8 @@
 #define ERANGE      34  /* Math result not representable */
 
 // Kernel only (so we differ from linux)
-#define EINIT_DEFER    512 /* Similar to linux EPROBE_DEFER but from any init_stage, 
-                              (init function requests we try again later) */
+#define EINIT_DEFER    512 /* Like linux's EPROBE_DEFER but at any init_stage */
+#define EUNIMPL        513 /* This function is unimplemented for the device */
+#define EDEPTH         514 /* Recursive depth has been reached */
 
 #endif

@@ -192,7 +192,7 @@ static int plic_dev_revmap(void *state, nk_hwirq_t hwirq, nk_irq_t *irq)
 {
   struct sifive_plic *plic = (struct sifive_plic*)state;
   if(hwirq < PLIC_BASE_HWIRQ || hwirq >= PLIC_BASE_HWIRQ + plic->num_irqs) {
-    return -1;
+    return -ENXIO;
   }
   *irq = plic->irq_base + (hwirq-1);
   return 0;
@@ -208,7 +208,7 @@ static int plic_dev_translate(void *state, nk_dev_info_type_t type, const void *
       return 0;
     default:
       PLIC_ERROR("Cannot translate nk_dev_info IRQ's of type other than OF!\n");
-      return -1;
+      return -EINVAL;
   }
 }
 
@@ -313,19 +313,21 @@ static int plic_dev_irq_status(void *state, nk_hwirq_t hwirq)
 
 static int plic_interrupt_handler(struct nk_irq_action *action, struct nk_regs *regs, void *state) 
 {
+  int res;
   struct sifive_plic *plic = (struct sifive_plic *)state;
 
   nk_hwirq_t hwirq;
   plic_dev_ack_irq(state, &hwirq);
 
   nk_irq_t irq = NK_NULL_IRQ;
-  if(plic_dev_revmap(state, hwirq, &irq)) {
-    return -1;
+  res = plic_dev_revmap(state, hwirq, &irq);
+  if(res) {
+    return res;
   }
 
   struct nk_irq_desc *desc = nk_irq_to_desc(irq);
   if(desc == NULL) {
-    return -1;
+    return -ENXIO;
   }
 
   nk_handle_irq_actions(desc, regs);
@@ -352,10 +354,13 @@ static int plic_init_dev_info(struct nk_dev_info *info)
   int did_register = 0;
   int did_context_alloc = 0;
 
+  int res;
+
   uint8_t flags = irq_disable_save();
 
   if(info->type != NK_DEV_INFO_OF) {
     PLIC_ERROR("Currently only support device tree initialization!\n");
+    res = -EINVAL;
     goto err_exit;
   }
 
@@ -370,24 +375,28 @@ static int plic_init_dev_info(struct nk_dev_info *info)
 
   if(!found_global_slot) {
       PLIC_WARN("Found more PLIC's than MAX_NUM_PLICS (%u)!\n", MAX_NUM_PLICS);
+      res = -ENOMEM;
       goto err_exit;
   }
 
   if(plic == NULL) 
   {
     PLIC_ERROR("Failed to allocate PLIC struct!\n");
+    res = -ENOMEM;
     goto err_exit;
   }
   did_alloc = 1;
 
   memset(plic, 0, sizeof(struct sifive_plic));
 
-  if(nk_dev_info_read_register_block(info, &plic->mmio_base, &plic->mmio_size)) {
+  res = nk_dev_info_read_register_block(info, &plic->mmio_base, &plic->mmio_size);
+  if(res) {
     PLIC_ERROR("Failed to read register block!\n");
     goto err_exit;
   }
 
-  if(nk_dev_info_read_u32(info, "riscv,ndev", &plic->num_irqs)) {
+  res = nk_dev_info_read_u32(info, "riscv,ndev", &plic->num_irqs);
+  if(res) {
     PLIC_ERROR("Failed to read number of IRQ's!\n");
     goto err_exit;
   }
@@ -399,6 +408,7 @@ static int plic_init_dev_info(struct nk_dev_info *info)
 
   if(dev == NULL) {
     PLIC_ERROR("Failed to register IRQ device!\n");
+    res = -ENOMEM;
     goto err_exit;
   } else {
     did_register = 1;
@@ -406,7 +416,8 @@ static int plic_init_dev_info(struct nk_dev_info *info)
 
   nk_dev_info_set_device(info, (struct nk_dev*)dev);
 
-  if(nk_request_irq_range(plic->num_irqs, &plic->irq_base)) {
+  res = nk_request_irq_range(plic->num_irqs, &plic->irq_base);
+  if(res) {
     PLIC_ERROR("Failed to get IRQ numbers!\n");
     goto err_exit;
   }
@@ -416,22 +427,31 @@ static int plic_init_dev_info(struct nk_dev_info *info)
   plic->irq_descs = nk_alloc_irq_descs(plic->num_irqs, PLIC_BASE_HWIRQ, 0, dev);
   if(plic->irq_descs == NULL) {
     PLIC_ERROR("Failed to allocate IRQ descriptors!\n");
+    res = -ENOMEM;
     goto err_exit;
   }
 
-  if(nk_assign_irq_descs(plic->num_irqs, plic->irq_base, plic->irq_descs)) {
+  res = nk_assign_irq_descs(plic->num_irqs, plic->irq_base, plic->irq_descs);
+  if(res) {
     PLIC_ERROR("Failed to assign IRQ descriptors!\n");
     goto err_exit;
   }
 
   PLIC_DEBUG("Created and Assigned IRQ Descriptors\n");
 
-  plic->num_contexts = nk_dev_info_num_irq(info);
+  size_t num_contexts;
+  res = nk_dev_info_num_irq(info, &num_contexts);
+  if(res) {
+      PLIC_ERROR("Failed to get number of IRQ's from device tree!\n");
+      goto err_exit;
+  }
+  plic->num_contexts = num_contexts;
   PLIC_DEBUG("num_contexts = %u\n", plic->num_contexts);
 
   plic->contexts = malloc(sizeof(struct sifive_plic_context) * plic->num_contexts);
   if(plic->contexts == NULL) {
     PLIC_ERROR("Failed to allocate PLIC contexts!\n");
+    res = -ENOMEM;
     goto err_exit;
   }
   did_context_alloc = 1;
@@ -454,14 +474,15 @@ static int plic_init_dev_info(struct nk_dev_info *info)
         PLIC_DEBUG("IRQ Parent Parent = %s\n", nk_dev_info_get_name(cpu_node));
     }
 
-    nk_irq_t ctx_irq = nk_dev_info_read_irq(info, i);
-    plic->contexts[i].irq = ctx_irq;
-
-    if(ctx_irq == NK_NULL_IRQ) {
+    nk_irq_t ctx_irq;
+    res = nk_dev_info_read_irq(info, i, &ctx_irq);
+    if(res) {
+      plic->contexts[i].irq = NK_NULL_IRQ;
       plic->contexts[i].exists = 0;
       PLIC_ERROR("Context (%u) does not exist\n", i);
       continue;
     } else {
+      plic->contexts[i].irq = ctx_irq;
       plic->contexts[i].exists = 1;
       PLIC_DEBUG("Context (%u) has nk_irq_t (%u)\n", i, ctx_irq);
       nk_dump_irq(ctx_irq);
@@ -482,7 +503,8 @@ static int plic_init_dev_info(struct nk_dev_info *info)
         if(desc->hwirq == PLIC_SMODE_HLIC_HWIRQ) {
   
           // Register the supervisor interrupt handler
-          if(nk_irq_add_handler_dev(ctx_irq, plic_interrupt_handler, (void*)plic, (struct nk_dev*)dev)) {
+          res = nk_irq_add_handler_dev(ctx_irq, plic_interrupt_handler, (void*)plic, (struct nk_dev*)dev);
+          if(res) {
             PLIC_ERROR("Failed to assign IRQ handler to context (%u)!\n");
             goto err_exit;
           }
@@ -499,6 +521,7 @@ static int plic_init_dev_info(struct nk_dev_info *info)
 
   if(!smode_handler_set) {
     PLIC_ERROR("Could not find HLIC hwirq %u!\n", PLIC_SMODE_HLIC_HWIRQ);
+    res = -EINVAL;
     goto err_exit;
   }
 
@@ -522,7 +545,7 @@ err_exit:
     nk_irq_dev_unregister(dev);
   }
   irq_enable_restore(flags);
-  return -1;
+  return res;
 }
 
 static const char * plic_properties_names[] = {

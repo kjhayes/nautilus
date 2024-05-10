@@ -31,6 +31,7 @@
 #include<nautilus/of/dt.h>
 #include<nautilus/of/fdt.h>
 #include<nautilus/dev.h>
+#include<nautilus/dev_info.h>
 #include<nautilus/init.h>
 #include<nautilus/endian.h>
 #include<nautilus/interrupt.h>
@@ -288,37 +289,42 @@ static int dt_node_read_register_blocks(void *state, void **bases, size_t *sizes
   return 0;
 }
 
-static nk_irq_t dt_node_translate_irq_from_parent(struct dt_node *node, struct dt_node *interrupt_parent, const void *raw_irq)
+static nk_irq_t dt_node_translate_irq_from_parent(struct dt_node *node, struct dt_node *interrupt_parent, const void *raw_irq, nk_irq_t *out_irq)
 {
+  int res;
+
   if(!(interrupt_parent->dev_info.flags & NK_DEV_INFO_FLAG_HAS_DEVICE) || interrupt_parent->dev_info.dev == NULL)  {
     // It has an interrupt parent but it's driver hasn't been called yet
     ERROR("Interrupt Parent does not have a device!\n");
-    return NK_NULL_IRQ;
+    // It may just not be initialized yet, we should "defer" and try again
+    // later (not -EAGAIN because we are sequential).
+    return -EINIT_DEFER;
   }
   struct nk_dev *dev = interrupt_parent->dev_info.dev;
 
   if(dev->type != NK_DEV_IRQ) {
     // It has an interrupt parent but it isn't an IRQ chip?
     ERROR("Interrupt Parent is not an IRQ device!\n");
-    return NK_NULL_IRQ;
+    return -EINVAL;
   }
 
   struct nk_irq_dev *irq_dev = (struct nk_irq_dev *)dev;
   DEBUG("Calling nk_irq_dev translate on device: %s\n", dev->name);
 
   nk_hwirq_t hwirq;
-  if(nk_irq_dev_translate(irq_dev, node->dev_info.type, raw_irq, &hwirq)) {
+  res = nk_irq_dev_translate(irq_dev, node->dev_info.type, raw_irq, &hwirq);
+  if(res) {
     ERROR("Failed to translate HWIRQ!\n");
-    return NK_NULL_IRQ;
+    return res;
   }
 
-  nk_irq_t irq;
-  if(nk_irq_dev_revmap(irq_dev, hwirq, &irq)) {
+  res = nk_irq_dev_revmap(irq_dev, hwirq, out_irq);
+  if(res) {
     ERROR("Failed to revmap IRQ: dev=%s, hwirq=%d\n", dev->name, hwirq);
-    return NK_NULL_IRQ;
+    return res;
   }
 
-  return irq;
+  return 0;
 }
 
 static int dt_node_cache_irq_ext_data(struct dt_node *node) 
@@ -327,7 +333,7 @@ static int dt_node_cache_irq_ext_data(struct dt_node *node)
   const uint32_t *raw = fdt_getprop(node->dtb, node->dtb_offset, "interrupts-extended", &raw_len);
 
   if(raw == NULL) {
-    return -1;
+    return -ENXIO;
   }
 
   const void *original_raw = raw;
@@ -349,7 +355,7 @@ static int dt_node_cache_irq_ext_data(struct dt_node *node)
 
     if(parent == NULL) {
       ERROR("phandle in \"interrupts-extended\" does not correspond to a device tree node! (phandle = 0x%x)\n", phandles[num_irqs]);
-      return -1;
+      return -ENXIO;
     }
 
     int interrupt_cells_len = 0;
@@ -357,7 +363,7 @@ static int dt_node_cache_irq_ext_data(struct dt_node *node)
 
     if(interrupt_cells_ptr == NULL) {
       ERROR("Could not get \"#interrupt-cells\" property from parent node in \"interrupts-extended\"!\n");
-      return -1;
+      return -ENXIO;
     }
 
     raw += be32toh(*interrupt_cells_ptr);
@@ -376,22 +382,25 @@ static int dt_node_cache_irq_ext_data(struct dt_node *node)
   return 0;
 }
 
-static nk_irq_t dt_node_read_interrupts_extended(struct dt_node *node, int index) 
+static int dt_node_read_interrupts_extended(struct dt_node *node, int index, nk_irq_t *out_irq) 
 {
   if((node->flags & DT_NODE_FLAG_CACHED_IRQ_EXT_DATA) == 0) {
-    if(dt_node_cache_irq_ext_data(node)) {
-        return NK_NULL_IRQ;
+    int res = dt_node_cache_irq_ext_data(node);
+    if(res) {
+        return res;
     }
   }
   if((node->flags & DT_NODE_FLAG_CACHED_IRQ_EXT_DATA) == 0) {
-    return NK_NULL_IRQ;
+    // This shouldn't be possible
+    return -EINVAL;
   }
   
   // From this point on it's an error if this fails
 
   if(index >= node->num_irq_extended) {
     ERROR("Requested interrupt index (%u) from a device tree node with only (%u) interrupts!\n", index, node->num_irq_extended);
-    return NK_NULL_IRQ;
+    *out_irq = NK_NULL_IRQ;
+    return -ENXIO;
   }
 
   int raw_len;
@@ -400,7 +409,8 @@ static nk_irq_t dt_node_read_interrupts_extended(struct dt_node *node, int index
   if(raw == NULL) {
     // Should not be possible but check anyways
     ERROR("dt_node_cache_ext_irq succeeded but \"interrupts-extended\" property is not present!\n");
-    return NK_NULL_IRQ;
+    *out_irq = NK_NULL_IRQ;
+    return -ENXIO;
   }
 
   const void *raw_irq = ((void*)raw) + node->extended_offsets[index]; 
@@ -410,10 +420,11 @@ static nk_irq_t dt_node_read_interrupts_extended(struct dt_node *node, int index
   if(interrupt_parent == NULL) {
     // Should not be possible but check anyways
     ERROR("Could not get interrupt parent phandle (%u)!\n", parent_phandle);
-    return NK_NULL_IRQ;
+    *out_irq = NK_NULL_IRQ;
+    return -ENXIO;
   }
 
-  return dt_node_translate_irq_from_parent(node, interrupt_parent, raw_irq);
+  return dt_node_translate_irq_from_parent(node, interrupt_parent, raw_irq, out_irq);
 }
 
 static struct dt_node * dt_node_read_interrupts_extended_parent(struct dt_node *node, int index) 
@@ -502,14 +513,15 @@ static int dt_node_cache_irq_data(struct dt_node *node)
   return 0;
 }
 
-static nk_irq_t dt_node_read_interrupts(struct dt_node *node, int index) 
+static int dt_node_read_interrupts(struct dt_node *node, int index, nk_irq_t *out_irq) 
 { 
   int raw_irqs_len;
   const void *raw_irqs = fdt_getprop(node->dtb, node->dtb_offset, "interrupts", &raw_irqs_len);
 
   if(raw_irqs == NULL) {
     ERROR("DTB node is missing \"interrupts\" property!\n");
-    return NK_NULL_IRQ;
+    *out_irq = NK_NULL_IRQ;
+    return -ENXIO;
   }
 
   struct dt_node *interrupt_parent = dt_node_get_interrupt_parent(node);
@@ -518,34 +530,40 @@ static nk_irq_t dt_node_read_interrupts(struct dt_node *node, int index)
   {
     // It has no interrupt parent
     ERROR("dt_node_read_interrupts: Called on Node with no Interrupt Parent!\n");
-    return NK_NULL_IRQ;
+    *out_irq = NK_NULL_IRQ;
+    return -ENXIO;
   }
 
   if((node->flags & DT_NODE_FLAG_CACHED_IRQ_DATA) == 0) {
     if(dt_node_cache_irq_data(node)) {
       ERROR("Could not get IRQ num or cells!\n");
-      return NK_NULL_IRQ;
+      *out_irq = NK_NULL_IRQ;
+      return -ENXIO;
     }
   }
 
   if(index >= node->num_irq) {
     ERROR("Invalid interrupt index (%u) is being read from device tree \"interrupts\" property with only (%u) interrupts!\n", index, node->num_irq);
-    return NK_NULL_IRQ;
+    *out_irq = NK_NULL_IRQ;
+    return -ENXIO;
   }
 
   const void *raw_irq = ((uint32_t*)raw_irqs) + (node->irq_cells * index);
 
-  return dt_node_translate_irq_from_parent(node, interrupt_parent, raw_irq);
+  return dt_node_translate_irq_from_parent(node, interrupt_parent, raw_irq, out_irq);
 }
 
-static nk_irq_t dt_node_read_irq(void *state, int index) 
+static int dt_node_read_irq(void *state, int index, nk_irq_t *out_irq) 
 { 
   struct dt_node *node = (struct dt_node *)state;
-  nk_irq_t irq = dt_node_read_interrupts_extended(node, index);
-  if(irq == NK_NULL_IRQ) {
-    irq = dt_node_read_interrupts(node, index);
+  int res = dt_node_read_interrupts_extended(node, index, out_irq);
+  if(res) {
+    res = dt_node_read_interrupts(node, index, out_irq);
+    if(res) {
+        return res;
+    }
   }
-  return irq;
+  return 0;
 }
 
 static struct nk_dev_info * dt_node_read_irq_parent(void *state, int index) {
@@ -558,28 +576,31 @@ static struct nk_dev_info * dt_node_read_irq_parent(void *state, int index) {
     return &parent->dev_info;
 }
 
-static int dt_node_num_interrupts_extended(struct dt_node *node, int *num) 
+static int dt_node_num_interrupts_extended(struct dt_node *node, size_t *num) 
 {
   if((node->flags & DT_NODE_FLAG_CACHED_IRQ_EXT_DATA) == 0) 
   {
-    dt_node_cache_irq_ext_data(node);
+    int res = dt_node_cache_irq_ext_data(node);
+    if(res) {
+        return res;
+    }
   }
   if((node->flags & DT_NODE_FLAG_CACHED_IRQ_EXT_DATA) == 0) 
   {
-    return -1;
+    return -ENXIO;
   }
   *num = node->num_irq_extended;
   return 0; 
 }
 
-static int dt_node_num_interrupts(struct dt_node *node, int *num) 
+static int dt_node_num_interrupts(struct dt_node *node, size_t *num) 
 {
   int raw_irqs_len;
   const void *raw_irqs = fdt_getprop(node->dtb, node->dtb_offset, "interrupts", &raw_irqs_len);
 
   if(raw_irqs == NULL) {
     ERROR("DTB node is missing \"interrupts\" property!\n");
-    return -1;
+    return -ENXIO;
   }
 
   struct dt_node *interrupt_parent = dt_node_get_interrupt_parent(node);
@@ -588,7 +609,7 @@ static int dt_node_num_interrupts(struct dt_node *node, int *num)
   {
     // It has no interrupt parent
     ERROR("Called on Node with no Interrupt Parent!\n");
-    return -1;
+    return -ENXIO;
   }
 
   int interrupt_cells_len;
@@ -596,12 +617,12 @@ static int dt_node_num_interrupts(struct dt_node *node, int *num)
 
   if(interrupt_cells_ptr == NULL) {
     ERROR("Could not read #interrupt-cells property from DTB interrupt parent node!\n");
-    return -1;
+    return -EINVAL;
   } 
 
   if(interrupt_cells_len < 4) {
     ERROR("#interrupt-cells property is less than one cell wide! len=%u\n", interrupt_cells_len);
-    return -1;
+    return -EINVAL;
   }
 
   if(interrupt_cells_len > 4) {
@@ -614,19 +635,21 @@ static int dt_node_num_interrupts(struct dt_node *node, int *num)
   return 0;
 }
 
-static int dt_node_num_irq(void *state) 
+static int dt_node_num_irq(void *state, size_t *out_num)
 {
   struct dt_node *node = (struct dt_node*)state;
-  int num;
+  int res;
 
-  if(dt_node_num_interrupts_extended(node, &num)) {
+  res = dt_node_num_interrupts_extended(node, out_num);
+  if(res) {
     // interrupts-extended failed, try interrupts
-    if(dt_node_num_interrupts(node, &num)) {
-      return 0;
+    res = dt_node_num_interrupts(node, out_num);
+    if(res) {
+      return res;
     }
   }
 
-  return num;
+  return 0;
 }
 
 static struct nk_dev_info_int dt_node_int = {

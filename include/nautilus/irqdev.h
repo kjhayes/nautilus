@@ -35,6 +35,7 @@
 #include<nautilus/nautilus.h>
 #include<nautilus/smp.h>
 #include<nautilus/dev.h>
+#include<nautilus/dev_info.h>
 
 struct nk_irq_dev_characteristics {};
 

@@ -90,7 +90,7 @@ static inline struct nk_irq_desc * __irq_to_desc(nk_irq_t irq)
 static inline int __irq_insert_desc(nk_irq_t irq, struct nk_irq_desc *desc) 
 {
   if(irq < 0 || irq > MAX_IRQ_NUM) {
-    return -1;
+    return -EINVAL;
   }
   descriptors[irq] = desc; 
   return 0;
@@ -108,7 +108,7 @@ int nk_request_irq_range(int n, nk_irq_t *out_base)
 #ifndef NAUT_CONFIG_SPARSE_IRQ
   if(irq_next_base + n > MAX_IRQ_NUM) {
     // Ran out of room 
-    return -1;
+    return -ENOMEM;
   }
 #endif
   // This could use some synchronization
@@ -199,11 +199,13 @@ int nk_assign_irq_desc(nk_irq_t irq, struct nk_irq_desc *desc)
 
 int nk_assign_irq_descs(int num, nk_irq_t base_irq, struct nk_irq_desc descs[num]) 
 {
+  int res;
   IRQ_DEBUG("Assigning IRQ's [%u - %u] descriptors\n", base_irq, base_irq + (num-1));
   for(int i = 0; i < num; i++) {
     descs[i].irq = base_irq + i;
-    if(__irq_insert_desc(base_irq + i, &descs[i])) {
-      return -1;
+    res = __irq_insert_desc(base_irq + i, &descs[i]);
+    if(res) {
+      return res;
     }
   }
   IRQ_DEBUG("Assigned irq range [%u - %u] to descs=%p\n", base_irq, base_irq + (num-1), descs);
@@ -214,13 +216,13 @@ int nk_set_irq_dev_percpu(cpu_id_t cpuid, nk_irq_t irq, struct nk_irq_dev *dev)
 {
   struct nk_irq_desc *desc = nk_irq_to_desc(irq);
   if(desc == NULL) {
-    return -1;
+    return -ENXIO;
   }
 
   if(desc->per_cpu_irq_devs == NULL) {
     desc->per_cpu_irq_devs = malloc(sizeof(struct nk_irq_dev*) * nk_get_num_cpus());
     if(desc->per_cpu_irq_devs == NULL) {
-      return -1;
+      return -ENOMEM;
     }
     memset(desc->per_cpu_irq_devs, 0, sizeof(struct nk_irq_dev*) * nk_get_num_cpus());
   }
@@ -245,7 +247,7 @@ int nk_set_all_irq_dev_percpu(nk_irq_t irq, struct nk_irq_dev **devs)
 {
   struct nk_irq_desc *desc = nk_irq_to_desc(irq);
   if(desc == NULL) {
-    return -1;
+    return -ENXIO;
   }
 
   desc->flags |= NK_IRQ_DESC_FLAG_PERCPU;
@@ -254,7 +256,7 @@ int nk_set_all_irq_dev_percpu(nk_irq_t irq, struct nk_irq_dev **devs)
     desc->per_cpu_irq_devs = devs;
     return 0;
   } else {
-    return -1;
+    return -EEXIST;
   }
 }
 
@@ -310,16 +312,16 @@ int nk_irq_add_handler_dev(nk_irq_t irq, nk_irq_handler_t handler, void *state, 
 {
   struct nk_irq_desc *desc = nk_irq_to_desc(irq);
   if(desc == NULL) {
-    return -1;
+    return -ENXIO;
   }
 
-  spin_lock(&desc->lock);
+  int flags = spin_lock_irq_save(&desc->lock);
 
   struct nk_irq_action *action = nk_irq_desc_add_action(desc);
 
   if(action == NULL) {
-    spin_unlock(&desc->lock);
-    return -1;
+    spin_unlock_irq_restore(&desc->lock, flags);
+    return -ENOMEM;
   }
 
   action->handler = handler;
@@ -328,7 +330,7 @@ int nk_irq_add_handler_dev(nk_irq_t irq, nk_irq_handler_t handler, void *state, 
   action->irq = irq;
   action->dev = dev;
 
-  spin_unlock(&desc->lock);
+  spin_unlock_irq_restore(&desc->lock, flags);
   return 0;
 }
 
@@ -336,12 +338,12 @@ int nk_irq_set_handler_early(nk_irq_t irq, nk_irq_handler_t handler, void *state
 {
   struct nk_irq_desc *desc = nk_irq_to_desc(irq);
   if(desc == NULL) {
-    return -1;
+    return -ENXIO;
   }
 
   if(desc->num_actions) {
     // Make sure we use the action within the descriptor itself
-    return -1;
+    return -EEXIST;
   }
    
   return nk_irq_add_handler(irq, handler, state);
@@ -354,7 +356,7 @@ int nk_irq_add_link_dev(nk_irq_t src, nk_irq_t dest, struct nk_dev *dev)
 {
   struct nk_irq_desc *src_desc = nk_irq_to_desc(src);
   if(src_desc == NULL) {
-    return -1;
+    return -ENXIO;
   }
 
   spin_lock(&src_desc->lock);
@@ -363,7 +365,7 @@ int nk_irq_add_link_dev(nk_irq_t src, nk_irq_t dest, struct nk_dev *dev)
 
   if(action == NULL) {
     spin_unlock(&src_desc->lock);
-    return -1;
+    return -ENOMEM;
   }
 
   action->link_irq = dest;
@@ -423,7 +425,8 @@ nk_irq_t nk_irq_find_range(int num_needed, int flags, uint16_t needed_flags, uin
 INTERRUPT static int __handle_irq_actions(struct nk_irq_desc *desc, struct nk_regs *regs, int depth) 
 {
   if(depth > MAX_IRQ_CHAIN_DEPTH) {
-    return -1;
+    // Which error this is doesn't really matter
+    return -EDEPTH;
   }
 
   // This is just to get a rough estimate,
@@ -440,7 +443,7 @@ INTERRUPT static int __handle_irq_actions(struct nk_irq_desc *desc, struct nk_re
     {
       case NK_IRQ_ACTION_TYPE_HANDLER:
         ret |= action->handler(action, regs, action->handler_state);
-	break;
+	    break;
       case NK_IRQ_ACTION_TYPE_LINK:
         link_desc = nk_irq_to_desc(action->link_irq);
         if(link_desc == NULL) {
@@ -470,7 +473,7 @@ int nk_map_irq_to_irqdev(nk_irq_t irq, struct nk_irq_dev *dev)
 {
   struct nk_irq_desc *desc = nk_irq_to_desc(irq);
   if(desc == NULL) {
-    return -1;
+    return -ENXIO;
   }
   desc->irq_dev = dev;
   return 0;
@@ -507,12 +510,12 @@ int nk_irq_is_assigned_to_irqdev(nk_irq_t irq)
 int nk_mask_irq(nk_irq_t irq) {
   struct nk_irq_desc *desc = nk_irq_to_desc(irq);
   if(desc == NULL) {
-    return 1;
+    return -ENXIO;
   }
   struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
   if(irq_dev == NULL) {
     if(desc->devless_status & IRQ_STATUS_ENABLED) {
-      return -1;
+      return -EINVAL;
     } else {
       return 0;
     }
@@ -523,14 +526,14 @@ int nk_mask_irq(nk_irq_t irq) {
 int nk_unmask_irq(nk_irq_t irq) {
   struct nk_irq_desc *desc = nk_irq_to_desc(irq);
   if(desc == NULL) {
-    return 1;
+    return -ENXIO;
   }
   struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
   if(irq_dev == NULL) {
     if(desc->devless_status & IRQ_STATUS_ENABLED) {
       return 0;
     } else {
-      return -1;
+      return -EINVAL;
     }
   }
   return nk_irq_dev_enable_irq(irq_dev, desc->hwirq);
@@ -541,18 +544,18 @@ int nk_send_ipi(nk_irq_t irq, cpu_id_t cpu) {
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
   if(desc == NULL) {
     IRQ_ERROR("Called nk_send_ipi on IRQ with NULL descriptor!\n");
-    return 1;
+    return -ENXIO;
   }
   if(!(desc->flags & NK_IRQ_DESC_FLAG_IPI)) {
     IRQ_ERROR("Called nk_send_ipi on IRQ without NK_IRQ_DESC_FLAG_IPI!\n");
-    return 1;
+    return -EINVAL;
   }
 #endif
   struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
   if(irq_dev == NULL) {
     IRQ_ERROR("Called nk_send_ipi on IRQ without an irq_dev!\n");
-    return 1;
+    return -EINVAL;
   }
 #endif
   return nk_irq_dev_send_ipi(irq_dev, desc->hwirq, cpu);
@@ -563,18 +566,18 @@ int nk_broadcast_ipi(nk_irq_t irq) {
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(desc == NULL) {
         IRQ_ERROR("Called nk_broadcast_ipi on IRQ with NULL descriptor!\n");
-        return 1;
+        return -ENXIO;
     }
     if(!(desc->flags & NK_IRQ_DESC_FLAG_IPI)) {
         IRQ_ERROR("Called nk_broadcast_ipi on IRQ without NK_IRQ_DESC_FLAG_IPI!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(irq_dev == NULL) {
         IRQ_ERROR("Called nk_broadcast_ipi on IRQ without an irq_dev!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     return nk_irq_dev_broadcast_ipi(irq_dev, desc->hwirq);
@@ -585,18 +588,18 @@ int nk_irq_msi_addr(nk_irq_t irq, void **addr) {
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(desc == NULL) {
         IRQ_ERROR("Called nk_irq_msi_addr on IRQ with NULL descriptor!\n");
-        return 1;
+        return -ENXIO;
     }
     if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
         IRQ_ERROR("Called nk_irq_msi_addr on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(irq_dev == NULL) {
         IRQ_ERROR("Called nk_irq_msi_addr on IRQ without an irq_dev!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     return nk_irq_dev_msi_addr(irq_dev, desc->hwirq, addr);
@@ -607,18 +610,18 @@ int nk_irq_msi_x_addr(nk_irq_t irq, void **addr) {
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(desc == NULL) {
         IRQ_ERROR("Called nk_irq_msi_x_addr on IRQ with NULL descriptor!\n");
-        return 1;
+        return -ENXIO;
     }
     if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
         IRQ_ERROR("Called nk_irq_msi_x_addr on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(irq_dev == NULL) {
         IRQ_ERROR("Called nk_irq_msi_x_addr on IRQ without an irq_dev!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     return nk_irq_dev_msi_x_addr(irq_dev, desc->hwirq, addr);
@@ -629,18 +632,18 @@ int nk_irq_msi_msg(nk_irq_t irq, uint16_t *msg) {
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(desc == NULL) {
         IRQ_ERROR("Called nk_irq_msi_msg on IRQ with NULL descriptor!\n");
-        return 1;
+        return -ENXIO;
     }
     if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
         IRQ_ERROR("Called nk_irq_msi_msg on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(irq_dev == NULL) {
         IRQ_ERROR("Called nk_irq_msi_msg on IRQ without an irq_dev!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     return nk_irq_dev_msi_msg(irq_dev, desc->hwirq, msg);
@@ -651,18 +654,18 @@ int nk_irq_msi_x_msg(nk_irq_t irq, uint32_t *msg) {
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(desc == NULL) {
         IRQ_ERROR("Called nk_irq_msi_x_msg on IRQ with NULL descriptor!\n");
-        return 1;
+        return -ENXIO;
     }
     if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
         IRQ_ERROR("Called nk_irq_msi_x_msg on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(irq_dev == NULL) {
         IRQ_ERROR("Called nk_irq_msi_x_msg on IRQ without an irq_dev!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     return nk_irq_dev_msi_x_msg(irq_dev, desc->hwirq, msg);
@@ -673,18 +676,18 @@ int nk_irq_msi_block_size(nk_irq_t irq, size_t *block_size) {
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(desc == NULL) {
         IRQ_ERROR("Called nk_irq_msi_block_size on IRQ with NULL descriptor!\n");
-        return 1;
+        return -ENXIO;
     }
     if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
         IRQ_ERROR("Called nk_irq_msi_block_size on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(irq_dev == NULL) {
         IRQ_ERROR("Called nk_irq_msi_block_size on IRQ without an irq_dev!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     return nk_irq_dev_msi_block_size(irq_dev, desc->hwirq, block_size);
@@ -695,18 +698,18 @@ int nk_irq_msi_index_block(nk_irq_t irq, size_t index, nk_irq_t *out) {
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(desc == NULL) {
         IRQ_ERROR("Called nk_irq_msi_index_block on IRQ with NULL descriptor!\n");
-        return 1;
+        return -ENXIO;
     }
     if(!(desc->flags & NK_IRQ_DESC_FLAG_MSI)) {
         IRQ_ERROR("Called nk_irq_msi_index_block on IRQ without NK_IRQ_DESC_FLAG_MSI!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     struct nk_irq_dev *irq_dev = nk_irq_desc_to_irqdev(desc);
 #ifdef NAUT_CONFIG_ENABLE_ASSERTS
     if(irq_dev == NULL) {
         IRQ_ERROR("Called nk_irq_msi_index_block on IRQ without an irq_dev!\n");
-        return 1;
+        return -EINVAL;
     }
 #endif
     nk_hwirq_t out_hwirq;
@@ -721,12 +724,14 @@ int nk_irq_msi_index_block(nk_irq_t irq, size_t index, nk_irq_t *out) {
 
 INTERRUPT int nk_handle_interrupt_generic(struct nk_irq_action *action, struct nk_regs *regs, struct nk_irq_dev *irq_dev) 
 {
+  int res;
   nk_hwirq_t hwirq;
   nk_irq_dev_ack(irq_dev, &hwirq);
 
   nk_irq_t irq = NK_NULL_IRQ;
-  if(nk_irq_dev_revmap(irq_dev, hwirq, &irq)) {
-    return -1;
+  res = nk_irq_dev_revmap(irq_dev, hwirq, &irq);
+  if(res) {
+    return res;
   }
 
   struct nk_irq_desc *desc = nk_irq_to_desc(irq);
@@ -753,8 +758,10 @@ int nk_dump_irq(nk_irq_t i)
 
   if(desc == NULL) 
   {
-    return -1;
+    return -ENXIO;
   }
+
+  int flags = spin_lock_irq_save(&desc->lock);
 
   printk("%u: triggered count = %u, num_actions = %u, irqdev = %s, hwirq = %u "
       "%s%s%s%s\n",
@@ -843,6 +850,8 @@ int nk_dump_irq(nk_irq_t i)
         break;
     }
   }    
+
+  spin_unlock_irq_restore(&desc->lock, flags);
 
   return 0;
 }

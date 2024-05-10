@@ -424,14 +424,19 @@ static int pl011_interrupt_handler(struct nk_irq_action *action, struct nk_regs 
 
 int pl011_uart_init_one(struct nk_dev_info *info) 
 {
-  struct nk_dev *existing_device = nk_dev_info_get_device(info);
-  if(existing_device != NULL) {
-    ERROR("Trying to initialize a device node (%s) as PL011 when it already has a device: %s\n", nk_dev_info_get_name(info), existing_device->name); 
-  }
-
   struct pl011_uart *uart;
   int did_alloc = 0;
   int registered_device = 0;
+
+  int res;
+
+  struct nk_dev *existing_device = nk_dev_info_get_device(info);
+  if(existing_device != NULL) {
+    ERROR("Trying to initialize a device node (%s) as PL011 when it already has a device: %s\n", nk_dev_info_get_name(info), existing_device->name); 
+    res = -EEXIST;
+    goto err_exit;
+  }
+
 #ifdef NAUT_CONFIG_PL011_UART_EARLY_OUTPUT
   if(info->type == NK_DEV_INFO_OF && ((struct dt_node *)info->state)->dtb_offset != pre_vc_pl011_dtb_offset) { 
     uart = malloc(sizeof(struct pl011_uart));
@@ -446,25 +451,26 @@ int pl011_uart_init_one(struct nk_dev_info *info)
 
   if(uart == NULL) {
     ERROR("init_one: uart = NULL\n");
+    res = -ENOMEM;
     goto err_exit;
   }
 
   size_t mmio_size;
-  int ret;
-  ret = nk_dev_info_read_register_block(info, &uart->mmio_base, &mmio_size);
-  if(ret) {
-    ERROR("init_one: Failed to read register block! ret = %u\n", ret);
+
+  res = nk_dev_info_read_register_block(info, &uart->mmio_base, &mmio_size);
+  if(res) {
+    ERROR("init_one: Failed to read register block! (res = %d)\n", res);
     goto err_exit;
   }
 
-  if(pl011_uart_configure(uart)) {
+  res = pl011_uart_configure(uart);
+  if(res) {
     ERROR("init_one: Failed to configure PL011!\n");
     goto err_exit;
   }
 
-  uart->irq = nk_dev_info_read_irq(info, 0);
-
-  if(uart->irq == NK_NULL_IRQ) {
+  res = nk_dev_info_read_irq(info, 0, &uart->irq);
+  if(res) {
     ERROR("init_one: Failed to read IRQ!\n");
     goto err_exit;
   }
@@ -476,17 +482,27 @@ int pl011_uart_init_one(struct nk_dev_info *info)
 
   if(uart->dev == NULL) {
     ERROR("init_one: Failed to allocate PL011 chardev!\n");
+    res = -ENOMEM;
     goto err_exit;
   }
   registered_device = 1;
 
-  nk_dev_info_set_device(info, (struct nk_dev*)uart->dev);
+  res = nk_dev_info_set_device(info, (struct nk_dev*)uart->dev);
+  if(res) {
+      ERROR("init_one: Failed to associate the device and dev_info!\n");
+      goto err_exit;
+  }
 
   // Clear out spurrious interrupts
   uint32_t int_status = pl011_read_reg(uart, UART_RAW_INT_STAT);
   pl011_write_reg(uart, UART_INT_CLR, int_status);
 
-  nk_irq_add_handler_dev(uart->irq, pl011_interrupt_handler, (void*)uart, (struct nk_dev*)uart->dev);
+  res = nk_irq_add_handler_dev(uart->irq, pl011_interrupt_handler, (void*)uart, (struct nk_dev*)uart->dev);
+  if(res) {
+      ERROR("init_one: Failed to assign IRQ handler!\n");
+      goto err_exit;
+  }
+
   nk_unmask_irq(uart->irq);
 
   pl011_write_reg(uart, UART_INT_MASK, 0x50);
@@ -500,7 +516,7 @@ err_exit:
   if(registered_device) {
     nk_char_dev_unregister(uart->dev);
   }
-  return 1;
+  return res;
 }
 
 static struct of_dev_id pl011_dev_ids[] = {

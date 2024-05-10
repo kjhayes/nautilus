@@ -159,6 +159,8 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
   int did_map = 0;
   int did_register = 0;
 
+  int res;
+
   struct uart_8250_port *port = NULL;
     
 #ifdef NAUT_CONFIG_OF_8250_UART_EARLY_OUTPUT
@@ -170,6 +172,7 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
      port = malloc(sizeof(struct uart_8250_port));
      memset(port, 0, sizeof(struct uart_8250_port));
      if(port == NULL) {
+       res = -ENOMEM;
        goto err_exit;
      }
      did_alloc = 1;
@@ -180,6 +183,7 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
 
   if(port == NULL) {
     ERROR("Failed to allocate UART!\n");
+    res = -ENOMEM;
     goto err_exit;
   }
 
@@ -206,7 +210,8 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
 
     void * reg_base;
     size_t reg_size;
-    if(nk_dev_info_read_register_block(info, &reg_base, &reg_size)) {
+    res = nk_dev_info_read_register_block(info, &reg_base, &reg_size);
+    if(res) {
       ERROR("Failed to read register block for UART!\n");
       goto err_exit;
     }
@@ -242,6 +247,7 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
     port->reg_base = nk_io_map(reg_base, reg_size, 0);
     if((void*)port->reg_base == NULL) {
       ERROR("Failed to map UART registers!\n");
+      res = -EFAULT;
       goto err_exit;
     } else {
       DEBUG("Mapped I/O registers for UART\n");
@@ -252,9 +258,8 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
   }
 #endif
 
-  port->irq = nk_dev_info_read_irq(info, 0);
-
-  if(port->irq == NK_NULL_IRQ) {
+  res = nk_dev_info_read_irq(info, 0, &port->irq);
+  if(res) {
     ERROR("Failed to read UART irq!\n");
     goto err_exit;
   }
@@ -267,6 +272,7 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
 
   if(dev == NULL) {
     ERROR("Failed to register UART as a character device!\n");
+    res = -ENOMEM;
     goto err_exit;
   }
   did_register = 1;
@@ -280,8 +286,10 @@ static int of_8250_dev_init_one(struct nk_dev_info *info)
   uart_port_set_parity(&port->port, UART_PARITY_ODD);
   uart_port_set_stop_bits(&port->port, 2);
 
-  if(nk_irq_add_handler_dev(port->irq, uart_8250_interrupt_handler, (void*)port, (struct nk_dev *)dev)) {
+  res = nk_irq_add_handler_dev(port->irq, uart_8250_interrupt_handler, (void*)port, (struct nk_dev *)dev);
+  if(res) {
     ERROR("Failed to add IRQ handler for UART!\n");
+    goto err_exit;
   }
 
   generic_8250_enable_fifos(port);
@@ -303,7 +311,7 @@ err_exit:
   if(did_register) {
     nk_char_dev_unregister(dev);
   }
-  return -1;
+  return res;
 }
 
 

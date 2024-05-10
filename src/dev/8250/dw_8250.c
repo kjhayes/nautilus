@@ -115,12 +115,12 @@ static int dw_8250_fdt_init(uint64_t dtb, uint64_t offset, struct dw_8250 *dw) {
     fdt_reg_t reg = { .address = 0, .size = 0 };
 
     if(fdt_getreg((void*)dtb, offset, &reg)) {
-      return -1;
+      return -ENXIO;
     }
 
     dw->port.reg_base = nk_io_map(reg.address, reg.size, 0);
     if(dw->port.reg_base == NULL) {
-      return -1;
+      return -EFAULT;
     }
 
     // Set default ops
@@ -175,6 +175,8 @@ static int dw_8250_pre_vc_init(void)
 
   memset(&pre_vc_dw_8250, 0, sizeof(struct dw_8250));
 
+  int res;
+
   // KJH - HACK for getting to rockpro64 uart2
   int uart_num = 2;
   // UART 0
@@ -184,13 +186,14 @@ static int dw_8250_pre_vc_init(void)
   }
 
   if(offset < 0) {
-    return -1;
+    return -ENXIO;
   }
 
   pre_vc_dw_8250_dtb_offset = offset;
 
-  if(dw_8250_fdt_init(dtb, offset, &pre_vc_dw_8250)) {
-    return -1;
+  res = dw_8250_fdt_init(dtb, offset, &pre_vc_dw_8250);
+  if(res) {
+    return res;
   }
 
   generic_8250_disable_fifos(&pre_vc_dw_8250.port);
@@ -201,8 +204,9 @@ static int dw_8250_pre_vc_init(void)
   uart_port_set_parity(&pre_vc_dw_8250.port.port, UART_PARITY_NONE);
   uart_port_set_stop_bits(&pre_vc_dw_8250.port.port, 2);
 
-  if(nk_pre_vc_register(dw_8250_early_putchar, NULL)) {
-    return -1;
+  res = nk_pre_vc_register(dw_8250_early_putchar, NULL);
+  if(res) {
+    return res;
   }
 
   return 0;
@@ -219,6 +223,8 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
   int did_map = 0;
   int did_register = 0;
 
+  int res;
+
   struct dw_8250 *dw = NULL;
     
 #ifdef NAUT_CONFIG_DW_8250_UART_EARLY_OUTPUT
@@ -228,10 +234,11 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
   } else {
      DEBUG("Initializing new DW 8250 UART\n");
      dw = malloc(sizeof(struct dw_8250));
-     memset(dw, 0, sizeof(struct dw_8250));
      if(dw == NULL) {
+       res = -ENOMEM;
        goto err_exit;
      }
+     memset(dw, 0, sizeof(struct dw_8250));
      did_alloc = 1;
   }
 #else
@@ -240,6 +247,7 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
 
   if(dw == NULL) {
     ERROR("Failed to allocate DW UART!\n");
+    res = -ENOMEM;
     goto err_exit;
   }
 
@@ -262,6 +270,7 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
   size_t reg_size;
   if(nk_dev_info_read_register_block(info, &reg_base, &reg_size)) {
     ERROR("Failed to read register block for DW UART!\n");
+    res = -EINVAL;
     goto err_exit;
   }
 
@@ -274,6 +283,7 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
     dw->port.reg_base = nk_io_map(reg_base, reg_size, 0);
     if(dw->port.reg_base == NULL) {
       ERROR("Failed to map DW UART registers!\n");
+      res = -EFAULT;
       goto err_exit;
     } else {
       DEBUG("Mapped I/O registers for DW UART\n");
@@ -302,8 +312,7 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
     dw->port.reg_shift = 0;
   }
 
-  dw->port.irq = nk_dev_info_read_irq(info, 0);
-
+  res = nk_dev_info_read_irq(info, 0, &dw->port.irq);
   if(dw->port.irq == NK_NULL_IRQ) {
     ERROR("Failed to read DW UART irq!\n");
     goto err_exit;
@@ -317,6 +326,7 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
 
   if(dev == NULL) {
     ERROR("Failed to register DW UART as a character device!\n");
+    res = -ENOMEM;
     goto err_exit;
   }
   did_register = 1;
@@ -332,13 +342,17 @@ static int dw_8250_dev_init_one(struct nk_dev_info *info)
   uart_port_set_parity(&dw->port.port, UART_PARITY_ODD);
   uart_port_set_stop_bits(&dw->port.port, 2);
 
-  if(nk_irq_add_handler_dev(dw->port.irq, uart_8250_interrupt_handler, (void*)dw, (struct nk_dev *)dev)) {
+  res = nk_irq_add_handler_dev(dw->port.irq, uart_8250_interrupt_handler, (void*)dw, (struct nk_dev *)dev);
+  if(res) {
     ERROR("Failed to add IRQ handler for DW UART!\n");
+    goto err_exit;
   }
 
-  if(generic_8250_enable_fifos(&dw->port)) {
-      WARN("Failed to enable FIFO's!\n");
+  res = generic_8250_enable_fifos(&dw->port);
+  if(res) {
+      WARN("Failed to enable FIFO's (res = %d)!\n", res);
   } 
+
   generic_8250_enable_recv_interrupts(&dw->port);
 
   nk_dev_info_set_device(info, (struct nk_dev*)dev);
@@ -357,7 +371,7 @@ err_exit:
   if(did_register) {
     nk_char_dev_unregister(dev);
   }
-  return -1;
+  return res;
 }
 
 static struct of_dev_id dw_8250_of_dev_ids[] = {

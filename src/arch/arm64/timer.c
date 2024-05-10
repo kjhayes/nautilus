@@ -145,12 +145,19 @@ static nk_irq_t arch_timer_irq_num;
 int arm_timer_init_one(struct nk_dev_info *info) {
 
   int did_register = 0;
+  int res = -EINVAL;
 
   nk_irq_t irqs[4];
 
-  int num_irq = nk_dev_info_num_irq(info);
+  size_t num_irq;
+  res = nk_dev_info_num_irq(info, &num_irq);
+  if(res) {
+      TIMER_ERROR("Failed to read the number of timer IRQ's from the device tree!\n");
+      goto err_exit;
+  }
   if(num_irq < 4) {
     TIMER_ERROR("Invalid number of interrupts found in ARM timer device tree: (%u) < 4!\n", num_irq);
+    res = -EINVAL;
     goto err_exit;
   }
   else if(num_irq > 4) {
@@ -158,8 +165,9 @@ int arm_timer_init_one(struct nk_dev_info *info) {
   }
 
   for(int i = 0; i < 4; i++) {
-    nk_irq_t irq = nk_dev_info_read_irq(info, i);
-    if(irq == NK_NULL_IRQ) {
+    nk_irq_t irq;
+    res = nk_dev_info_read_irq(info, i, &irq);
+    if(res) {
       TIMER_ERROR("Could not get interrupt %u from device info!\n");
       goto err_exit; 
     }
@@ -173,6 +181,7 @@ int arm_timer_init_one(struct nk_dev_info *info) {
 
   if(dev == NULL) {
     TIMER_ERROR("Failed to register timer device!\n");
+    res = -EINVAL;
     goto err_exit;
   }
 
@@ -192,7 +201,7 @@ err_exit:
   if(did_register) {
     nk_dev_unregister(dev);
   }
-  return -1;
+  return res;
 }
 
 static struct of_dev_id timer_of_dev_ids[] = {

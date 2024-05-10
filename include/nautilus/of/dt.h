@@ -33,6 +33,7 @@
 #define __NAUT_DEVICE_TREE_H__
 
 #include<nautilus/dev.h>
+#include<nautilus/dev_info.h>
 
 #define DT_NODE_FLAG_INT_PARENT_PHANDLE  (1<<0)
 #define DT_NODE_FLAG_CACHED_IRQ_DATA     (1<<1)
