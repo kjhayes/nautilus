@@ -121,7 +121,7 @@
 #include <dev/port_gpio.h>
 #endif
 #include <dev/serial.h>
-#include <dev/vga.h>
+#include <dev/vga_early.h>
 #ifdef NAUT_CONFIG_VIRTIO_PCI
 #include <dev/virtio_pci.h>
 #endif

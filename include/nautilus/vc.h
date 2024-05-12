@@ -120,6 +120,12 @@ int nk_vc_is_active(void);
 int nk_vc_start_chardev_console(const char *chardev);
 int nk_vc_stop_chardev_console(char *chardev);
 
+int nk_vc_start_gpudev_console(const char *gpudev);
+int nk_vc_stop_gpudev_console(const char *gpudev);
+
+int nk_vc_make_gpudev_console_current(const char *name);
+int nk_vc_make_gpudev_console_private(const char *name);
+
 int nk_vc_deinit(void);
 
 

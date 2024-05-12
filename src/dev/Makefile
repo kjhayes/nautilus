@@ -3,7 +3,8 @@ obj-$(NAUT_CONFIG_ARCH_X86) += apic.o \
 	 ioapic.o \
 	 i8254.o \
 	 ps2.o \
-	 vga.o \
+	 vga_early.o \
+	 vga/ \
 
 obj-$(NAUT_CONFIG_HAS_PCI) += \
 	pci.o \

@@ -35,9 +35,10 @@
 #include <dev/ps2.h>
 #include <nautilus/vc.h>
 #include <nautilus/chardev.h>
+#include <nautilus/gpudev.h>
 #include <nautilus/printk.h>
 #include <dev/serial.h>
-#include <dev/vga.h>
+#include <dev/vga_early.h>
 
 #include <nautilus/shell.h>
 
@@ -113,13 +114,31 @@ struct chardev_console {
     struct list_head chardev_node;  // for list of chardev consoles
 };
 
+struct gpudev_console 
+{
+    char name[DEV_NAME_LEN];
+    struct nk_gpu_dev *dev;
+
+    nk_gpu_dev_video_mode_t mode;
+
+    struct nk_virtual_console *private_vc;
+    struct nk_virtual_console **cur_vc;
+
+    struct list_head gpudev_node;
+};
+
 // List of all chardev consoles in the system
 static struct list_head chardev_console_list;
-
+// List of all gpudev consoles in the system
+static struct list_head gpudev_console_list;
 
 // Broadcast updates to chardev consoles
 static void chardev_consoles_putchar(struct nk_virtual_console *vc, char data);
 static void chardev_consoles_print(struct nk_virtual_console *vc, char *data);
+
+// Broadcast updates to gpudev consoles
+static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x, uint32_t y, int state_lock_held);
+//static void gpudev_consoles_set_char(struct nk_virtual_console *vc, uint32_t x, uint32_t y, nk_gpu_dev_char_t *val);
 
 static nk_thread_id_t list_tid;
 
@@ -286,9 +305,8 @@ static int _switch_to_vc(struct nk_virtual_console *vc)
     copy_display_to_vc(cur_vc);
     cur_vc = vc;
     copy_vc_to_display(cur_vc);
-#ifdef NAUT_CONFIG_X86_64_HOST
-    vga_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
-#elif NAUT_CONFIG_XEON_PHI
+    gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 1);
+#if NAUT_CONFIG_XEON_PHI
     phi_cons_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
 #endif
   }
@@ -491,13 +509,12 @@ static int _vc_display_char_specific(struct nk_virtual_console *vc, uint8_t c, u
     if(vc == cur_vc) {
 #ifdef NAUT_CONFIG_X86_64_HOST
       vga_write_screen(x,y,val);
-      vga_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
 #endif
 #ifdef NAUT_CONFIG_XEON_PHI
       vga_write_screen(x,y,val);
       phi_cons_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
 #endif
-
+      gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
     }
   }
   return 0;
@@ -602,11 +619,9 @@ static int _vc_setpos(uint8_t x, uint8_t y)
   if (vc) {
     vc->cur_x = x;
     vc->cur_y = y;
-#ifdef NAUT_CONFIG_X86_64_HOST
     if (vc==cur_vc) {
-      vga_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
+      gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
     }
-#endif
   }
   return 0;
 }
@@ -668,11 +683,9 @@ static int _vc_setpos_specific(struct nk_virtual_console *vc, uint8_t x, uint8_t
   if (vc) {
     vc->cur_x = x;
     vc->cur_y = y;
-#ifdef NAUT_CONFIG_X86_64_HOST
     if (vc==cur_vc) {
-      vga_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
+      gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
     }
-#endif
   }
 
   return rc;
@@ -720,9 +733,8 @@ INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t
       vc->cur_y--;
     }
     if (vc==cur_vc) {
-#ifdef NAUT_CONFIG_X86_64_HOST
-      vga_set_cursor(vc->cur_x,vc->cur_y);
-#elif NAUT_CONFIG_XEON_PHI
+      gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
+#if NAUT_CONFIG_XEON_PHI
       phi_cons_set_cursor(vc->cur_x,vc->cur_y);
 #endif
     }
@@ -746,9 +758,8 @@ INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t
     }
   }
   if (vc==cur_vc) {
-#ifdef NAUT_CONFIG_X86_64_HOST
-    vga_set_cursor(vc->cur_x, vc->cur_y);
-#elif NAUT_CONFIG_XEON_PHI
+    gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
+#if NAUT_CONFIG_XEON_PHI
       phi_cons_set_cursor(vc->cur_x,vc->cur_y);
 #endif
   }
@@ -1566,6 +1577,7 @@ static int char_dev_write_all(struct nk_char_dev *dev,
 }
 
 #define MAX_MATCHING_CHARDEV_CONSOLES 64
+#define MAX_MATCHING_GPUDEV_CONSOLES 64
 
 static void _chardev_consoles_print(struct nk_virtual_console *vc, char *data, uint64_t len)
 {
@@ -1645,6 +1657,54 @@ static void chardev_consoles_print(struct nk_virtual_console *vc, char *data)
 static void chardev_consoles_putchar(struct nk_virtual_console *vc, char data)
 {
     _chardev_consoles_print(vc,&data,1);
+}
+
+static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x, uint32_t y, const int have_lock) 
+{
+    nk_gpu_dev_coordinate_t zero_coord = { 0 };
+    nk_gpu_dev_coordinate_t coord = {
+        .x = x,
+        .y = y,
+    };
+    
+    struct list_head *cur=0;
+    struct gpudev_console *c;
+    struct gpudev_console *matching_gdc[MAX_MATCHING_GPUDEV_CONSOLES];
+    int match_count = 0;
+    int match_cur;
+
+    STATE_LOCK_CONF;
+      
+    // search for matching consoles with the global lock held
+    // DOING NO OUTPUT AS WE DO SO TO AVOID POSSIBLE DEADLOCK
+
+    if(!have_lock) {
+      STATE_LOCK();
+    }
+
+    list_for_each(cur,&gpudev_console_list) {
+	c = list_entry(cur,struct gpudev_console, gpudev_node);
+	if (c && c->cur_vc && (*c->cur_vc) == vc) {
+	    matching_gdc[match_count++] = c;
+	    if (match_count==MAX_MATCHING_GPUDEV_CONSOLES) {
+		break;
+	    }
+	}
+    }
+
+    if(!have_lock) {
+      STATE_UNLOCK();
+    }
+
+    for(int i = 0; i < match_count; i++) {
+        c = matching_gdc[i];
+        if(c->mode.width <= x ||
+           c->mode.height <= y) {
+            nk_gpu_dev_text_set_cursor(c->dev, &zero_coord, 0);
+        } else {
+            nk_gpu_dev_text_set_cursor(c->dev, &coord, NK_GPU_DEV_TEXT_CURSOR_ON);
+        }
+    }
 }
 
 static void vc_copy_to_chardev_console(struct chardev_console *c) 
@@ -1859,9 +1919,6 @@ static void chardev_console(void *in, void **out)
     atomic_and(c->inited,0);
 }
 
-
-
-
 int nk_vc_start_chardev_console(const char *chardev)
 {
     struct chardev_console *c = malloc(sizeof(*c));
@@ -1938,7 +1995,194 @@ int nk_vc_stop_chardev_console(char *chardev)
     return 0;
 }
 
+#define MAX_GPU_MODES_TO_SEARCH 16
+static int
+_configure_gpudev_console(struct gpudev_console *c) 
+{
+    int res;
+    nk_gpu_dev_video_mode_t  modes[MAX_GPU_MODES_TO_SEARCH];
+    int num_modes = MAX_GPU_MODES_TO_SEARCH;
 
+    res = nk_gpu_dev_get_available_modes(c->dev, modes, &num_modes);
+    if(res) {
+        return res;
+    }
+
+    int best_index = -1;
+    for(int i = 0; i < num_modes; i++) {
+        if(modes[i].type != NK_GPU_DEV_MODE_TYPE_TEXT) {
+            continue;
+        }
+        int text_channel = -1;
+        for(int channel = 0; channel < 4; channel++) {
+            if(modes[i].channel_offset[channel] == NK_GPU_DEV_CHANNEL_OFFSET_TEXT) {
+                text_channel = channel;
+                break;
+            }
+        }
+        if(text_channel < 0) {
+            // No text channel
+            continue;
+        }
+
+        if(best_index < 0) {
+            best_index = i;
+            continue;
+        }
+        
+        // Compare this mode with our "best" found so far
+        // (Currently just look for the mode with the greatest number of vertical lines)
+        if(modes[best_index].height < modes[i].height) {
+            best_index = i;
+            continue;
+        }
+    }
+
+    if(best_index < 0) {
+        // There's no valid text mode to use for a gpudev_console
+        return -EINVAL;
+    }
+
+    // Set the GPU into the desired text mode
+    c->mode = modes[best_index];
+    res = nk_gpu_dev_set_mode(c->dev, &c->mode);
+    if(res) {
+        return res;
+    }
+
+    return 0;
+}
+
+int nk_vc_start_gpudev_console(const char *name) 
+{
+    int res;
+    struct gpudev_console *c = malloc(sizeof(*c));
+
+    if (!c) {
+  	  ERROR("Cannot allocate gpudev console for %s\n",name);
+	  return -ENOMEM;
+    }
+
+    memset(c,0,sizeof(*c));
+    strncpy(c->name,name,DEV_NAME_LEN);
+    c->name[DEV_NAME_LEN-1] = 0;
+
+    c->private_vc = default_vc;
+    c->cur_vc = &c->private_vc;
+
+    struct nk_gpu_dev *gpudev = nk_gpu_dev_find(c->name);
+    if(gpudev == NULL) {
+        ERROR("Failed to find gpu device: \"%s\" when starting gpudev console!\n", name);
+        free(c);
+        return -ENXIO;
+    }
+    c->dev = gpudev;
+
+    res = _configure_gpudev_console(c);
+    if(res) {
+        ERROR("Failed to configure gpudev console \"%s\"!\n", name);
+        free(c);
+        return res;
+    }
+
+    STATE_LOCK_CONF;
+
+    STATE_LOCK();
+    list_add_tail(&c->gpudev_node, &gpudev_console_list);
+    STATE_UNLOCK();
+
+    INFO("gpudev console %s launched\n",c->name);
+
+    return 0;
+}
+
+int nk_vc_make_gpudev_console_current(const char *name) {
+    STATE_LOCK_CONF;
+    STATE_LOCK();
+     
+    struct list_head *cur=0;
+    struct gpudev_console *c;
+    struct gpudev_console *found = NULL;
+
+    list_for_each(cur,&gpudev_console_list) 
+    {
+      c = list_entry(cur,struct gpudev_console, gpudev_node);
+	  if (c && (strcmp(c->name, name) == 0)) {
+          found = c;
+          break;
+	  }
+    }
+
+    if(found == NULL) {
+        STATE_UNLOCK();
+        return -ENXIO;
+    }
+
+    c->cur_vc = &cur_vc;
+
+    STATE_UNLOCK();
+    return 0;
+}
+
+int nk_vc_make_gpudev_console_private(const char *name) 
+{
+    STATE_LOCK_CONF;
+    STATE_LOCK();
+     
+    struct list_head *cur=0;
+    struct gpudev_console *c;
+    struct gpudev_console *found = NULL;
+
+    list_for_each(cur,&gpudev_console_list) 
+    {
+      c = list_entry(cur,struct gpudev_console, gpudev_node);
+	  if (c && (strcmp(c->name, name) == 0)) {
+          found = c;
+          break;
+	  }
+    }
+
+    if(found == NULL) {
+        STATE_UNLOCK();
+        return -ENXIO;
+    }
+
+    c->cur_vc = &c->private_vc;
+
+    STATE_UNLOCK();
+    return 0;
+}
+
+int nk_vc_stop_gpudev_console(const char *name) 
+{
+    STATE_LOCK_CONF;
+    struct gpudev_console *c = 0;
+    struct list_head *cur;
+    int found=0;
+
+    // find the console
+    STATE_LOCK();
+
+    list_for_each(cur,&gpudev_console_list) {
+	c = list_entry(cur,struct gpudev_console, gpudev_node);
+	if (c && !strcmp(c->name,name)) {
+	    found = 1;
+	    break;
+	}
+    }
+
+    if (found) {
+	list_del_init(&c->gpudev_node);
+    }
+
+    STATE_UNLOCK();
+
+    if(found) {
+	  free(c);
+    }
+
+    return 0;
+}
 
 int nk_vc_init(void)
 {
@@ -1946,6 +2190,7 @@ int nk_vc_init(void)
   spinlock_init(&state_lock);
   INIT_LIST_HEAD(&vc_list);
   INIT_LIST_HEAD(&chardev_console_list);
+  INIT_LIST_HEAD(&gpudev_console_list);
 
   default_vc = nk_create_vc("default", COOKED, 0x0f, 0, 0);
   if(!default_vc) {
@@ -1986,12 +2231,12 @@ int nk_vc_init(void)
   cur_vc->cur_x = vga_x;
   cur_vc->cur_y = vga_y;
   vga_init_screen();
-  vga_set_cursor(cur_vc->cur_x,cur_vc->cur_y);
 #elif NAUT_CONFIG_XEON_PHI
   phi_cons_get_cursor(&(cur_vc->cur_x), &(cur_vc->cur_y));
   phi_cons_clear_screen();
   phi_cons_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
 #endif
+  gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
 
   up=1;
 

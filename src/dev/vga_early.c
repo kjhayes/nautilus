@@ -26,7 +26,9 @@
 #include <nautilus/cpu.h>
 #include <nautilus/dev.h>
 #include <nautilus/vc.h>
-#include <dev/vga.h>
+#include <dev/vga_early.h>
+#include <nautilus/gpudev.h>
+#include <nautilus/errno.h>
 
 #define VGA_BASE_ADDR 0xb8000
 
