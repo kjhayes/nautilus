@@ -104,7 +104,7 @@ void nk_sched_thread_state_deinit(struct nk_thread *thread);
 // would like to put the thread, if it can choose
 // returns a CPU id [0, num_cpus)
 // negative number indicates error
-int nk_sched_initial_placement();
+cpu_id_t nk_sched_initial_placement();
 
 // call after thread creation is complete, but before it is first run
 // this will also select the initial cpu, setting current_cpu
@@ -178,7 +178,7 @@ uint64_t nk_sched_get_realtime();
 
 // Print out threads on cpu
 // -1 => all CPUs
-void nk_sched_dump_threads(int cpu);
+//void nk_sched_dump_threads(int cpu);
 
 // print out scheduler info on the cpu
 // -1 => all CPUs

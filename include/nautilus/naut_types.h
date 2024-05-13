@@ -82,7 +82,7 @@ typedef unsigned int nk_hwirq_t; // IRQ Device local IRQ no.
 
 typedef uint32_t nk_gpio_t;
 
-typedef uint32_t cpu_id_t;
+typedef sint32_t cpu_id_t;
 
 #define NK_NULL_CPU_ID (cpu_id_t)(-1)
 

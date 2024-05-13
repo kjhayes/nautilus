@@ -25,6 +25,8 @@
 #ifndef __NK_SHELL
 #define __NK_SHELL
 
+#include <nautilus/nautilus.h>
+
 #define NK_SHELL_SCRIPT_ONLY 0x1
 #define SHELL_OP_NAME_LEN 32
 #define SHELL_MAX_CMD 240

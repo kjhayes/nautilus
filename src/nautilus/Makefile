@@ -52,6 +52,7 @@ obj-y += \
 	ipi.o \
 	iomap.o \
 	topo.o \
+	argp.o \
 	xcall.o
 
 obj-$(NAUT_CONFIG_ARCH_X86) += \

@@ -92,7 +92,7 @@ nk_thread_create (nk_thread_fun_t fun,
 		  uint8_t is_detached,
 		  nk_stack_size_t stack_size,
 		  nk_thread_id_t * tid,
-		  int bound_cpu);  // -1 => not bound
+		  cpu_id_t bound_cpu);  // NK_NULL_CPU_ID => not bound
 
 // Launch a previously created thread
 int
@@ -106,7 +106,7 @@ nk_thread_start (nk_thread_fun_t fun,
                  uint8_t is_detached,
                  nk_stack_size_t stack_size,
                  nk_thread_id_t * tid,
-                 int bound_cpu); // -1 => not bound
+                 cpu_id_t bound_cpu); // NK_NULL_CPU_ID => not bound
 
 // fork the current thread 
 //   - parent is returned the tid of child
@@ -256,9 +256,9 @@ struct nk_thread {
     /* thread state */
     nk_thread_status_t status;
 
-    int bound_cpu;
-    int placement_cpu;
-    int current_cpu;
+    cpu_id_t bound_cpu;
+    cpu_id_t placement_cpu;
+    cpu_id_t current_cpu;
 
     uint8_t is_idle;
 
@@ -297,8 +297,8 @@ int
 _nk_thread_init (nk_thread_t * t, 
 		 void * stack, 
 		 uint8_t is_detached, 
-		 int bound_cpu, // -1 => not bound
-		 int placement_cpu, // must be >=0 - where thread will go initially
+		 cpu_id_t bound_cpu, // NK_NULL_CPU_ID => not bound
+		 cpu_id_t placement_cpu, // must be >=0 - where thread will go initially
 		 nk_thread_t * parent);
 
 

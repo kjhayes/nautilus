@@ -543,16 +543,20 @@ shell_handle_cmd (struct shell_cmd_state * state, char * buf, int max)
 
     cmd = shell_rtree_lookup(state->root, cmd_buf);
 
-    if (cmd && cmd->impl && cmd->impl->handler) {
-        ret = cmd->impl->handler(buf, cmd->priv_data);
-    }
-            
-    if (ret < 0) {
+    if(!cmd) {
+        ret = -ENXIO;
         nk_vc_printf("Don't understand \"%s\"\n", cmd_buf);
-    } else {
-        shell_add_cmd_to_hist(state, buf);
-    }
+    } else if(cmd->impl && cmd->impl->handler) {
+        ret = cmd->impl->handler(buf, cmd->priv_data);
 
+        // Even if the command had an error, it still goes in the history
+        shell_add_cmd_to_hist(state, buf);
+
+        if(ret) {
+            nk_vc_printf("Command \"%s\" Returned Error: (%d)!\n", cmd_buf, ret);
+        }
+    }
+ 
     return ret;
 }
 

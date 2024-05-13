@@ -52,6 +52,7 @@
 #include <nautilus/nautilus.h>
 #include <nautilus/arch.h>
 #include <nautilus/errno.h>
+#include <nautilus/argp.h>
 #include <nautilus/thread.h>
 #include <nautilus/waitqueue.h>
 #include <nautilus/task.h>
@@ -575,7 +576,15 @@ static inline void     get_periodic_util(rt_scheduler *sched, uint64_t *util, ui
 static inline void     get_sporadic_util(rt_scheduler *sched, uint64_t now, uint64_t *util, uint64_t *count);
 static inline uint64_t get_random();
 
-
+struct print_thread_args {
+    cpu_id_t cpu;
+    unsigned int show_sched : 1;
+    unsigned int show_timing : 1;
+    unsigned int show_stats : 1;
+    unsigned int show_refs : 1;
+    unsigned int show_constraints : 1;
+    unsigned int show_aspace : 1;
+};
 
 static void print_thread(rt_thread *r, void *priv)
 {
@@ -583,24 +592,24 @@ static void print_thread(rt_thread *r, void *priv)
     ASSERT(r->thread);
 
     nk_thread_t  * t = r->thread;
-    int cpu = (int)(uint64_t)priv;
-
+    struct print_thread_args *args = (struct print_thread_args*)priv;
 
 #define US(ns) ((ns)/1000ULL)
 #define MS(ns) ((ns)/1000000ULL)
 
 #define CO(ns) MS(ns)
 
-    if (cpu==t->current_cpu || cpu<0) { 
+    if (args->cpu==t->current_cpu || args->cpu == NK_NULL_CPU_ID) { 
 
-#define PREFIX "    "
+#define PREFIX "  "
 
 	printk("%s id=%llu %sCPU(%d)\n", 
 		     t->is_idle ? "(idle)" : t->name[0]==0 ? "(noname)" : t->name,
 		     t->tid, 
-		     t->bound_cpu>=0 ? "BOUND-" : "",
+		     t->bound_cpu != NK_NULL_CPU_ID ? "BOUND-" : "",
 		     t->current_cpu);
 
+    if(args->show_sched) {
     printk(PREFIX"[status: \"%s\", rt_status: \"%s\"]\n",
 		     t->status==NK_THR_INIT ? "init" :
 		     t->status==NK_THR_RUNNING ? "running" :
@@ -615,25 +624,33 @@ static void print_thread(rt_thread *r, void *priv)
 		     r->status==SLEEPING ? "sleeping" :
 		     r->status==DENIED ? "denied" :
 		     r->status==REAPABLE ? "reapable" : "UNKNOWN");
+    }
 
+    if(args->show_timing) {
     printk(PREFIX"[start_time=%llu, cur_run_time=%llu, run_time=%llu deadline=%llu exit_time=%llu]\n",
 		     CO(r->start_time),
 		     CO(r->cur_run_time),
 		     CO(r->run_time),
 		     CO(r->deadline),
 		     CO(r->exit_time));
+    }
 
+    if(args->show_stats) {
 	printk(PREFIX"[arrivals=%llu rescheds=%llu resched_longs=%llu switch_ins=%llu misses=%llu]\n",
 		     r->arrival_count,
 		     r->resched_count,
 		     r->resched_long_count,
 		     r->switch_in_count,
 		     r->miss_count);
+    }
 
+    if(args->show_refs) {
     printk(PREFIX"[ref-count=%llu]\n",
             t->refcount
             );
-	
+    }
+
+    if(args->show_constraints) {
 	switch (r->constraints.type) {
 	case APERIODIC:
 	    printk(PREFIX"[aperiodic(irq_priority=%u, priority=%llu)]\n", r->constraints.interrupt_priority_class,CO(r->constraints.aperiodic.priority));
@@ -645,8 +662,11 @@ static void print_thread(rt_thread *r, void *priv)
 	    printk(PREFIX"[periodic(irq_priority=%u, period=%llu, slice=%llu)]\n", r->constraints.interrupt_priority_class,CO(r->constraints.periodic.period), CO(r->constraints.periodic.slice));
 	    break;
 	}
+    }
 
+    if(args->show_aspace) {
 	printk(PREFIX"[aspace: \"%s\"]\n", r->thread->aspace ? r->thread->aspace->name : "default");
+    }
 
 #undef PREFIX
 	
@@ -789,12 +809,12 @@ void nk_sched_dump_time(int cpu) {}
 
 #endif /* NAUT_CONFIG_ARCH_X86 */
 
-void nk_sched_dump_threads(int cpu)
+static void nk_sched_dump_threads(struct print_thread_args *args)
 {
     GLOBAL_LOCK_CONF;
     GLOBAL_LOCK();
 
-    rt_list_map(global_sched_state.thread_list,print_thread,(void*)(long)cpu);
+    rt_list_map(global_sched_state.thread_list,print_thread,(void*)args);
 
     GLOBAL_UNLOCK();
 }
@@ -808,7 +828,7 @@ void nk_sched_map_threads(int cpu, void (func)(struct nk_thread *t, void *state)
 
     rt_node *n = global_sched_state.thread_list->head;
     while (n != NULL) {
-	if (cpu==-1 || n->thread->thread->current_cpu==cpu) { 
+	if (cpu==NK_NULL_CPU_ID || n->thread->thread->current_cpu==cpu) { 
 	    func(n->thread->thread,state);
 	}
         n = n->next;
@@ -939,7 +959,7 @@ handle_threadtopotest (char * buf, void * priv)
                 break;
             default:
                 nk_vc_printf("Unknown threadtopotest command requested\n");
-                return -1;
+                return -EINVAL;
         }
     }
 
@@ -1281,10 +1301,10 @@ struct nk_sched_thread_state *nk_sched_thread_state_init(struct nk_thread *threa
     return t;
 }
 
-int nk_sched_initial_placement()
+cpu_id_t nk_sched_initial_placement()
 {
     struct sys_info * sys = per_cpu_get(system);
-    return (int)(get_random() % sys->num_cpus);
+    return (cpu_id_t)(get_random() % sys->num_cpus);
 }
 
 int nk_sched_thread_post_create(nk_thread_t * t)
@@ -1656,7 +1676,7 @@ static int _rt_list_enqueue(rt_list *l, rt_thread *t, rt_node *newnode)
 {
     if (l == NULL) {
         ERROR("RT_LIST IS UNINITIALIZED.\n");
-        return -1;
+        return -EINVAL;
     }
 
     _rt_node_init(newnode,t);
@@ -1685,7 +1705,7 @@ static int rt_list_enqueue(rt_list *l, rt_thread *t)
     
     if (!n) {
 	ERROR("Failed to allocate node for rt list enqueue\n");
-	return -1;
+	return -ENOMEM;
     } else {
 	return _rt_list_enqueue(l,t,n);
     }
@@ -1768,7 +1788,7 @@ static rt_thread* rt_list_remove_search(rt_list *l, rt_thread *t)
 static int        rt_queue_enqueue(rt_queue *queue, rt_thread *thread)
 {
     if (queue->size==MAX_QUEUE) {
-	return -1;
+	return -ENOMEM;
     } else {
 	queue->threads[queue->head] = thread;
 	queue->head = (queue->head + 1 ) % MAX_QUEUE;
@@ -1882,7 +1902,7 @@ static int rt_priority_queue_enqueue(rt_priority_queue *queue, rt_thread *thread
 	      queue->type==PENDING_QUEUE ? "Pending" :
 	      queue->type==APERIODIC_QUEUE ? "Aperiodic Runnable" : "UNKNOWN");
 	      
-	return -1;
+	return -ENOMEM;
     }
         
     uint64_t pos = queue->size++;
@@ -2976,19 +2996,19 @@ int nk_sched_thread_move(struct nk_thread *t, int new_cpu, int block)
     rt_scheduler *os = sys->cpus[old_cpu]->sched_state;
     int rc=-1;
 
-    if (t->bound_cpu>=0) { 
+    if (t->bound_cpu != NK_NULL_CPU_ID) { 
 	ERROR("Cannot move a bound thread\n");
-	return -1;
+	return -EINVAL;
     }
     
     if (new_cpu<0 || new_cpu>=sys->num_cpus) { 
 	ERROR("Impossible migration to %d\n",new_cpu);
-	return -1;
+	return -EINVAL;
     }
     
     if (t == get_cur_thread()) { 
 	ERROR("Cannot currently migrate self\n");
-	return -1;
+	return -EINVAL;
     }
     
     if (old_cpu == new_cpu) { 
@@ -2997,7 +3017,7 @@ int nk_sched_thread_move(struct nk_thread *t, int new_cpu, int block)
     
     if (rt->constraints.type!=APERIODIC) { 
 	ERROR("Currently only non-RT threads can be migrated\n");
-	return -1;
+	return -EINVAL;
     }
     
 retry:
@@ -3016,7 +3036,7 @@ retry:
     if (t->status!=NK_THR_SUSPENDED || rt->status!=ADMITTED) {
 	// it is not in a workable state for migration
 	DEBUG("Thread cannot be migrated as it is not suspended\n");
-	rc = -1;
+	rc = -EINVAL;
 	goto out_good_or_retry_if_blocking;
     }
     
@@ -3024,7 +3044,7 @@ retry:
     // remove it.  
     if (!REMOVE_APERIODIC(os,rt)) { 
 	DEBUG("Thread cannot be migrated as it is not in the aperiodic ready queue\n");
-	rc = -1;
+	rc = -EINVAL;
 	goto out_good_or_retry_if_blocking;
     }
 
@@ -3051,16 +3071,19 @@ out_good_or_retry_if_blocking:
 	// so all we need to do is get it on the destination's
 	// queue
 	DEBUG("Making thread runnable on new CPU\n");
-	if (_sched_make_runnable(t,t->current_cpu,0,0)) {
+    int first_res;
+	first_res = _sched_make_runnable(t,t->current_cpu,0,0);
+    if(first_res) {
 	    ERROR("Failed to make thread runnable on destination - attempting fallback\n");
 	    t->current_cpu = old_cpu;
-	    if (_sched_make_runnable(t,t->current_cpu,0,0)) { 
+	    int fallback_res = _sched_make_runnable(t,t->current_cpu,0,0);
+        if(fallback_res) {
 		ERROR("Cannot move thread back to original cpu\n");
 		// very bad...
 		panic("Failed to make migrated task runnable on destination or source\n");
-		return -1;
+		return fallback_res;
 	    } else {
-		return -1;
+		return first_res;
 	    }
 	} else {
 	    return 0;
@@ -3146,7 +3169,7 @@ int nk_sched_cpu_mug(int old_cpu, uint64_t maxcount, uint64_t *actualcount)
     for (cur=0;cur<SIZE_APERIODIC(os);cur++) {
 	rt_thread *t = PEEK_APERIODIC(os,cur);
 	// do not steal the idle thread, interrupt thread, task thread, or any bound thread
-	if (t && !t->thread->is_idle && !t->is_intr && !t->is_task && t->thread->bound_cpu<0 ) { 
+	if (t && !t->thread->is_idle && !t->is_intr && !t->is_task && t->thread->bound_cpu == NK_NULL_CPU_ID ) { 
 	    DEBUG("Found thread %llu %s\n",t->thread->tid,t->thread->name);
 	    prosp[count++] = t;
 	    if (count>=maxcount) { 
@@ -3619,7 +3642,7 @@ static int rt_thread_admit(rt_scheduler *scheduler, rt_thread *thread, uint64_t 
 
     if(thread == NULL) {
       ERROR("Cannot admit NULL thread!\n");
-      return -1;
+      return -EINVAL;
     }
 
     DEBUG("Admission: %s tpr=%u util_limit=%llu aper_res=%llu spor_res=%llu per_res=%llu\n",
@@ -3631,7 +3654,7 @@ static int rt_thread_admit(rt_scheduler *scheduler, rt_thread *thread, uint64_t 
 
     if (thread->constraints.interrupt_priority_class > 0xe) {
 	DEBUG("Rejecting thread with too high of an interrupt priority class (%u)\n", thread->constraints.interrupt_priority_class);
-	return -1;
+	return -ERANGE;
     }
 
     
@@ -3654,14 +3677,14 @@ static int rt_thread_admit(rt_scheduler *scheduler, rt_thread *thread, uint64_t 
 	    ((thread->constraints.periodic.period % GRANULARITY) || 
 	     (thread->constraints.periodic.slice % GRANULARITY))) {
 	    DEBUG("Rejecting thread because period and/or slice do not meet granularity requirement of %lu ns\n", GRANULARITY);
-	    return -1;
+	    return -EINVAL;
 	}
 	
 	if (ENFORCE_LOWER_LIMITS &&
 	    ((thread->constraints.periodic.period < PERIOD_LOWER_LIMIT) ||
 	     (thread->constraints.periodic.slice < SLICE_LOWER_LIMIT))) {
 	    DEBUG("Rejecting thread because period and/or slice are below the lower limits of %lu / %lu ns\n", PERIOD_LOWER_LIMIT,SLICE_LOWER_LIMIT);
-	    return -1;
+	    return -ERANGE;
 	}
 
 	get_periodic_util(scheduler,&cur_util,&cur_count);
@@ -3682,7 +3705,7 @@ static int rt_thread_admit(rt_scheduler *scheduler, rt_thread *thread, uint64_t 
 	    return 0;
 	} else {
 	    DEBUG("Rejected PERIODIC thread\n");
-	    return -1;
+	    return -EINVAL;
 	}
     }
 	break;
@@ -3696,13 +3719,13 @@ static int rt_thread_admit(rt_scheduler *scheduler, rt_thread *thread, uint64_t 
 	if (ENFORCE_GRANULARITY && 
 	    (thread->constraints.sporadic.size % GRANULARITY)) {
 	    DEBUG("Rejecting thread because sporadic size does not meet granularity requirement of %lu ns\n", GRANULARITY);
-	    return -1;
+	    return -EINVAL;
 	}
 
 	if (ENFORCE_LOWER_LIMITS &&
 	    (thread->constraints.sporadic.size < SLICE_LOWER_LIMIT)) {
 	    DEBUG("Rejecting thread because sporadic size is below the lower slice limit of %lu\n", SLICE_LOWER_LIMIT);
-	    return -1;
+	    return -ERANGE;
 	}
 
 	if ((now + 
@@ -3711,7 +3734,7 @@ static int rt_thread_admit(rt_scheduler *scheduler, rt_thread *thread, uint64_t 
 	    thread->constraints.sporadic.deadline) { 
 	    // immediate reject
 	    DEBUG("Rejected impossible SPORADIC thread\n");
-	    return -1;
+	    return -EINVAL;
 	}
 	
 	time_left = (thread->constraints.sporadic.deadline - (now + thread->constraints.periodic.phase));
@@ -3732,13 +3755,13 @@ static int rt_thread_admit(rt_scheduler *scheduler, rt_thread *thread, uint64_t 
 	    return 0;
 	} else {
 	    DEBUG("Rejected SPORADIC thread\n");
-	    return -1;
+	    return -EINVAL;
 	}
     }
 	break;
     default:
 	ERROR("Attempt to admit unknown kind of thread\n");
-	return -1;
+	return -EINVAL;
 	break;
     }
 }
@@ -3940,7 +3963,7 @@ static int task_seed(task_info *ti, int cpu)
     
     if (!t) {
       TASK_ERROR("ran out of memory in seeding tasks for cpu %d\n",cpu);
-      return -1;
+      return -ENOMEM;
     }
     
     memset(t,0,sizeof(*t));
@@ -4168,7 +4191,7 @@ static int _nk_task_wait(struct nk_task *task, void **output, struct nk_task_sta
     
     if (task->flags & NK_TASK_DETACHED) {
 	TASK_ERROR("Cannot wait on detached task; also probable race...\n");
-	return -1;
+	return -EINVAL;
     }
 
     task->stats.wait_start_ns = cur_time();
@@ -4414,11 +4437,13 @@ static void interrupt(void *in, void **out)
 static int start_interrupt_thread_for_this_cpu()
 {
   nk_thread_id_t tid;
+  int res;
   
   // 2 MB stack since we'll be running interrupt handlers on it
-  if (nk_thread_start(interrupt, 0, 0, 1, INTERRUPT_THREAD_STACK_SIZE, &tid, my_cpu_id())) {
+  res = nk_thread_start(interrupt, 0, 0, 1, INTERRUPT_THREAD_STACK_SIZE, &tid, my_cpu_id());
+  if(res) {
       ERROR("Failed to start interrupt thread\n");
-      return -1;
+      return res;
   }
 
   DEBUG("Interrupt thread launched on cpu %d as %p\n", my_cpu_id(), tid);
@@ -4486,10 +4511,12 @@ static void task(void *in, void **out)
 static int start_task_thread_for_this_cpu()
 {
   nk_thread_id_t tid;
+  int res;
   
-  if (nk_thread_start(task, 0, 0, 1, TASK_THREAD_STACK_SIZE, &tid, my_cpu_id())) {
+  res = nk_thread_start(task, 0, 0, 1, TASK_THREAD_STACK_SIZE, &tid, my_cpu_id());
+  if(res) {
       TASK_ERROR("Failed to start task thread\n");
-      return -1;
+      return res;
   }
 
   TASK_DEBUG("Task thread launched on cpu %d as %p\n", my_cpu_id(), tid);
@@ -4518,7 +4545,7 @@ static int shared_init(struct cpu *my_cpu, struct nk_sched_config *cfg)
 
     if (!my_cpu->sched_state) {
 	ERROR("Failed to allocate local state\n");
-	return -1;
+	return -ENOMEM;
     }
 
     flags = irq_disable_save();
@@ -4616,7 +4643,7 @@ static int init_global_state()
     global_sched_state.thread_list = rt_list_init();
     if (!global_sched_state.thread_list) { 
 	ERROR("Cannot allocate global thread list\n");
-	return -1;
+	return -ENOMEM;
     }
 
     spinlock_init(&global_sched_state.lock);
@@ -4645,16 +4672,17 @@ nk_sched_init_ap (struct nk_sched_config *cfg)
 {
     cpu_id_t id = my_cpu_id();
     struct cpu * my_cpu = get_cpu();
+    int res;
 
     DEBUG("Initializing scheduler on AP %u (%p)\n",id,my_cpu);
 
-    if (shared_init(my_cpu,cfg)) { 
+    res = shared_init(my_cpu,cfg);
+    if(res) {
 	ERROR("Could not intialize scheduler\n");
-	return -1;
+	return res;
     }
 
     return 0;
-
 }
 
 
@@ -4685,15 +4713,16 @@ static void reaper(void *in, void **out)
 static int start_reaper()
 {
   nk_thread_id_t tid;
+  int res;
 
-  if (nk_thread_start(reaper, 0, 0, 1, REAPER_THREAD_STACK_SIZE, &tid, my_cpu_id())) {
+  res = nk_thread_start(reaper, 0, 0, 1, REAPER_THREAD_STACK_SIZE, &tid, my_cpu_id());
+  if(res) {
       ERROR("Failed to start reaper thread\n");
-      return -1;
+      return res;
   }
 
   DEBUG("Reaper launched on cpu 0 as %p\n",tid);
   return 0;
-
 }
 
 #endif
@@ -4809,6 +4838,7 @@ static void timing_test(uint64_t N, uint64_t M, int print);
   int
 nk_sched_init(struct nk_sched_config *cfg) 
 {
+    int res;
     struct cpu * my_cpu = nk_get_nautilus_info()->sys.cpus[nk_get_nautilus_info()->sys.bsp_id];
 
     INFO("Initializing scheduler on BSP\n");
@@ -4817,14 +4847,16 @@ nk_sched_init(struct nk_sched_config *cfg)
     //INFO("Hanging\n");
     //while (1) { arch_halt(); }
 
-    if (init_global_state()) { 
+    res = init_global_state();
+    if(res) {
 	ERROR("Could not initialize global scheduler state\n");
-	return -1;
+	return res;
     }
 
-    if (shared_init(my_cpu,cfg)) { 
+    res = shared_init(my_cpu,cfg);
+    if(res) {
 	ERROR("Could not intialize scheduler\n");
-	return -1;
+	return res;
     }
 
     return 0;
@@ -4888,7 +4920,7 @@ handle_tasks (char * buf, void * priv)
     int cpu;
 
     if (sscanf(buf, "tasks %d", &cpu) != 1) {
-      cpu = -1; 
+      cpu = NK_NULL_CPU_ID; 
     }
 
     nk_task_dump_state(cpu);
@@ -4911,7 +4943,7 @@ handle_cores (char * buf, void * priv)
     int cpu;
 
     if (sscanf(buf, "cores %d", &cpu) != 1) {
-      cpu = -1; 
+      cpu = NK_NULL_CPU_ID; 
     }
 
     nk_sched_dump_cores(cpu);
@@ -4931,13 +4963,51 @@ nk_register_shell_cmd(cores_impl);
   static int
 handle_threads (char * buf, void * priv)
 {
-    int cpu;
+    struct print_thread_args pt_args = { 0 };
+    struct nk_args *args = nk_argp_create_args(buf);
 
-    if (sscanf(buf, "threads %d", &cpu) != 1) {
-        cpu = -1; 
+    int cpu_index = nk_argp_find_str_arg(args, "cpu");
+    if(cpu_index >= 0) {
+        cpu_index++;
+        if(cpu_index >= args->argc) {
+            ERROR("Missing number after argument: \"--cpu\"\n");
+            return -EINVAL;
+        }
+        int cpu_id;
+        if(sscanf(args->argv[cpu_index], "%d", &cpu_id) == 1) {
+            pt_args.cpu = cpu_id;
+        } else {
+            ERROR("Couldn't parse number: \"%s\" in argument to \"--cpu\"\n");
+            return -EINVAL;
+        }
+    } else {
+        // Match all cpu's
+        pt_args.cpu = NK_NULL_CPU_ID;
     }
 
-    nk_sched_dump_threads(cpu);
+    // if 'a' is given print everything
+    if(nk_argp_find_char_arg(args, 'a') >= 0) {
+        pt_args.show_timing = 1;
+        pt_args.show_sched = 1;
+        pt_args.show_refs = 1;
+        pt_args.show_stats = 1;
+        pt_args.show_aspace = 1;
+        pt_args.show_constraints = 1;
+    }
+    else {
+#define CHECK_CHAR_ARG(field, chr) \
+    if(nk_argp_find_char_arg(args, chr) >= 0) { pt_args.field = 1; }
+    CHECK_CHAR_ARG(show_timing, 't')
+    CHECK_CHAR_ARG(show_constraints, 'c')
+    CHECK_CHAR_ARG(show_stats, 's')
+    CHECK_CHAR_ARG(show_aspace, 'p')
+    CHECK_CHAR_ARG(show_refs, 'r')
+    CHECK_CHAR_ARG(show_sched, 'd')
+#undef CHECK_CHAR_ARG
+    }
+    nk_argp_destroy_args(args);
+
+    nk_sched_dump_threads(&pt_args);
 
     return 0;
 }
@@ -4971,7 +5041,7 @@ handle_time (char * buf, void * priv)
     int cpu;
 
     if (sscanf(buf, "time %d", &cpu) != 1) {
-        cpu = -1; 
+        cpu = NK_NULL_CPU_ID; 
     }
 
     nk_sched_dump_time(cpu);
@@ -5061,11 +5131,12 @@ launch_aperiodic_burner (char * name,
 {
     nk_thread_id_t tid;
     struct burner_args *a;
+    int res;
 
     a = malloc(sizeof(struct burner_args));
 
     if (!a) { 
-        return -1;
+        return -ENOMEM;
     }
     
     strncpy(a->name,name,SHELL_MAX_CMD); a->name[SHELL_MAX_CMD-1]=0;
@@ -5076,9 +5147,10 @@ launch_aperiodic_burner (char * name,
     a->constraints.interrupt_priority_class = (uint8_t) tpr;
     a->constraints.aperiodic.priority       = priority;
 
-    if (nk_thread_start(burner, (void*)a , NULL, 1, TSTACK_DEFAULT, &tid, 1)) { 
+    res = nk_thread_start(burner, (void*)a , NULL, 1, TSTACK_DEFAULT, &tid, 1);
+    if(res) {
         free(a);
-        return -1;
+        return res;
     } else {
         return 0;
     }
@@ -5095,10 +5167,11 @@ launch_sporadic_burner (char * name,
 {
     nk_thread_id_t tid;
     struct burner_args *a;
+    int res;
 
     a = malloc(sizeof(struct burner_args));
     if (!a) { 
-        return -1;
+        return -ENOMEM;
     }
     
     strncpy(a->name,name,SHELL_MAX_CMD); a->name[SHELL_MAX_CMD-1]=0;
@@ -5112,9 +5185,10 @@ launch_sporadic_burner (char * name,
     a->constraints.sporadic.deadline           = deadline;
     a->constraints.sporadic.aperiodic_priority = aperiodic_priority;
 
-    if (nk_thread_start(burner, (void*)a , NULL, 1, TSTACK_DEFAULT, &tid, 1)) {
+    res = nk_thread_start(burner, (void*)a , NULL, 1, TSTACK_DEFAULT, &tid, 1);
+    if(res) {
         free(a);
-        return -1;
+        return res;
     } else {
         return 0;
     }
@@ -5130,10 +5204,11 @@ launch_periodic_burner (char * name,
 {
     nk_thread_id_t tid;
     struct burner_args *a;
+    int res;
 
     a = malloc(sizeof(struct burner_args));
     if (!a) { 
-        return -1;
+        return -ENOMEM;
     }
     
     strncpy(a->name,name,SHELL_MAX_CMD); a->name[SHELL_MAX_CMD-1]=0;
@@ -5146,9 +5221,10 @@ launch_periodic_burner (char * name,
     a->constraints.periodic.period          = period;
     a->constraints.periodic.slice           = slice;
 
-    if (nk_thread_start(burner, (void*)a , NULL, 1, TSTACK_DEFAULT, &tid, 1)) {
+    res = nk_thread_start(burner, (void*)a , NULL, 1, TSTACK_DEFAULT, &tid, 1);
+    if(res) {
         free(a);
-        return -1;
+        return res;
     } else {
         return 0;
     }
@@ -5236,7 +5312,7 @@ test_timed_stop (char * buf, void * priv)
   uint64_t count = 0;
   if (sscanf(buf, "timed_stop %lu", &count) != 1) { 
     nk_vc_printf("Incorrect number of arguments! (only requires a single unsigned long)\n");
-    return -1;
+    return -EINVAL;
   } 
 
   uint64_t* timestamps = (uint64_t*)MALLOC(sizeof(uint64_t) * count);

@@ -66,7 +66,7 @@ extern void nk_thread_switch(nk_thread_t*);
 extern void nk_thread_entry(void *);
 static struct nk_tls tls_keys[TLS_MAX_KEYS];
 
-static void * nk_thread_set_tls(int placement_cpu);
+static void * nk_thread_set_tls(cpu_id_t placement_cpu);
 
 
 /****** SEE BELOW FOR EXTERNAL THREAD INTERFACE ********/
@@ -140,8 +140,8 @@ int
 _nk_thread_init (nk_thread_t * t,
 		 void * stack,
 		 uint8_t is_detached,
-		 int bound_cpu,
-		 int placement_cpu,
+		 cpu_id_t bound_cpu,
+		 cpu_id_t placement_cpu,
 		 nk_thread_t * parent)
 {
     struct sys_info * sys = per_cpu_get(system);
@@ -151,7 +151,7 @@ _nk_thread_init (nk_thread_t * t,
         return -EINVAL;
     }
 
-    if (bound_cpu>=0 && bound_cpu>=sys->num_cpus) {
+    if (bound_cpu==NK_NULL_CPU_ID && bound_cpu>=sys->num_cpus) {
 	THREAD_ERROR("Impossible CPU binding %d\n",bound_cpu);
 	return -EINVAL;
     }
@@ -347,7 +347,7 @@ static void nk_thread_brain_wipe(nk_thread_t *t);
 static int hwtls_config_kernel_tls(nk_thread_t *t)
 {
 
-    int placement_cpu = t->placement_cpu;
+    cpu_id_t placement_cpu = t->placement_cpu;
     
     extern addr_t _tbss_end, _tdata_start,_tdata_end;
 
@@ -434,12 +434,12 @@ nk_thread_create (nk_thread_fun_t fun,
                   uint8_t is_detached,
                   nk_stack_size_t stack_size,
                   nk_thread_id_t * tid,
-                  int bound_cpu)
+                  cpu_id_t bound_cpu)
 {
     int err = -EINVAL;
     struct sys_info * sys = per_cpu_get(system);
     nk_thread_t * t = NULL;
-    int placement_cpu = bound_cpu<0 ? nk_sched_initial_placement() : bound_cpu;
+    cpu_id_t placement_cpu = bound_cpu<0 ? nk_sched_initial_placement() : bound_cpu;
     nk_stack_size_t required_stack_size = stack_size ? stack_size: PAGE_SIZE;
 
 
@@ -591,7 +591,7 @@ nk_thread_start (nk_thread_fun_t fun,
                  uint8_t is_detached,
                  nk_stack_size_t stack_size,
                  nk_thread_id_t * tid,
-                 int bound_cpu)
+                 cpu_id_t bound_cpu)
 {
     int err;
     nk_thread_id_t newtid   = NULL;
