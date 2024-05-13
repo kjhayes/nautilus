@@ -49,13 +49,8 @@
 #include <arch/hrt/hrt.h>
 #endif
 
-#ifdef NAUT_CONFIG_ARCH_X86
-#define VC_WIDTH VGA_WIDTH
-#define VC_HEIGHT VGA_HEIGHT
-#else
-#define VC_WIDTH 200
-#define VC_HEIGHT 1000
-#endif
+#define DEFAULT_VC_WIDTH VGA_WIDTH
+#define DEFAULT_VC_HEIGHT VGA_HEIGHT
 
 #define CHARDEV_CONSOLE_STACK_SIZE PAGE_SIZE_2MB
 #define VC_LIST_STACK_SIZE PAGE_SIZE_2MB
@@ -120,6 +115,7 @@ struct gpudev_console
     struct nk_gpu_dev *dev;
 
     nk_gpu_dev_video_mode_t mode;
+    nk_gpu_dev_box_t box;
 
     struct nk_virtual_console *private_vc;
     struct nk_virtual_console **cur_vc;
@@ -138,7 +134,9 @@ static void chardev_consoles_print(struct nk_virtual_console *vc, char *data);
 
 // Broadcast updates to gpudev consoles
 static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x, uint32_t y, int state_lock_held);
-//static void gpudev_consoles_set_char(struct nk_virtual_console *vc, uint32_t x, uint32_t y, nk_gpu_dev_char_t *val);
+static void gpudev_consoles_set_char(struct nk_virtual_console *vc, uint32_t x, uint32_t y, char symbol, uint8_t attr);
+static void gpudev_consoles_display_buffer(struct nk_virtual_console *vc, int state_lock_held);
+static void gpudev_consoles_flush(struct nk_virtual_console *vc, int state_lock_held);
 
 static nk_thread_id_t list_tid;
 
@@ -152,12 +150,15 @@ struct nk_virtual_console {
   spinlock_t       queue_lock;
   // held without interrupt change => coordinate with threads
   spinlock_t       buf_lock;
+
   union queue{
     nk_scancode_t s_queue[Scancode_QUEUE_SIZE];
     nk_keycode_t k_queue[Keycode_QUEUE_SIZE];
   } keyboard_queue;
-  uint16_t BUF[VC_WIDTH * VC_HEIGHT];
-  uint16_t cur_x, cur_y;
+
+  nk_gpu_dev_charmap_t *buffer;
+  nk_gpu_dev_coordinate_t cursor;
+
   uint8_t cur_attr, fill_attr;
   uint16_t head, tail;
   struct nk_vc_ops *ops;
@@ -179,32 +180,6 @@ struct nk_virtual_console * nk_get_cur_vc()
     return cur_vc;
 }
 
-static inline void copy_display_to_vc(struct nk_virtual_console *vc)
-{
-#ifdef NAUT_CONFIG_X86_64_HOST
-  vga_copy_out((void *)vc->BUF,sizeof(vc->BUF));
-#endif
-#ifdef NAUT_CONFIG_XEON_PHI
-  vga_copy_out((void *)vc->BUF,sizeof(vc->BUF));
-#endif
-#ifdef NAUT_CONFIG_HVM_HRT
-  // not supported
-#endif
-}
-
-static inline void copy_vc_to_display(struct nk_virtual_console *vc)
-{
-#ifdef NAUT_CONFIG_X86_64_HOST
-  vga_copy_in((void*)vc->BUF,sizeof(vc->BUF));
-#endif
-#ifdef NAUT_CONFIG_XEON_PHI
-  vga_copy_in((void*)vc->BUF,sizeof(vc->BUF));
-#endif
-#ifdef NAUT_CONFIG_HVM_HRT
-  // not supported
-#endif
-}
-
 #ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_DISPLAY_NAME
 
 #define VC_TIMER_MS 500UL
@@ -214,7 +189,7 @@ static void vc_timer_callback(void *state)
 {
     struct nk_virtual_console *vc = (struct nk_virtual_console *)state;
 
-    nk_vc_display_str_specific(vc,vc->name,strlen(vc->name),0xf0,VC_WIDTH-strlen(vc->name),0);
+    nk_vc_display_str_specific(vc,vc->name,strlen(vc->name),0xf0,vc->buffer->width-strlen(vc->name),0);
 
     nk_timer_reset(vc->timer, VC_TIMER_NS);
     nk_timer_start(vc->timer);
@@ -249,6 +224,9 @@ struct nk_virtual_console *nk_create_vc (char *name,
   new_vc->ops = ops;
   new_vc->cur_attr = attr;
   new_vc->fill_attr = attr;
+
+  DEBUG("creating new vc charmap...\n");
+  new_vc->buffer = nk_gpu_dev_charmap_create(DEFAULT_VC_WIDTH, DEFAULT_VC_HEIGHT);
   
   DEBUG("intiailizing locks...\n");
   spinlock_init(&new_vc->queue_lock);
@@ -268,8 +246,9 @@ struct nk_virtual_console *nk_create_vc (char *name,
 
   DEBUG("clearing new vc...\n");
   // clear to new attr
-  for (i = 0; i < VC_HEIGHT*VC_WIDTH; i++) {
-    new_vc->BUF[i] = vga_make_entry(' ', new_vc->cur_attr);
+  for (i = 0; i < new_vc->buffer->width*new_vc->buffer->height; i++) {
+    new_vc->buffer->chars[i].symbol = ' ';
+    new_vc->buffer->chars[i].attribute = new_vc->cur_attr;
   }
 
 #ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_DISPLAY_NAME
@@ -302,12 +281,18 @@ static int _switch_to_vc(struct nk_virtual_console *vc)
     return 0;
   }
   if (vc!=cur_vc) {
-    copy_display_to_vc(cur_vc);
+    // This function doesn't make sense with the "gpudev" consoles system
+    // We just need to make sure that we update a vc's charmap first, and never
+    // only update the gpudev consoles without updating the charmap.
+    //copy_display_to_vc(cur_vc);
+
     cur_vc = vc;
-    copy_vc_to_display(cur_vc);
-    gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 1);
+    gpudev_consoles_display_buffer(cur_vc, 1);
+    gpudev_consoles_set_cursor(cur_vc, cur_vc->cursor.x, cur_vc->cursor.y, 1);
+    gpudev_consoles_flush(cur_vc, 1);
+
 #if NAUT_CONFIG_XEON_PHI
-    phi_cons_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
+    phi_cons_set_cursor(cur_vc->cursor.x, cur_vc->cursor.y);
 #endif
   }
   return 0;
@@ -434,6 +419,8 @@ int nk_switch_to_next_vc()
 INTERRUPT static int _vc_scrollup_specific(struct nk_virtual_console *vc)
 {
   int i;
+  uint32_t width = vc->buffer->width;
+  uint32_t height = vc->buffer->height;
 
 #ifdef NAUT_CONFIG_XEON_PHI
   if (vc==cur_vc) {
@@ -441,24 +428,30 @@ INTERRUPT static int _vc_scrollup_specific(struct nk_virtual_console *vc)
   }
 #endif
 
+  // Move all rows up by one
   for (i=0;
-       i<VC_WIDTH*(VC_HEIGHT-1);
+       i< width*(height-1);
        i++) {
-    vc->BUF[i] = vc->BUF[i+VC_WIDTH];
+    vc->buffer->chars[i] = vc->buffer->chars[i+width];
   }
 
-  for (i = VC_WIDTH*(VC_HEIGHT-1);
-       i < VC_WIDTH*VC_HEIGHT;
+  // Blank the bottom row
+  for (i = 0;
+       i < width;
        i++) {
-    vc->BUF[i] = vga_make_entry(' ', vc->fill_attr);
+    nk_gpu_dev_char_t *chr = &NK_GPU_DEV_CHARMAP_CHAR(vc->buffer, i, height-1);
+    chr->symbol = ' ';
+    chr->attribute = vc->fill_attr;
   }
 
-  if(vc == cur_vc) {
-    copy_vc_to_display(vc);
+  gpudev_consoles_display_buffer(vc, 0);
+  gpudev_consoles_flush(vc, 0);
+
 #ifdef NAUT_CONFIG_XEON_PHI
+  if(vc == cur_vc) {
     phi_cons_notify_redraw();
-#endif
   }
+#endif
 
   return 0;
 }
@@ -500,22 +493,24 @@ static int _vc_display_char_specific(struct nk_virtual_console *vc, uint8_t c, u
     return 0;
   }
 
-  uint16_t val = vga_make_entry(c, attr);
+  uint32_t width = vc->buffer->width;
+  uint32_t height = vc->buffer->height;
 
-  if(x >= VC_WIDTH || y >= VC_HEIGHT) {
+  if(x >= width || y >= height) {
     return -1;
   } else {
-    vc->BUF[(y * VC_WIDTH) + x] = val;
-    if(vc == cur_vc) {
-#ifdef NAUT_CONFIG_X86_64_HOST
-      vga_write_screen(x,y,val);
-#endif
+    NK_GPU_DEV_CHARMAP_CHAR(vc->buffer,x,y).symbol = c;
+    NK_GPU_DEV_CHARMAP_CHAR(vc->buffer,x,y).attribute = attr;
+
+    gpudev_consoles_set_char(vc, x, y, c, attr);
+    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y, 0);
+    gpudev_consoles_flush(cur_vc, 0);
+
 #ifdef NAUT_CONFIG_XEON_PHI
-      vga_write_screen(x,y,val);
-      phi_cons_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
-#endif
-      gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
+    if(vc == cur_vc) {
+      phi_cons_set_cursor(cur_vc->cursor.x, cur_vc->cursor.y);
     }
+#endif
   }
   return 0;
 }
@@ -571,7 +566,7 @@ int nk_vc_display_str_specific(struct nk_virtual_console *vc,
 {
   int rc = 0;
   uint16_t i;
-  uint16_t limit = (x+(uint16_t)n) > VC_WIDTH ? VC_WIDTH : x+(uint16_t)n;
+  uint16_t limit = (x+(uint16_t)n) > vc->buffer->width ? vc->buffer->width : x+(uint16_t)n;
 
   if (vc) {
     BUF_LOCK_CONF;
@@ -588,8 +583,8 @@ int nk_vc_display_str(uint8_t *c, uint8_t n, uint8_t attr, uint8_t x, uint8_t y)
 {
   int rc=0;
   uint16_t i;
-  uint16_t limit = (x+(uint16_t)n) > VC_WIDTH ? VC_WIDTH : x+(uint16_t)n;
   struct nk_virtual_console *vc = get_cur_thread()->vc;
+  uint16_t limit = (x+(uint16_t)n) > vc->buffer->width ? vc->buffer->width : x+(uint16_t)n;
 
   if (!vc) {
     vc = default_vc;
@@ -617,11 +612,10 @@ static int _vc_setpos(uint8_t x, uint8_t y)
     vc = default_vc;
   }
   if (vc) {
-    vc->cur_x = x;
-    vc->cur_y = y;
-    if (vc==cur_vc) {
-      gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
-    }
+    vc->cursor.x = x;
+    vc->cursor.y = y;
+    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y, 0);
+    gpudev_consoles_flush(vc, 0);
   }
   return 0;
 }
@@ -635,8 +629,8 @@ static void _vc_getpos(uint8_t * x, uint8_t * y)
     }
 
     if (vc) {
-        if (x) *x = vc->cur_x;
-        if (y) *y = vc->cur_y;
+        if (x) *x = vc->cursor.x;
+        if (y) *y = vc->cursor.y;
     }
 }
 
@@ -681,11 +675,10 @@ static int _vc_setpos_specific(struct nk_virtual_console *vc, uint8_t x, uint8_t
   int rc=0;
 
   if (vc) {
-    vc->cur_x = x;
-    vc->cur_y = y;
-    if (vc==cur_vc) {
-      gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
-    }
+    vc->cursor.x = x;
+    vc->cursor.y = y;
+    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y, 0);
+    gpudev_consoles_flush(vc, 0);
   }
 
   return rc;
@@ -715,54 +708,61 @@ INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t
   }
 
   if (c == ASCII_BS) {
-	  vc->cur_x--;
-	  _vc_display_char_specific(vc, ' ', vc->fill_attr, vc->cur_x, vc->cur_y);
+	  vc->cursor.x--;
+	  _vc_display_char_specific(vc, ' ', vc->fill_attr, vc->cursor.x, vc->cursor.y);
 	  return 0;
   }
 
   if (c == '\n') {
-    vc->cur_x = 0;
+    vc->cursor.x = 0;
 #ifdef NAUT_CONFIG_XEON_PHI
     if (vc==cur_vc) {
-      phi_cons_notify_line_draw(vc->cur_y);
+      phi_cons_notify_line_draw(vc->cursor.y);
     }
 #endif
-    vc->cur_y++;
-    if (vc->cur_y == VC_HEIGHT) {
+
+    vc->cursor.y++;
+    if (vc->cursor.y == vc->buffer->height) {
       _vc_scrollup_specific(vc);
-      vc->cur_y--;
+      vc->cursor.y--;
     }
-    if (vc==cur_vc) {
-      gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
+
+    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y, 0);
+    gpudev_consoles_flush(vc, 0);
+
 #if NAUT_CONFIG_XEON_PHI
-      phi_cons_set_cursor(vc->cur_x,vc->cur_y);
-#endif
+    if (vc==cur_vc) {
+      phi_cons_set_cursor(vc->cursor.x,vc->cursor.y);
     }
+#endif
     return 0;
   }
 
 
-  _vc_display_char_specific(vc, c, vc->cur_attr, vc->cur_x, vc->cur_y);
-  vc->cur_x++;
-  if (vc->cur_x == VC_WIDTH) {
-    vc->cur_x = 0;
+  _vc_display_char_specific(vc, c, vc->cur_attr, vc->cursor.x, vc->cursor.y);
+  vc->cursor.x++;
+  if (vc->cursor.x == vc->buffer->width) {
+    vc->cursor.x = 0;
 #ifdef NAUT_CONFIG_XEON_PHI
     if (vc==cur_vc) {
-      phi_cons_notify_line_draw(vc->cur_y);
+      phi_cons_notify_line_draw(vc->cursor.y);
     }
 #endif
-    vc->cur_y++;
-    if (vc->cur_y == VC_HEIGHT) {
+    vc->cursor.y++;
+    if (vc->cursor.y == vc->buffer->height) {
       _vc_scrollup_specific(vc);
-      vc->cur_y--;
+      vc->cursor.y--;
     }
   }
-  if (vc==cur_vc) {
-    gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
+
+  gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y, 0);
+  gpudev_consoles_flush(vc, 0);
+
 #if NAUT_CONFIG_XEON_PHI
-      phi_cons_set_cursor(vc->cur_x,vc->cur_y);
-#endif
+  if (vc==cur_vc) {
+      phi_cons_set_cursor(vc->cursor.x,vc->cursor.y);
   }
+#endif
   return 0;
 }
 
@@ -970,24 +970,26 @@ int nk_vc_setattr(uint8_t attr)
 static int _vc_clear_specific(struct nk_virtual_console *vc, uint8_t attr)
 {
   int i;
-  uint16_t val = vga_make_entry (' ', attr);
 
   vc->cur_attr = attr;
   vc->fill_attr = attr;
 
-  for (i = 0; i < VC_HEIGHT*VC_WIDTH; i++) {
-    vc->BUF[i] = val;
+  for (i = 0; i < vc->buffer->width*vc->buffer->height; i++) {
+    vc->buffer->chars[i].symbol = ' ';
+    vc->buffer->chars[i].attribute = attr;
   }
 
-  if (vc==cur_vc) {
-    copy_vc_to_display(vc);
+  gpudev_consoles_display_buffer(vc, 0);
+  gpudev_consoles_flush(vc, 0);
+
 #ifdef NAUT_CONFIG_XEON_PHI
+  if (vc==cur_vc) {
     phi_cons_notify_redraw();
-#endif
   }
+#endif
 
-  vc->cur_x=0;
-  vc->cur_y=0;
+  vc->cursor.x=0;
+  vc->cursor.y=0;
   return 0;
 }
 
@@ -1566,8 +1568,8 @@ static int char_dev_write_all(struct nk_char_dev *dev,
 
     while (left>0) {
 	cur = nk_char_dev_write(dev,left,&(src[count-left]),type);
-	if (cur == -1ULL) {
-	    return -1;
+	if (cur < 0) {
+	    return cur;
 	} else {
 	    left-=cur;
 	}
@@ -1662,10 +1664,6 @@ static void chardev_consoles_putchar(struct nk_virtual_console *vc, char data)
 static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x, uint32_t y, const int have_lock) 
 {
     nk_gpu_dev_coordinate_t zero_coord = { 0 };
-    nk_gpu_dev_coordinate_t coord = {
-        .x = x,
-        .y = y,
-    };
     
     struct list_head *cur=0;
     struct gpudev_console *c;
@@ -1698,12 +1696,138 @@ static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x
 
     for(int i = 0; i < match_count; i++) {
         c = matching_gdc[i];
-        if(c->mode.width <= x ||
-           c->mode.height <= y) {
+        if(c->box.width <= x ||
+           c->box.height <= y) {
             nk_gpu_dev_text_set_cursor(c->dev, &zero_coord, 0);
         } else {
+            nk_gpu_dev_coordinate_t coord = {
+              .x = c->box.x + x,
+              .y = c->box.y + y,
+            };
             nk_gpu_dev_text_set_cursor(c->dev, &coord, NK_GPU_DEV_TEXT_CURSOR_ON);
         }
+    }
+}
+
+static void gpudev_consoles_set_char(struct nk_virtual_console *vc, uint32_t x, uint32_t y, char symbol, uint8_t attr) 
+{
+    nk_gpu_dev_char_t character = {
+        .symbol = symbol,
+        .attribute = attr,
+    };
+    
+    struct list_head *cur=0;
+    struct gpudev_console *c;
+    struct gpudev_console *matching_gdc[MAX_MATCHING_GPUDEV_CONSOLES];
+    int match_count = 0;
+    int match_cur;
+
+    STATE_LOCK_CONF;
+      
+    // search for matching consoles with the global lock held
+    // DOING NO OUTPUT AS WE DO SO TO AVOID POSSIBLE DEADLOCK
+
+    STATE_LOCK();
+
+    list_for_each(cur,&gpudev_console_list) {
+	c = list_entry(cur,struct gpudev_console, gpudev_node);
+	if (c && c->cur_vc && (*c->cur_vc) == vc) {
+	    matching_gdc[match_count++] = c;
+	    if (match_count==MAX_MATCHING_GPUDEV_CONSOLES) {
+		break;
+	    }
+	}
+    }
+
+    STATE_UNLOCK();
+
+    for(int i = 0; i < match_count; i++) {
+        c = matching_gdc[i];
+        if(c->box.width <= x ||
+           c->box.height <= y) {
+            // Outside of this gpudev console
+            continue;
+        } else {
+            nk_gpu_dev_coordinate_t coord = {
+                .x = c->box.x + x,
+                .y = c->box.y + y,
+            };
+            nk_gpu_dev_text_set_char(c->dev, &coord, &character);
+        }
+    }
+}
+
+static void gpudev_consoles_flush(struct nk_virtual_console *vc, int have_lock) 
+{
+    struct list_head *cur=0;
+    struct gpudev_console *c;
+    struct gpudev_console *matching_gdc[MAX_MATCHING_GPUDEV_CONSOLES];
+    int match_count = 0;
+    int match_cur;
+
+    STATE_LOCK_CONF;
+      
+    // search for matching consoles with the global lock held
+    // DOING NO OUTPUT AS WE DO SO TO AVOID POSSIBLE DEADLOCK
+
+    if(!have_lock) {
+      STATE_LOCK();
+    }
+
+    list_for_each(cur,&gpudev_console_list) {
+	c = list_entry(cur,struct gpudev_console, gpudev_node);
+	if (c && c->cur_vc && (*c->cur_vc) == vc) {
+	    matching_gdc[match_count++] = c;
+	    if (match_count==MAX_MATCHING_GPUDEV_CONSOLES) {
+		break;
+	    }
+	}
+    }
+
+    if(!have_lock) {
+      STATE_UNLOCK();
+    }
+
+    for(int i = 0; i < match_count; i++) {
+        c = matching_gdc[i];
+        nk_gpu_dev_flush(c->dev);
+    }
+}
+
+static void gpudev_consoles_display_buffer(struct nk_virtual_console *vc, int have_lock) 
+{
+    struct list_head *cur=0;
+    struct gpudev_console *c;
+    struct gpudev_console *matching_gdc[MAX_MATCHING_GPUDEV_CONSOLES];
+    int match_count = 0;
+    int match_cur;
+
+    STATE_LOCK_CONF;
+      
+    // search for matching consoles with the global lock held
+    // DOING NO OUTPUT AS WE DO SO TO AVOID POSSIBLE DEADLOCK
+
+    if(!have_lock) {
+      STATE_LOCK();
+    }
+
+    list_for_each(cur,&gpudev_console_list) {
+	c = list_entry(cur,struct gpudev_console, gpudev_node);
+	if (c && c->cur_vc && (*c->cur_vc) == vc) {
+	    matching_gdc[match_count++] = c;
+	      if (match_count==MAX_MATCHING_GPUDEV_CONSOLES) {
+		  break;
+	    }
+	}
+    }
+
+    if(!have_lock) {
+      STATE_UNLOCK();
+    }
+
+    for(int i = 0; i < match_count; i++) {
+        c = matching_gdc[i];
+        nk_gpu_dev_text_set_box_from_charmap(c->dev, &c->box, vc->buffer);
     }
 }
 
@@ -1711,21 +1835,42 @@ static void vc_copy_to_chardev_console(struct chardev_console *c)
 {
   // When we switch VC's try to output the buffer so we can potentially see past output
   // (this is a rough system but it's for debugging so any output at all is appreciated)
-  for(int y = 0; y < VC_HEIGHT && y <= c->cur_vc->cur_y; y++) {
-    for(int x = 0; x < VC_WIDTH; x++) {
-      if((y == VC_HEIGHT-1 || y >= c->cur_vc->cur_y) && x >= c->cur_vc->cur_x)
+
+  uint32_t height = c->cur_vc->buffer->height;
+  uint32_t width = c->cur_vc->buffer->width;
+
+  for(int y = 0; y < height && y <= c->cur_vc->cursor.y; y++) {
+    //Remove extra whitespace off the end of the line
+    int found_non_whitespace = 0;
+    uint32_t eol = width;
+    while(eol > 0 && !found_non_whitespace) {
+        char chr = NK_GPU_DEV_CHARMAP_CHAR(c->cur_vc->buffer,eol,y).symbol;
+        switch(chr) {
+            case '\n':
+            case '\r':
+            case '\t':
+            case ' ':
+            case '\0':
+                eol--;
+                break;
+            default:
+                found_non_whitespace = 1;
+                break;
+        }
+    }
+    for(int x = 0; x < eol; x++) {
+      if((y == height-1 || y >= c->cur_vc->cursor.y) && x >= c->cur_vc->cursor.x)
       {
         break;
       }
-      uint16_t vga = c->cur_vc->BUF[x + (y*VC_WIDTH)];
-      uint8_t ascii = vga & 0b1111111;
-      if(ascii != '\n') {
-	    char_dev_write_all(c->dev,1,&ascii,NK_DEV_REQ_BLOCKING);
+      char chr = NK_GPU_DEV_CHARMAP_CHAR(c->cur_vc->buffer, x, y).symbol;
+      if(chr != '\n') {
+	    char_dev_write_all(c->dev,1,&chr,NK_DEV_REQ_BLOCKING);
       } else {
         break;
       }
     }
-    if(y < VC_HEIGHT-1 && y < c->cur_vc->cur_y)
+    if(y < height-1 && y < c->cur_vc->cursor.y)
     {
       uint8_t bp = '\r';
       char_dev_write_all(c->dev,1,&bp,NK_DEV_REQ_BLOCKING);
@@ -2050,6 +2195,11 @@ _configure_gpudev_console(struct gpudev_console *c)
         return res;
     }
 
+    c->box.x = 0;
+    c->box.y = 0;
+    c->box.width = c->mode.width;
+    c->box.height = c->mode.height;
+
     return 0;
 }
 
@@ -2221,22 +2371,20 @@ int nk_vc_init(void)
   }
 
   cur_vc = default_vc;
-  copy_display_to_vc(cur_vc);
+  //copy_display_to_vc(cur_vc);
+  //DEBUG("Copied display to vc\n");
 
-  DEBUG("Copied display to vc\n");
+  cur_vc->cursor.x = 0;
+  cur_vc->cursor.y = 0;
 
-#ifdef NAUT_CONFIG_X86_64_HOST
-  uint8_t vga_x, vga_y;
-  vga_get_cursor(&vga_x,&vga_y);
-  cur_vc->cur_x = vga_x;
-  cur_vc->cur_y = vga_y;
-  vga_init_screen();
-#elif NAUT_CONFIG_XEON_PHI
-  phi_cons_get_cursor(&(cur_vc->cur_x), &(cur_vc->cur_y));
+#if NAUT_CONFIG_XEON_PHI
+  phi_cons_get_cursor(&(cur_vc->cursor.x), &(cur_vc->cursor.y));
   phi_cons_clear_screen();
-  phi_cons_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
+  phi_cons_set_cursor(cur_vc->cursor.x, cur_vc->cursor.y);
 #endif
-  gpudev_consoles_set_cursor(cur_vc, cur_vc->cur_x, cur_vc->cur_y, 0);
+
+  gpudev_consoles_set_cursor(cur_vc, cur_vc->cursor.x, cur_vc->cursor.y, 0);
+  gpudev_consoles_flush(cur_vc, 0);
 
   up=1;
 

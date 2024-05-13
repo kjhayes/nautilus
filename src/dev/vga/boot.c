@@ -59,6 +59,24 @@ boot_vga_dev_text_set_char(void *state, nk_gpu_dev_coordinate_t *location, nk_gp
     vga_write_screen(location->x, location->y, vga_make_entry(val->symbol, val->attribute));
     return 0;
 }
+
+static int
+boot_vga_dev_text_set_box_from_charmap(void *state, nk_gpu_dev_box_t *box, nk_gpu_dev_charmap_t *map) {
+    size_t min_width = map->width < box->width ? map->width : box->width;
+    size_t min_height = map->height < box->height ? map->height : box->height;
+
+    // row major
+    for(size_t y_i = 0; y_i < min_height; y_i++) {
+      for(size_t x_i = 0; x_i < min_width; x_i++) {
+          nk_gpu_dev_char_t *c = &NK_GPU_DEV_CHARMAP_CHAR(map,x_i,y_i);
+          uint16_t val = vga_make_entry(c->symbol, c->attribute);
+          vga_write_screen(box->x + x_i, box->y + y_i, val);
+      }
+    }
+
+    return 0;
+}
+
 static int
 boot_vga_dev_text_set_cursor(void *state, nk_gpu_dev_coordinate_t *location, uint32_t flags) {
     if((flags & NK_GPU_DEV_TEXT_CURSOR_ON) == 0) {
@@ -79,12 +97,15 @@ struct nk_gpu_dev_int boot_vga_dev_int = {
     .set_mode = boot_vga_dev_set_mode,
     .flush = boot_vga_dev_flush,
     .text_set_char = boot_vga_dev_text_set_char,
+    .text_set_box_from_charmap = boot_vga_dev_text_set_box_from_charmap,
     .text_set_cursor = boot_vga_dev_text_set_cursor,
 };
 
 static int
 boot_vga_dev_init(void) {
     printk("boot_vga_dev_init!\n");
+
+    vga_init_screen();
 
     struct nk_gpu_dev *dev = nk_gpu_dev_register("boot-vga",0,&boot_vga_dev_int,NULL);
     if(dev == NULL) {

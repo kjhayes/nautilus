@@ -105,6 +105,11 @@ typedef union nk_gpu_dev_pixel {
     uint8_t  channel[4];
 } nk_gpu_dev_pixel_t;
 
+typedef struct nk_gpu_dev_charmap {
+    uint32_t width;
+    uint32_t height;
+    nk_gpu_dev_char_t chars[0]; // row major order, no interleaving
+} nk_gpu_dev_charmap_t;
 
 // 32 bit full color bitmap, same as screen
 typedef struct nk_gpu_dev_bitmap {
@@ -170,8 +175,10 @@ struct nk_gpu_dev_int {
 
     // text mode drawing commands
     int (*text_set_char)(void *state, nk_gpu_dev_coordinate_t *location, nk_gpu_dev_char_t *val);
+    int (*text_set_box_from_charmap)(void *state, nk_gpu_dev_box_t *box, nk_gpu_dev_charmap_t *charmap);
     // cursor location in text mode
     int (*text_set_cursor)(void *state, nk_gpu_dev_coordinate_t *location, uint32_t flags);
+
 #define NK_GPU_DEV_TEXT_CURSOR_ON    1
 #define NK_GPU_DEV_TEXT_CURSOR_BLINK 2
 
@@ -238,6 +245,7 @@ int nk_gpu_dev_flush(nk_gpu_dev_t *dev);
 
 // output a character in a text mode
 int nk_gpu_dev_text_set_char(nk_gpu_dev_t *dev, nk_gpu_dev_coordinate_t *location, nk_gpu_dev_char_t *val);
+int nk_gpu_dev_text_set_box_from_charmap(nk_gpu_dev_t *dev, nk_gpu_dev_box_t *box, nk_gpu_dev_charmap_t *map);
 // locate and configure the cursor in a text mode
 // you probably want to use the "on" flag
 int nk_gpu_dev_text_set_cursor(nk_gpu_dev_t *dev, nk_gpu_dev_coordinate_t *location, uint32_t flags);
@@ -280,6 +288,10 @@ nk_gpu_dev_bitmap_t *nk_gpu_dev_bitmap_create(uint32_t width, uint32_t height);
 // for reading/writing pixels in the bitmap
 #define              NK_GPU_DEV_BITMAP_PIXEL(bitmap,x,y) ((bitmap)->pixels[(y)*((bitmap)->width)+(x)])
 void                 nk_gpu_dev_bitmap_destroy(nk_gpu_dev_bitmap_t *bitmap);
+
+nk_gpu_dev_charmap_t *nk_gpu_dev_charmap_create(uint32_t width, uint32_t height);
+#define NK_GPU_DEV_CHARMAP_CHAR(charmap,x,y) ((charmap)->chars[(y)*((charmap)->width)+(x)])
+void nk_gpu_dev_charmap_destroy(nk_gpu_dev_charmap_t *charmap);
 
 // fonts
 nk_gpu_dev_font_t   *nk_gpu_dev_font_create(uint32_t width, uint32_t height);

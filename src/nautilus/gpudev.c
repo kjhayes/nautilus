@@ -107,7 +107,7 @@ struct nk_gpu_dev * nk_gpu_dev_find(char *name)
 	return di->f(d->state,##args);					\
     } else {								\
 	ERROR(str " not supported on %s\n", d->name);			\
-	return -1;							\
+	return -EUNIMPL;							\
     }
 
 
@@ -135,6 +135,11 @@ int nk_gpu_dev_flush(nk_gpu_dev_t *dev)
 int nk_gpu_dev_text_set_char(nk_gpu_dev_t *dev, nk_gpu_dev_coordinate_t *location, nk_gpu_dev_char_t *val)
 {
     BOILERPLATE("text set char",text_set_char,location,val);
+}
+
+int nk_gpu_dev_text_set_box_from_charmap(nk_gpu_dev_t *dev, nk_gpu_dev_box_t *box, nk_gpu_dev_charmap_t *map)
+{
+    BOILERPLATE("text set box from charmap",text_set_box_from_charmap,box,map);
 }
 
 int nk_gpu_dev_text_set_cursor(nk_gpu_dev_t *dev, nk_gpu_dev_coordinate_t *location, uint32_t flags)
@@ -206,7 +211,7 @@ nk_gpu_dev_bitmap_t *nk_gpu_dev_bitmap_create(uint32_t width, uint32_t height)
 
     if (!b) {
 	ERROR("failed to allocate bitmap\n");
-	return 0;
+	return b;
     }
 
     memset(b,0,size);
@@ -220,6 +225,26 @@ nk_gpu_dev_bitmap_t *nk_gpu_dev_bitmap_create(uint32_t width, uint32_t height)
 void                 nk_gpu_dev_bitmap_destroy(nk_gpu_dev_bitmap_t *bitmap)
 {
     free(bitmap);
+}
+
+nk_gpu_dev_charmap_t *
+nk_gpu_dev_charmap_create(uint32_t width, uint32_t height) {
+    size_t size = sizeof(nk_gpu_dev_charmap_t);
+    size += sizeof(nk_gpu_dev_pixel_t) * width * height;
+    nk_gpu_dev_charmap_t *map = malloc(size);
+    if(!map) {
+        ERROR("Failed to allocate charmap!\n");
+        return map;
+    }
+    memset(map,0,size);
+    map->width = width;
+    map->height = height;
+    return map;
+}
+
+void
+nk_gpu_dev_charmap_destroy(nk_gpu_dev_charmap_t *map) {
+    free(map);
 }
 
 #define CEIL_DIV(x,y) ((x/y) + !!(x%y))
