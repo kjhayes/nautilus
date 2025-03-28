@@ -133,10 +133,13 @@ static void chardev_consoles_putchar(struct nk_virtual_console *vc, char data);
 static void chardev_consoles_print(struct nk_virtual_console *vc, char *data);
 
 // Broadcast updates to gpudev consoles
-static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x, uint32_t y, int state_lock_held);
+static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x, uint32_t y);
+static void _gpudev_consoles_set_cursor_lockless(struct nk_virtual_console *vc, uint32_t x, uint32_t y);
 static void gpudev_consoles_set_char(struct nk_virtual_console *vc, uint32_t x, uint32_t y, char symbol, uint8_t attr);
-static void gpudev_consoles_display_buffer(struct nk_virtual_console *vc, int state_lock_held);
-static void gpudev_consoles_flush(struct nk_virtual_console *vc, int state_lock_held);
+static void gpudev_consoles_display_buffer(struct nk_virtual_console *vc);
+static void _gpudev_consoles_display_buffer_lockless(struct nk_virtual_console *vc);
+static void gpudev_consoles_flush(struct nk_virtual_console *vc);
+static void _gpudev_consoles_flush_lockless(struct nk_virtual_console *vc);
 
 static nk_thread_id_t list_tid;
 
@@ -287,9 +290,9 @@ static int _switch_to_vc(struct nk_virtual_console *vc)
     //copy_display_to_vc(cur_vc);
 
     cur_vc = vc;
-    gpudev_consoles_display_buffer(cur_vc, 1);
-    gpudev_consoles_set_cursor(cur_vc, cur_vc->cursor.x, cur_vc->cursor.y, 1);
-    gpudev_consoles_flush(cur_vc, 1);
+    _gpudev_consoles_display_buffer_lockless(cur_vc);
+    _gpudev_consoles_set_cursor_lockless(cur_vc, cur_vc->cursor.x, cur_vc->cursor.y);
+    _gpudev_consoles_flush_lockless(cur_vc);
 
 #if NAUT_CONFIG_XEON_PHI
     phi_cons_set_cursor(cur_vc->cursor.x, cur_vc->cursor.y);
@@ -444,8 +447,8 @@ INTERRUPT static int _vc_scrollup_specific(struct nk_virtual_console *vc)
     chr->attribute = vc->fill_attr;
   }
 
-  gpudev_consoles_display_buffer(vc, 0);
-  gpudev_consoles_flush(vc, 0);
+  gpudev_consoles_display_buffer(vc);
+  gpudev_consoles_flush(vc);
 
 #ifdef NAUT_CONFIG_XEON_PHI
   if(vc == cur_vc) {
@@ -503,8 +506,8 @@ static int _vc_display_char_specific(struct nk_virtual_console *vc, uint8_t c, u
     NK_GPU_DEV_CHARMAP_CHAR(vc->buffer,x,y).attribute = attr;
 
     gpudev_consoles_set_char(vc, x, y, c, attr);
-    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y, 0);
-    gpudev_consoles_flush(cur_vc, 0);
+    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y);
+    gpudev_consoles_flush(cur_vc);
 
 #ifdef NAUT_CONFIG_XEON_PHI
     if(vc == cur_vc) {
@@ -614,8 +617,8 @@ static int _vc_setpos(uint8_t x, uint8_t y)
   if (vc) {
     vc->cursor.x = x;
     vc->cursor.y = y;
-    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y, 0);
-    gpudev_consoles_flush(vc, 0);
+    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y);
+    gpudev_consoles_flush(vc);
   }
   return 0;
 }
@@ -677,8 +680,8 @@ static int _vc_setpos_specific(struct nk_virtual_console *vc, uint8_t x, uint8_t
   if (vc) {
     vc->cursor.x = x;
     vc->cursor.y = y;
-    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y, 0);
-    gpudev_consoles_flush(vc, 0);
+    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y);
+    gpudev_consoles_flush(vc);
   }
 
   return rc;
@@ -727,8 +730,8 @@ INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t
       vc->cursor.y--;
     }
 
-    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y, 0);
-    gpudev_consoles_flush(vc, 0);
+    gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y);
+    gpudev_consoles_flush(vc);
 
 #if NAUT_CONFIG_XEON_PHI
     if (vc==cur_vc) {
@@ -755,8 +758,8 @@ INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t
     }
   }
 
-  gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y, 0);
-  gpudev_consoles_flush(vc, 0);
+  gpudev_consoles_set_cursor(vc, vc->cursor.x, vc->cursor.y);
+  gpudev_consoles_flush(vc);
 
 #if NAUT_CONFIG_XEON_PHI
   if (vc==cur_vc) {
@@ -979,8 +982,8 @@ static int _vc_clear_specific(struct nk_virtual_console *vc, uint8_t attr)
     vc->buffer->chars[i].attribute = attr;
   }
 
-  gpudev_consoles_display_buffer(vc, 0);
-  gpudev_consoles_flush(vc, 0);
+  gpudev_consoles_display_buffer(vc);
+  gpudev_consoles_flush(vc);
 
 #ifdef NAUT_CONFIG_XEON_PHI
   if (vc==cur_vc) {
@@ -1661,7 +1664,7 @@ static void chardev_consoles_putchar(struct nk_virtual_console *vc, char data)
     _chardev_consoles_print(vc,&data,1);
 }
 
-static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x, uint32_t y, const int have_lock) 
+static void _gpudev_consoles_set_cursor_lockless(struct nk_virtual_console *vc, uint32_t x, uint32_t y) 
 {
     nk_gpu_dev_coordinate_t zero_coord = { 0 };
     
@@ -1670,15 +1673,9 @@ static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x
     struct gpudev_console *matching_gdc[MAX_MATCHING_GPUDEV_CONSOLES];
     int match_count = 0;
     int match_cur;
-
-    STATE_LOCK_CONF;
       
     // search for matching consoles with the global lock held
     // DOING NO OUTPUT AS WE DO SO TO AVOID POSSIBLE DEADLOCK
-
-    if(!have_lock) {
-      STATE_LOCK();
-    }
 
     list_for_each(cur,&gpudev_console_list) {
 	c = list_entry(cur,struct gpudev_console, gpudev_node);
@@ -1688,10 +1685,6 @@ static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x
 		break;
 	    }
 	}
-    }
-
-    if(!have_lock) {
-      STATE_UNLOCK();
     }
 
     for(int i = 0; i < match_count; i++) {
@@ -1707,6 +1700,14 @@ static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x
             nk_gpu_dev_text_set_cursor(c->dev, &coord, NK_GPU_DEV_TEXT_CURSOR_ON);
         }
     }
+}
+
+static void gpudev_consoles_set_cursor(struct nk_virtual_console *vc, uint32_t x, uint32_t y)
+{
+    STATE_LOCK_CONF;
+    STATE_LOCK();
+    _gpudev_consoles_set_cursor_lockless(vc, x, y);
+    STATE_UNLOCK();
 }
 
 static void gpudev_consoles_set_char(struct nk_virtual_console *vc, uint32_t x, uint32_t y, char symbol, uint8_t attr) 
@@ -1757,7 +1758,7 @@ static void gpudev_consoles_set_char(struct nk_virtual_console *vc, uint32_t x, 
     }
 }
 
-static void gpudev_consoles_flush(struct nk_virtual_console *vc, int have_lock) 
+static void _gpudev_consoles_flush_lockless(struct nk_virtual_console *vc) 
 {
     struct list_head *cur=0;
     struct gpudev_console *c;
@@ -1765,14 +1766,8 @@ static void gpudev_consoles_flush(struct nk_virtual_console *vc, int have_lock)
     int match_count = 0;
     int match_cur;
 
-    STATE_LOCK_CONF;
-      
     // search for matching consoles with the global lock held
     // DOING NO OUTPUT AS WE DO SO TO AVOID POSSIBLE DEADLOCK
-
-    if(!have_lock) {
-      STATE_LOCK();
-    }
 
     list_for_each(cur,&gpudev_console_list) {
 	c = list_entry(cur,struct gpudev_console, gpudev_node);
@@ -1784,32 +1779,30 @@ static void gpudev_consoles_flush(struct nk_virtual_console *vc, int have_lock)
 	}
     }
 
-    if(!have_lock) {
-      STATE_UNLOCK();
-    }
-
     for(int i = 0; i < match_count; i++) {
         c = matching_gdc[i];
         nk_gpu_dev_flush(c->dev);
     }
 }
 
-static void gpudev_consoles_display_buffer(struct nk_virtual_console *vc, int have_lock) 
+static void gpudev_consoles_flush(struct nk_virtual_console *vc)
+{
+    STATE_LOCK_CONF;
+    STATE_LOCK();
+    _gpudev_consoles_flush_lockless(vc);
+    STATE_UNLOCK();
+}
+
+static void _gpudev_consoles_display_buffer_lockless(struct nk_virtual_console *vc) 
 {
     struct list_head *cur=0;
     struct gpudev_console *c;
     struct gpudev_console *matching_gdc[MAX_MATCHING_GPUDEV_CONSOLES];
     int match_count = 0;
     int match_cur;
-
-    STATE_LOCK_CONF;
       
     // search for matching consoles with the global lock held
     // DOING NO OUTPUT AS WE DO SO TO AVOID POSSIBLE DEADLOCK
-
-    if(!have_lock) {
-      STATE_LOCK();
-    }
 
     list_for_each(cur,&gpudev_console_list) {
 	c = list_entry(cur,struct gpudev_console, gpudev_node);
@@ -1821,14 +1814,18 @@ static void gpudev_consoles_display_buffer(struct nk_virtual_console *vc, int ha
 	}
     }
 
-    if(!have_lock) {
-      STATE_UNLOCK();
-    }
-
     for(int i = 0; i < match_count; i++) {
         c = matching_gdc[i];
         nk_gpu_dev_text_set_box_from_charmap(c->dev, &c->box, vc->buffer);
     }
+}
+
+static void gpudev_consoles_display_buffer(struct nk_virtual_console *vc)
+{
+    STATE_LOCK_CONF;
+    STATE_LOCK();
+    _gpudev_consoles_display_buffer_lockless(vc);
+    STATE_UNLOCK();
 }
 
 static void vc_copy_to_chardev_console(struct chardev_console *c) 
@@ -2383,8 +2380,8 @@ int nk_vc_init(void)
   phi_cons_set_cursor(cur_vc->cursor.x, cur_vc->cursor.y);
 #endif
 
-  gpudev_consoles_set_cursor(cur_vc, cur_vc->cursor.x, cur_vc->cursor.y, 0);
-  gpudev_consoles_flush(cur_vc, 0);
+  gpudev_consoles_set_cursor(cur_vc, cur_vc->cursor.x, cur_vc->cursor.y);
+  gpudev_consoles_flush(cur_vc);
 
   up=1;
 
