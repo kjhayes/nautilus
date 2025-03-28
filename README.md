@@ -20,9 +20,7 @@ or address space isolation if this is required for its execution model.
 - [Prerequisites](#prerequisites)
 - [Hardware Support](#hardware-support)
 - [Building](#building)
-- [Using QEMU](#using-qemu)
-- [Using BOCHS](#using-bochs)
-- [Using Gem5](#using-gem5)
+- [Running](#running)
 - [Rapid Development](#rapid-development)
 - [RISC-V Development](#risc-v-development)
 - [ARM64 Development](#arm64-development)
@@ -79,151 +77,14 @@ For example, `make x64/defconfig`, `make arm64/defconfig`, and `make riscv/defco
 will load a config made for the QEMU virtual machine targeting the x64, arm64 and riscv64
 architectures respectively.
 
-## Using QEMU
+## Running
 
-Here's an example:
+To quickly start a QEMU virtual machine based upon the current config,
+you can run the command `make qemu`.
+The command `make qemu-gdb-PORT` will start the same virtual machine running
+a GDB server over TCP on the specified port.
 
-[![asciicast](https://asciinema.org/a/xT76jwP0Qe9H7w3nKAk7gkTmv.png)](https://asciinema.org/a/xT76jwP0Qe9H7w3nKAk7gkTmv)
-
-Recommended:
-
-```Shell
-$> qemu-system-x86_64 -cdrom nautilus.iso -m 2048
-```
-
-Nautilus has multicore support, so this will also work just fine:
-
-```Shell
-$> qemu-system-x86_64 -cdrom nautilus.iso -m 2048 -smp 4
-```
-
-You should see Nautilus boot up on all 4 cores.
-
-Nautilus is a NUMA-aware Aerokernel. To see this in action, try (with a sufficiently new
-version of QEMU):
-
-```Shell
-$> qemu-system-x86_64 -cdrom nautilus.iso \
-                      -m 8G \
-                      -numa node,nodeid=0,cpus=0-1 \
-                      -numa node,nodeid=1,cpus=2-3 \
-                      -smp 4,sockets=2,cores=2,threads=1
-```
-
-Nautilus supports debugging over the serial port. This is useful if you want to
-debug a physical machine remotely. All prints after the serial port has been
-initialized will be redirected to COM1. To use this, find the SERIAL_REDIRECT
-entry and enable it in `make menuconfig`. You can now run like this:
-
-```Shell
-$> qemu-system-x86_64 -cdrom nautilus.iso -m 2G -serial stdio
-```
-
-Sometimes it is useful to interact with the Nautilus root shell via serial port,
-e.g. when you're running under QEMU on a system that does not have a windowing
-system. You'll want to first put a character device on the serial port by
-rebuilding Nautilus after selecting the *Place a virtual console interface on a character device* option.
-Then, after Nautilus boots (making sure you enabled the `-serial stdio` option
-in QEMU) you'll see a virtual console at your terminal. You can get to the root
-shell by getting to the terminal list with `\``3`. You can then select the root
-shell, and you will be able to run shell commands and see output. If you want to
-see more kernel output, you can use serial redirection and serial mirroring in
-your config.
-
-If you'd like to use Nautilus networking with QEMU, you should use a TUN/TAP
-interface. First, you can run the following on your host machine:
-
-```Shell
-$> sudo tunctl -d tap0
-$> sudo tunctl -t tap0
-$> sudo ifconfig tap0 up 10.10.10.2 netmask 255.255.255.0
-```
-
-Then you can use the tap interface with QEMU as follows. This particular
-invocation attaches both a virtual e1000 fast ethernet card and a virtio
-network interface:
-
-```Shell
-$> sudo qemu-system-x86_64 -smp 2 \
-                           -m 2048 \
-                           -vga std \
-                           -serial stdio \
-                           -cdrom nautilus.iso \
-                           -netdev tap,ifname=tap0,script=no,id=net0 \
-                               -device virtio-net,netdev=net0 \
-                           -netdev user,id=net1 \
-                               -device e1000,netdev=net1 \
-                           -drive if=none,id=hd0,format=raw,file=nautilus.iso \
-                               -device virtio-blk,drive=hd0
-```
-
-
-## Using BOCHS
-
-While we recommend using QEMU, sometimes it is nice to use the native debugging
-support in [BOCHS](http://bochs.sourceforge.net/). We've used BOCHS successfully with version 2.6.8. You must have
-a version of BOCHS that is built with x86_64 support, which does not seem to be the
-default in a lot of package repos. We had to build it manually. You probably also
-want to enable the native debugger.
-
-Here is a BOCHS config file (`~/.bochsrc`) that we used successfully:
-
-```
-ata0-master: type=cdrom, path=nautilus.iso, status=inserted
-boot: cdrom
-com1: enabled=1, mode=file, dev=serial.out
-cpu: count=2
-cpuid: level=6, mmx=1, level=6, x86_64=1, 1g_pages=1
-megs: 2048
-```
-
-## Using Gem5
-
-You can configure and build Nautilus for execution in the [Gem5
-architectural simulator](http://gem5.org).  Note that Gem5 is very
-slow.  Simulated time is 2-3 orders of magnitude slower than
-real-time.  If you care about interaction, and not simulation
-accuracy, configure Nautilus to override the APIC timing calibration
-results, a suboption under the Gem5 target architecture.  Once you
-have built the kernel for the Gem5 target architecture, you can copy
-`nautilus.bin` to `~gem5/binaries`, and run it using Gem5's example full
-system configuration (`~gem5/configs/example/fs.py`), like this (for two
-cpus):
-
-```Shell
-$> cd ~gem5
-$> build/X86/gem5.opt -d run.out configs/example/fs.py -n 2
-```
-
-Nautilus on Gem5 follows Gem5's boot model for Linux.  If you don't
-want to change anything, just symlink `binaries/nautilus.bin` as the
-linux kernel executable the example config expects.  Alternatively,
-you can modify the config like this, or do something similar in your
-own config:
-
-```
-     test_sys = makeLinuxX86System(...)
-+++  test_sys.kernel = binary('nautilus.bin')
-```
-
-Once Gem5 is running, you can debug Nautilus in the following
-Gem5-standard ways:
-
-```Shell
-$> telnet localhost 3456  # access serial0 / com1
-```
-
-```GDB
-gdb binaries/nautilus.bin
-(gdb) target remote localhost:7000 # attach debugger to cpu 0
-(gdb) set architecture i386:x86-64
-(gdb) ...
-```
-
-Note that if you want to interact with Nautilus running on Gem5, you
-will need to use the virtual console on a char device (`serial0`) to
-do so.   If you don't want to interact, please see the `autoexec.bat`
-startup script feature in `src/arch/gem5/init.c`.
+More details on running Nautilus with different emulators/virtual machines/simulators such as QEMU, BOCHS, or Gem5 can be found in `./docs/emulators/`.
 
 ## Rapid Development
 
