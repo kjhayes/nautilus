@@ -151,9 +151,9 @@ _nk_thread_init (nk_thread_t * t,
         return -EINVAL;
     }
 
-    if (bound_cpu==NK_NULL_CPU_ID && bound_cpu>=sys->num_cpus) {
-	THREAD_ERROR("Impossible CPU binding %d\n",bound_cpu);
-	return -EINVAL;
+    if (bound_cpu != NK_NULL_CPU_ID && bound_cpu>=sys->num_cpus) {
+	    THREAD_ERROR("Impossible CPU binding %d\n",bound_cpu);
+	    return -EINVAL;
     }
 
 
