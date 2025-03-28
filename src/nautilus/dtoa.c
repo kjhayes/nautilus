@@ -5038,7 +5038,7 @@ dtoa_r(double dd, int mode, int ndigits, int *decpt, int *sign, char **rve, char
 #ifdef USE_BF96 /*{{*/
 	BF96 *p10;
 	ULLong dbhi, dbits, dblo, den, hb, rb, rblo, res, res0, res3, reslo, sres,
-		sulp, tv0, tv1, tv2, tv3, ulp, ulplo, ulpmask, ures, ureslo, zb;
+		sulp, tv0, tv1, tv2, tv3, ulp, ulplo, ulpmask = 0, ures, ureslo, zb;
 	int eulp, k1, n2, ulpadj, ulpshift;
 #else /*}{*/
 #ifndef Sudden_Underflow
