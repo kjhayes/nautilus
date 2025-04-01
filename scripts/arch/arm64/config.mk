@@ -1,4 +1,7 @@
 
+# This will need to be set depending on where you've placed the u-boot binary
+UBOOT_BIN ?= ../u-boot-arm64.bin
+
 CFLAGS += \
 	  -mno-outline-atomics \
 	  -mstrict-align \
@@ -8,7 +11,6 @@ CFLAGS += \
 
 LDFLAGS += --fatal-warnings
 
-UBOOT_BIN = ../u-boot.bin
 QEMU_FLASH = $(SETUPS_DIR)/$(ARCH)/flash.img
 
 QEMU := qemu-system-aarch64

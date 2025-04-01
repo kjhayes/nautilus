@@ -37,6 +37,8 @@
 #include <nautilus/of/fdt.h>
 #include <arch/riscv/plic.h>
 
+#error "The SiFive GPIO Driver is currently broken, please disable CONFIG_SIFIVE_GPIO! (sorry -Kevin)"
+
 #define SIFIVE_GPIO_INPUT_VAL	0x00
 #define SIFIVE_GPIO_INPUT_EN	0x04
 #define SIFIVE_GPIO_OUTPUT_EN	0x08
@@ -134,7 +136,7 @@ static void sifive_init(const void *fdt, addr_t addr, int offset) {
 
     int num_irqs = lenp / 4;
 	for (int i = 0; i < num_irqs; i++) {
-		uint32_t irq = bswap_32(vals[i]);
+		uint32_t irq = bswap32(vals[i]);
         // if (irq == 23) {
         //     continue;
         // }

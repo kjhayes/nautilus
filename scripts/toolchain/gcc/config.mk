@@ -4,15 +4,13 @@ GCC_CROSS_COMPILE ?=
 endif
 
 ifdef NAUT_CONFIG_ARCH_ARM64
-GCC_CROSS_COMPILE ?= ~/opt/toolchain/aarch64/bin/aarch64-linux-gnu-
+GCC_CROSS_COMPILE ?= aarch64-linux-gnu-
 LDFLAGS += -m aarch64elf
 endif
 
 ifdef NAUT_CONFIG_ARCH_RISCV
-GCC_CROSS_COMPILE ?= ~/opt/toolchain/riscv64/bin/riscv64-linux-gnu-
+GCC_CROSS_COMPILE ?= riscv64-linux-gnu-
 CFLAGS += -finline-atomics
-LDFLAGS += -m elf64lriscv_lp64f -L ~/opt/toolchain/riscv64/lib/gcc/riscv64-linux-gnu/12.2.0
-LDFLAGS += -lgcc
 endif
 
 CC = $(GCC_CROSS_COMPILE)gcc
