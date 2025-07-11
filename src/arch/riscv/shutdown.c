@@ -22,19 +22,16 @@
  */
 #include <nautilus/shutdown.h>
 
-// RISCV HACK
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winvalid-noreturn"
-
 void
 reboot (void)
 {
+    while(1) {}
 }
 
 /* TODO: fix this */
 void
 acpi_shutdown (void)
 {
+    while(1) {}
 }
 
-#pragma clang diagnostic pop
