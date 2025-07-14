@@ -43,6 +43,19 @@ All such rules will then be invoked when `make clean` is run, to remove all gene
 
 ## Extra Rules
 
+### Kconfig Custom Attributes
+
+Nautilus is using a modified version of `Kconfiglib` to allow easily adding new custom attributes to Kconfig files.
+A list of all options can be found at the top of `scripts/kconfig/kconfiglib.py` and once an option is added to can be added to a symbol as such
+```
+config MY_CONFIG_OPTION
+    bool "Some Option"
+    option my_custom_option
+```
+which will add a new field `my_custom_option` to the `Symbol` class in `Kconfiglib`.
+
+For a simple example see the `no_fuzz` option used by `scripts/kconfig/fuzzconfig`.
+
 ### Kconfig Fuzzing
 
 To generate a "random" configuration based on the current `.config` the command `make fuzzconfig` is provided.

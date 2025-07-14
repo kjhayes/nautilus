@@ -3,6 +3,11 @@
 
 # Modified for the Nautilus Kernel by Kevin Hayes
 
+# NAUTILUS Addition: Any strings added to this list will be valid "option NAME"
+#                    attributes to be added onto symbols and be set
+#                    to "True" as fields inside a Symbol object if the option is set
+EXTRA_SYMBOL_OPTIONS=["allnoconfig_y", "no_fuzz"]
+
 """
 Overview
 ========
@@ -475,6 +480,7 @@ from os.path import dirname, exists, expandvars, islink, join, realpath
 
 VERSION = (14, 1, 0)
 
+EXTRA_SYMBOL_TOKENS={option:num for num,option in enumerate(EXTRA_SYMBOL_OPTIONS)}
 
 # File layout:
 #
@@ -3172,22 +3178,18 @@ class Kconfig(object):
                                    "wasn't used.",
                                    self.filename, self.linenr)
 
-                elif self._check_token(_T_ALLNOCONFIG_Y):
-                    if node.item.__class__ is not Symbol:
-                        self._parse_error("the 'allnoconfig_y' option is only "
-                                          "valid for symbols")
-
-                    node.item.is_allnoconfig_y = True
-
-                elif self._check_token(_T_NO_FUZZ):
-                    if node.item.__class__ is not Symbol:
-                        self._parse_error("the 'no_fuzz' option is only "
-                                          "valid for symbols")
-
-                    node.item.no_fuzz = True
-
                 else:
-                    self._parse_error("unrecognized option")
+                    is_extra = False
+                    for keyword, tok in EXTRA_SYMBOL_TOKENS.items():
+                        if self._check_token(tok):
+                            if node.item.__class__ is not Symbol:
+                                self._parse_error(f"the '{keyword}' option is only valid for symbols")
+                            setattr(node.item, keyword, True)
+                            is_extra=True
+                            break
+
+                    if not is_extra:
+                        self._parse_error("unrecognized option")
 
             elif t0 is _T_OPTIONAL:
                 if node.item.__class__ is not Choice:
@@ -4179,7 +4181,6 @@ class Symbol(object):
         "direct_dep",
         "env_var",
         "implies",
-        "is_allnoconfig_y",
         "is_constant",
         "kconfig",
         "name",
@@ -4191,6 +4192,7 @@ class Symbol(object):
         "selects",
         "user_value",
         "weak_rev_dep",
+        *EXTRA_SYMBOL_TOKENS,
     )
 
     #
@@ -4646,8 +4648,9 @@ class Symbol(object):
             if self.choice:
                 add("choice symbol")
 
-            if self.is_allnoconfig_y:
-                add("allnoconfig_y")
+            for option in EXTRA_SYMBOL_OPTIONS:
+                if self.getattr(option):
+                    add(option)
 
             if self is self.kconfig.defconfig_list:
                 add("is the defconfig_list symbol")
@@ -4730,8 +4733,9 @@ class Symbol(object):
         # _write_to_conf is calculated along with the value. If True, the
         # Symbol gets a .config entry.
 
-        self.is_allnoconfig_y = \
-        self.no_fuzz = \
+        for option in EXTRA_SYMBOL_OPTIONS:
+            setattr(self, option, False)
+
         self._was_set = \
         self._write_to_conf = False
 
@@ -5764,8 +5768,9 @@ class MenuNode(object):
                             self.orig_prompt[1])
 
         if sc.__class__ is Symbol:
-            if sc.is_allnoconfig_y:
-                indent_add("option allnoconfig_y")
+            for option in EXTRA_SYMBOL_OPTIONS:
+                if sc.getattr(option):
+                    indent_add(f"option {option}")
 
             if sc is sc.kconfig.defconfig_list:
                 indent_add("option defconfig_list")
@@ -6777,7 +6782,6 @@ except AttributeError:
 # Tokens, with values 1, 2, ... . Avoiding 0 simplifies some checks by making
 # all tokens except empty strings truthy.
 (
-    _T_ALLNOCONFIG_Y,
     _T_AND,
     _T_BOOL,
     _T_CHOICE,
@@ -6810,7 +6814,6 @@ except AttributeError:
     _T_MENU,
     _T_MENUCONFIG,
     _T_MODULES,
-    _T_NO_FUZZ,
     _T_NOT,
     _T_ON,
     _T_OPEN_PAREN,
@@ -6828,13 +6831,12 @@ except AttributeError:
     _T_TRISTATE,
     _T_UNEQUAL,
     _T_VISIBLE,
-) = range(1, 52)
+) = range(len(EXTRA_SYMBOL_OPTIONS)+1, 52)
 
 # Keyword to token map, with the get() method assigned directly as a small
 # optimization
-_get_keyword = {
+_get_keyword_dict = {
     "---help---":     _T_HELP,
-    "allnoconfig_y":  _T_ALLNOCONFIG_Y,
     "bool":           _T_BOOL,
     "boolean":        _T_BOOL,
     "choice":         _T_CHOICE,
@@ -6863,7 +6865,6 @@ _get_keyword = {
     "menu":           _T_MENU,
     "menuconfig":     _T_MENUCONFIG,
     "modules":        _T_MODULES,
-    "no_fuzz":        _T_NO_FUZZ,
     "on":             _T_ON,
     "option":         _T_OPTION,
     "optional":       _T_OPTIONAL,
@@ -6877,7 +6878,10 @@ _get_keyword = {
     "string":         _T_STRING,
     "tristate":       _T_TRISTATE,
     "visible":        _T_VISIBLE,
-}.get
+}
+for keyword,tok in EXTRA_SYMBOL_TOKENS.items():
+    _get_keyword_dict[keyword] = tok
+_get_keyword = _get_keyword_dict.get
 
 # The constants below match the value of the corresponding tokens to remove the
 # need for conversion
