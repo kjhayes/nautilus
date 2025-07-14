@@ -27,6 +27,7 @@
 #include <nautilus/macros.h>
 #include <nautilus/multiboot2.h>
 #include <nautilus/of/fdt.h>
+#include <nautilus/of/mem.h>
 
 extern char * mem_region_types[6];
 
