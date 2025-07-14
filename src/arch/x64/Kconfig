@@ -1,4 +1,10 @@
 
+config X64_KERNEL_LINK_ADDR
+    hex "Kernel Load Address"
+    default 0x100000
+    help
+      Sets the base address which the kernel is linked to be loaded at
+
 config MAX_IOAPICS
     depends on X86_64_HOST
     int "Maximum Number of IOAPICS"

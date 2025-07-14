@@ -3,7 +3,7 @@ ENTRY( nautilus_entry )
 
 SECTIONS
 {
-  . = NAUT_CONFIG_KERNEL_LINK_ADDR;
+  . = NAUT_CONFIG_ARM64_KERNEL_LINK_ADDR;
 
   PROVIDE(kernel_start = .);
 

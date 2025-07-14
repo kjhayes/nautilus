@@ -73,12 +73,6 @@ menu "Platform"
           This exists to avoid configuration options which will cause bugs in a uniprocessor
           system (ex. Work Stealing will cause an infinite loop if there is only a single processor)
 
-    config KERNEL_LINK_ADDR
-        hex "Kernel Load Address"
-        default 0x100000
-        help
-          Sets the base address which the kernel is linked to be loaded at
-
     menu "x64 Options"
     depends on ARCH_X86
     source "./src/arch/x64/Kconfig"

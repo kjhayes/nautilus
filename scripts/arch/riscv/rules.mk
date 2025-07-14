@@ -4,7 +4,7 @@ uImage: $(NAUT_BIN)
 	$(Q)$(OBJCOPY) -O binary $(NAUT_BIN) Image
 	$(call quiet-cmd,MKIMAGE,$@)
 	$(Q)mkimage -A riscv -O linux -T kernel -C none \
-		-a $(NAUT_CONFIG_KERNEL_LINK_ADDR) -e $(NAUT_CONFIG_KERNEL_LINK_ADDR) -n "Nautilus" \
+		-a $(NAUT_CONFIG_RISCV_KERNEL_LINK_ADDR) -e $(NAUT_CONFIG_RISCV_KERNEL_LINK_ADDR) -n "Nautilus" \
 		-d Image uImage $(QPIPE)
 	$(Q)rm Image
 

@@ -1,4 +1,10 @@
 
+config ARM64_KERNEL_LINK_ADDR
+    hex "Kernel Load Address"
+    default 0x0
+    help
+      Sets the base address which the kernel is linked to be loaded at
+
 config ARM64_HAS_SECURE_MONITOR
     bool "ARM Has Secure Monitor"
     default n
