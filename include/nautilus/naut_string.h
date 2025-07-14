@@ -80,7 +80,7 @@ static inline unsigned char __toupper(unsigned char c)
 #ifdef NAUT_CONFIG_USE_NAUT_BUILTINS
 void * memcpy (void * dst, const void * src, size_t n);
 int memcmp (const void * s1_, const void * s2_, size_t n);
-void * memset (void * dst, char c, size_t n);
+void * memset (void * dst, int c, size_t n);
 void * memmove (void * dst, const void * src, size_t n);
 
 size_t strlen (const char * str);
@@ -104,6 +104,31 @@ size_t strspn (const char * s, const char * accept);
 size_t strcspn (const char * s, const char * reject);
 char * strstr (const char * haystack, const char * needle);
 
+#else
+
+#include <stddef.h>
+
+#define memcpy      __builtin_memcpy
+#define memset      __builtin_memset
+#define memcmp      __builtin_memcmp
+#define strlen      __builtin_strlen
+#define strnlen     __builtin_strnlen
+#define strcmp      __builtin_strcmp
+#define strncmp     __builtin_strncmp
+#define strncpy     __builtin_strncpy
+#define strcpy      __builtin_strcpy
+#define strncasecmp __builtin_strncasecmp
+#define strcat      __builtin_strcat
+#define strncat     __builtin_strncat
+#define strstr      __builtin_strstr
+#define strspn      __builtin_strspn
+#define strcspn     __builtin_strcspn
+#define strchr      __builtin_strchr
+#define strrchr     __builtin_strrchr
+#define strpbrk     __builtin_strpbrk
+
+#endif
+
 #ifdef NAUT_CONFIG_ARCH_RISCV
 #include <arch/riscv/naut_string.h>
 #elif NAUT_CONFIG_ARCH_X86
@@ -112,28 +137,6 @@ char * strstr (const char * haystack, const char * needle);
 #include <arch/arm64/naut_string.h>
 #else
 #error "Unsupported Arch"
-#endif
-
-#else
-
-#include <stddef.h>
-
-#define memcpy  __builtin_memcpy
-#define memset  __builtin_memset
-#define memcmp  __builtin_memcmp
-#define strlen  __builtin_strlen
-#define strnlen __builtin_strnlen
-#define strcmp  __builtin_strcmp
-#define strncmp __builtin_strncmp
-#define strcat  __builtin_strcat
-#define strncat __builtin_strncat
-#define strstr  __builtin_strstr
-#define strspn  __builtin_strspn
-#define strcspn __builtin_strcspn
-#define strchr  __builtin_strchr
-#define strrchr __builtin_strrchr
-#define strpbrk __builtin_strpbrk
-
 #endif
 
 int atoi (const char * buf);

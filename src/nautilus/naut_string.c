@@ -52,7 +52,6 @@ _L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,       /* 224-239 */
 _L,_L,_L,_L,_L,_L,_L,_P,_L,_L,_L,_L,_L,_L,_L,_L};      /* 240-255 */
 
 
-#ifdef NAUT_CONFIG_USE_NAUT_BUILTINS
 size_t 
 strlen (const char * str)
 {
@@ -91,7 +90,7 @@ memcpy (void * dst, const void * src, size_t n)
 
 
 void * 
-memset (void * dst, char c, size_t n)
+memset (void * dst, int c, size_t n)
 {
 //    printk("memset(dst=%p, c=%c, n=%x)\n", dst, c, n);
     unsigned char * d = (unsigned char *)dst;
@@ -387,8 +386,6 @@ strrchr (const char * s, int c)
     return 0;
 }
 
-
-#endif  /* USE_NAUT_BUILTINS */
 
 int 
 atoi (const char * buf) 
