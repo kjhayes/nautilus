@@ -43,6 +43,14 @@ All such rules will then be invoked when `make clean` is run, to remove all gene
 
 ## Extra Rules
 
+### Kconfig Fuzzing
+
+To generate a "random" configuration based on the current `.config` the command `make fuzzconfig` is provided.
+This will go through and generate a new configuration with randomly set options.
+
+Certain options should not be randomly set however (for example: NAUT_CONFIG_RISCV_KERNEL_LINK_ADDR cannot be set randomly due to alignment constraints)
+and so Nautilus has the custom Kconfig attribute `option no_fuzz` which will stop `fuzzconfig` from changing the variables value.
+
 ### QEMU
 
 If the variable `QEMU` is defined, then the `scripts/extra/qemu.mk` file will be included, defining a few useful rules such as `make qemu`, which will try to start a virtual machine with the current config, `make qemu-gdb` which is the same as `make qemu` but it will won't start the virtual machine immediately, instead opening a gdbserver on TCP port 1234 to debug the kernel.
