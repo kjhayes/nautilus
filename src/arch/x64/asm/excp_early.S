@@ -140,7 +140,7 @@ skip_cat_entry:
 #if GPIO_OUTPUT && defined(NAUT_CONFIG_PARALLEL_PORT_GPIO)
     movq $0x10, %rdi   // bit 4
     movq $0x0, %rsi    // or it high
-    callq nk_gpio_output_mask
+    callq nk_port_gpio_output_mask
 #endif
     // Interrupts are enabled only after per-cpu functonality
     // is enabled (and gsbase is set), so these are safe to execute
@@ -242,7 +242,7 @@ thr_return:
     movq $0x10, %rdi   // bit 4
     notq %rdi          // clear
     movq $0x1, %rsi    // and it low
-    callq nk_gpio_output_mask
+    callq nk_port_gpio_output_mask
 #endif
 
 #ifdef NAUT_CONFIG_CACHEPART

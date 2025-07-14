@@ -75,7 +75,7 @@ ENTRY(nk_thread_switch_intr_entry)
     pushq %rdi
     movq $0x8, %rdi   // bit 3 set
     movq $0x0, %rsi    // or it high
-    callq nk_gpio_output_mask
+    callq nk_port_gpio_output_mask
     popq %rdi
 #endif
 	
@@ -228,7 +228,7 @@ TL_skip_signal_delivery:
     movq $0x18, %rdi   // bit 3+4 (irq goes low too)
     notq %rdi         // clear
     movq $0x1, %rsi    // and it low
-    callq nk_gpio_output_mask
+    callq nk_port_gpio_output_mask
 #endif
 	
     RESTORE_GPRS()      /* load the new thread's GPRs */
