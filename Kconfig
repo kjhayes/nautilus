@@ -479,6 +479,7 @@ config VIRTUAL_CONSOLE_SERIAL_MIRROR_ALL
     config TASK_DEEP_STATISTICS
         bool "Collect deeper statistics for each task"
         default n
+        depends on CONFIG_X64
         help
             When enabled, additional task overheads are collected to help
 	        work on the task system.  These come at the cost of greater measurement overhead
@@ -1546,6 +1547,7 @@ endmenu
 config ALLOW_UNINTEGRATED
     bool "Allow Unintegrated Options"
     default n
+    option no_fuzz
     help
       It's been a long time of trying to get integration to work with all 3 architectures,
       and at times it seems like one step forward, three steps back, so I'm putting down

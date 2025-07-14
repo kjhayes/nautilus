@@ -43,6 +43,10 @@ defconfig:
 %defconfig:
 	$(Q)$(PYTHON) $(KCONFIG_DIR)/defconfig.py $(SETUPS_DIR)/$@
 
+fuzzconfig:
+	$(Q)$(PYTHON) $(KCONFIG_DIR)/fuzzconfig.py
+
+
 -include $(DOT_CONFIG)
 
 .PHONY: menuconfig defconfig

@@ -1,6 +1,8 @@
 # Copyright (c) 2011-2019, Ulf Magnusson
 # SPDX-License-Identifier: ISC
 
+# Modified for the Nautilus Kernel by Kevin Hayes
+
 """
 Overview
 ========
@@ -17,95 +19,12 @@ kconfiglib.VERSION, which is a (<major>, <minor>, <patch>) tuple, e.g.
 (12, 0, 0).
 
 
-Using Kconfiglib on the Linux kernel with the Makefile targets
-==============================================================
-
-For the Linux kernel, a handy interface is provided by the
-scripts/kconfig/Makefile patch, which can be applied with either 'git am' or
-the 'patch' utility:
-
-  $ wget -qO- https://raw.githubusercontent.com/ulfalizer/Kconfiglib/master/makefile.patch | git am
-  $ wget -qO- https://raw.githubusercontent.com/ulfalizer/Kconfiglib/master/makefile.patch | patch -p1
-
-Warning: Not passing -p1 to patch will cause the wrong file to be patched.
-
-Please tell me if the patch does not apply. It should be trivial to apply
-manually, as it's just a block of text that needs to be inserted near the other
-*conf: targets in scripts/kconfig/Makefile.
-
-Look further down for a motivation for the Makefile patch and for instructions
-on how you can use Kconfiglib without it.
-
-If you do not wish to install Kconfiglib via pip, the Makefile patch is set up
-so that you can also just clone Kconfiglib into the kernel root:
-
-  $ git clone git://github.com/ulfalizer/Kconfiglib.git
-  $ git am Kconfiglib/makefile.patch  (or 'patch -p1 < Kconfiglib/makefile.patch')
-
-Warning: The directory name Kconfiglib/ is significant in this case, because
-it's added to PYTHONPATH by the new targets in makefile.patch.
-
-The targets added by the Makefile patch are described in the following
-sections.
-
-
-make kmenuconfig
+make menuconfig
 ----------------
 
 This target runs the curses menuconfig interface with Python 3. As of
 Kconfiglib 12.2.0, both Python 2 and Python 3 are supported (previously, only
 Python 3 was supported, so this was a backport).
-
-
-make guiconfig
---------------
-
-This target runs the Tkinter menuconfig interface. Both Python 2 and Python 3
-are supported. To change the Python interpreter used, pass
-PYTHONCMD=<executable> to 'make'. The default is 'python'.
-
-
-make [ARCH=<arch>] iscriptconfig
---------------------------------
-
-This target gives an interactive Python prompt where a Kconfig instance has
-been preloaded and is available in 'kconf'. To change the Python interpreter
-used, pass PYTHONCMD=<executable> to 'make'. The default is 'python'.
-
-To get a feel for the API, try evaluating and printing the symbols in
-kconf.defined_syms, and explore the MenuNode menu tree starting at
-kconf.top_node by following 'next' and 'list' pointers.
-
-The item contained in a menu node is found in MenuNode.item (note that this can
-be one of the constants kconfiglib.MENU and kconfiglib.COMMENT), and all
-symbols and choices have a 'nodes' attribute containing their menu nodes
-(usually only one). Printing a menu node will print its item, in Kconfig
-format.
-
-If you want to look up a symbol by name, use the kconf.syms dictionary.
-
-
-make scriptconfig SCRIPT=<script> [SCRIPT_ARG=<arg>]
-----------------------------------------------------
-
-This target runs the Python script given by the SCRIPT parameter on the
-configuration. sys.argv[1] holds the name of the top-level Kconfig file
-(currently always "Kconfig" in practice), and sys.argv[2] holds the SCRIPT_ARG
-argument, if given.
-
-See the examples/ subdirectory for example scripts.
-
-
-make dumpvarsconfig
--------------------
-
-This target prints a list of all environment variables referenced from the
-Kconfig files, together with their values. See the
-Kconfiglib/examples/dumpvars.py script.
-
-Only environment variables that are referenced via the Kconfig preprocessor
-$(FOO) syntax are included. The preprocessor was added in Linux 4.18.
-
 
 Using Kconfiglib without the Makefile targets
 =============================================
@@ -3260,6 +3179,13 @@ class Kconfig(object):
 
                     node.item.is_allnoconfig_y = True
 
+                elif self._check_token(_T_NO_FUZZ):
+                    if node.item.__class__ is not Symbol:
+                        self._parse_error("the 'no_fuzz' option is only "
+                                          "valid for symbols")
+
+                    node.item.no_fuzz = True
+
                 else:
                     self._parse_error("unrecognized option")
 
@@ -4258,6 +4184,7 @@ class Symbol(object):
         "kconfig",
         "name",
         "nodes",
+        "no_fuzz",
         "orig_type",
         "ranges",
         "rev_dep",
@@ -4804,6 +4731,7 @@ class Symbol(object):
         # Symbol gets a .config entry.
 
         self.is_allnoconfig_y = \
+        self.no_fuzz = \
         self._was_set = \
         self._write_to_conf = False
 
@@ -6882,6 +6810,7 @@ except AttributeError:
     _T_MENU,
     _T_MENUCONFIG,
     _T_MODULES,
+    _T_NO_FUZZ,
     _T_NOT,
     _T_ON,
     _T_OPEN_PAREN,
@@ -6899,7 +6828,7 @@ except AttributeError:
     _T_TRISTATE,
     _T_UNEQUAL,
     _T_VISIBLE,
-) = range(1, 51)
+) = range(1, 52)
 
 # Keyword to token map, with the get() method assigned directly as a small
 # optimization
@@ -6934,6 +6863,7 @@ _get_keyword = {
     "menu":           _T_MENU,
     "menuconfig":     _T_MENUCONFIG,
     "modules":        _T_MODULES,
+    "no_fuzz":        _T_NO_FUZZ,
     "on":             _T_ON,
     "option":         _T_OPTION,
     "optional":       _T_OPTIONAL,
