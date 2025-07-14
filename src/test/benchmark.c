@@ -392,6 +392,7 @@ void time_condvar (void) {
 
 }
 
+#ifdef NAUT_CONFIG_LIBC_COMPAT
 void time_spinlock (void);
 void time_spinlock (void)
 {
@@ -504,7 +505,7 @@ void time_spinlock (void)
             min,
             max);
 }
-
+#endif
 
 static FUNC_TYPE
 create_test_func FUNC_HDR

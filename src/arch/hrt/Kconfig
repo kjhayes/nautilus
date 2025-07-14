@@ -1,0 +1,55 @@
+
+config HRT_HIHALF_OFFSET
+    hex "HRT High-half offset"
+    default 0xffff800000000000
+    depends on HVM_HRT
+    help
+      Sets the fixed virtual-to-physical address mapping for the HRT
+
+config HRT_GPA_MAP_REQ
+    hex "HRT Max GPA to map"
+    default 0x200000000
+    depends on HVM_HRT
+    help
+      Sets the default amount of physical memory that the VMM should
+      attempt to map for the HRT
+
+config HRT_COMM_PAGE
+    hex "GPA of HRT/HVM communication page"
+    default 0x1fffff000
+    depends on HVM_HRT
+    help
+      Sets the default page address at which the VMM and HRT will
+      communicate information
+
+config HVM_INT_VEC
+    int "HVM/HRT Interrupt vector"
+    default 255
+    range 33 255
+    depends on HVM_HRT
+    help
+      Sets the interrupt vector to use for communication between
+      the VMM and the HRT
+
+choice 
+    prompt "HRT Page Size Request"
+    depends on HVM_HRT
+    default HRT_PS_2M
+    help
+        Requests a given page size to map the initial page tables 
+        from the VMM
+
+    config HRT_PS_512G
+      bool "512GB Pages"
+      
+    config HRT_PS_1G
+      bool "1GB Pages"
+
+    config HRT_PS_2M
+      bool "2MB Pages"
+
+    config HRT_PS_4K
+      bool "4KB Pages"
+
+endchoice
+

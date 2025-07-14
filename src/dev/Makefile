@@ -1,8 +1,8 @@
 
-obj-$(NAUT_CONFIG_ARCH_X86) += apic.o \
+obj-$(NAUT_CONFIG_ARCH_X86) += \
+	 apic.o \
 	 ioapic.o \
 	 i8254.o \
-	 ps2.o \
 	 vga_early.o \
 	 vga/ \
 
@@ -13,6 +13,8 @@ obj-$(NAUT_CONFIG_HAS_PCI) += \
 ifndef NAUT_CONFIG_XEON_PHI
 obj-$(NAUT_CONFIG_ARCH_X86) += serial.o
 endif
+
+obj-$(NAUT_CONFIG_PS2) += ps2.o
 
 obj-$(NAUT_CONFIG_GIC_VERSION_2) += gicv2.o
 obj-$(NAUT_CONFIG_GIC_VERSION_2M) += gicv2.o gicv2m.o

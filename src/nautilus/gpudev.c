@@ -29,7 +29,7 @@
 #include <nautilus/gpudev.h>
 #include <nautilus/timer.h>
 #include <nautilus/shell.h>
-#include <nautilus/libccompat.h>
+#include <nautilus/random.h>
 
 #ifndef NAUT_CONFIG_DEBUG_GPUDEV
 #undef DEBUG_PRINT
@@ -365,17 +365,17 @@ int handle_gputest (char * buf, void * priv)
     
     // draw some random colored boxes with xor blits
     for (i=0;i<1024;i++) {
-	box.x = rand() % curmode->width;
-	box.y = rand() % curmode->height;
-	box.width = rand() % (curmode->width - box.x);
-	box.height = rand() % (curmode->height - box.y);
+	box.x = nk_get_rand_ulong() % curmode->width;
+	box.y = nk_get_rand_ulong() % curmode->height;
+	box.width = nk_get_rand_ulong() % (curmode->width - box.x);
+	box.height = nk_get_rand_ulong() % (curmode->height - box.y);
 	
-	NK_GPU_DEV_PIXEL_SET_RGBA(curmode,&pixel,rand()%256,rand()%256,rand()%256,0);
+	NK_GPU_DEV_PIXEL_SET_RGBA(curmode,&pixel,nk_get_rand_ulong()%256,nk_get_rand_ulong()%256,nk_get_rand_ulong()%256,0);
 	
 	CHECK(nk_gpu_dev_graphics_fill_box_with_pixel(d,
 						      &box,
 						      &pixel,
-						      rand() % (NK_GPU_DEV_BIT_BLIT_OP_DIVIDE+1)));
+						      nk_get_rand_ulong() % (NK_GPU_DEV_BIT_BLIT_OP_DIVIDE+1)));
        	CHECK(nk_gpu_dev_flush(d));
     }
     
@@ -407,12 +407,12 @@ int handle_gputest (char * buf, void * priv)
     
     // draw some random colored lines
     for (i=0;i<1024;i++) {
-	start.x = rand() % curmode->width;
-	start.y = rand() % curmode->height;
-	end.x = rand() % curmode->width;
-	end.y = rand() % curmode->height;
+	start.x = nk_get_rand_ulong() % curmode->width;
+	start.y = nk_get_rand_ulong() % curmode->height;
+	end.x = nk_get_rand_ulong() % curmode->width;
+	end.y = nk_get_rand_ulong() % curmode->height;
 	
-	NK_GPU_DEV_PIXEL_SET_RGBA(curmode,&pixel,rand()%256,rand()%256,rand()%256,0);
+	NK_GPU_DEV_PIXEL_SET_RGBA(curmode,&pixel,nk_get_rand_ulong()%256,nk_get_rand_ulong()%256,nk_get_rand_ulong()%256,0);
 	
 	CHECK(nk_gpu_dev_graphics_draw_line(d,&start,&end,&pixel));
 
@@ -430,19 +430,19 @@ int handle_gputest (char * buf, void * priv)
     
     // move box of pixels around the screen
     for (i=0;i<1024;i++) {
-	src.x = rand() % curmode->width;
-	src.y = rand() % curmode->height;
-	src.width = rand() % (curmode->width - box.x);
-	src.height = rand() % (curmode->height - box.y);
-	dst.x = rand() % curmode->width;
-	dst.y = rand() % curmode->height;
+	src.x = nk_get_rand_ulong() % curmode->width;
+	src.y = nk_get_rand_ulong() % curmode->height;
+	src.width = nk_get_rand_ulong() % (curmode->width - box.x);
+	src.height = nk_get_rand_ulong() % (curmode->height - box.y);
+	dst.x = nk_get_rand_ulong() % curmode->width;
+	dst.y = nk_get_rand_ulong() % curmode->height;
 	dst.width = src.width;
 	dst.height = src.height;
 	
 	CHECK(nk_gpu_dev_graphics_copy_box(d,
 					   &src,
 					   &dst,
-					   rand() % (NK_GPU_DEV_BIT_BLIT_OP_DIVIDE+1)));
+					   nk_get_rand_ulong() % (NK_GPU_DEV_BIT_BLIT_OP_DIVIDE+1)));
        	CHECK(nk_gpu_dev_flush(d));
     }
     

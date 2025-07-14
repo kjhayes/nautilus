@@ -1,0 +1,74 @@
+
+config MAX_IOAPICS
+    depends on X86_64_HOST
+    int "Maximum Number of IOAPICS"
+    range 1 255
+    default "16"
+    help
+      Specifies the maximum number of IOAPICS supported by Nautilus
+
+config APIC_FORCE_XAPIC_MODE
+    bool "Force APIC to use XAPIC mode"
+    depends on ARCH_X86
+    default n
+    help
+       Force the use of XAPIC mode even if X2APIC mode is available
+
+config APIC_TIMER_CALIBRATE_INDEPENDENTLY
+    bool "Calibrate APIC timer independently on each core"
+    depends on ARCH_X86
+    default n
+    help
+      If set, each core's APIC timer is independently calibrated
+      If not set, only the BSP core's timer is calibrated and
+      other cores clone its calibration
+
+config DEBUG_APIC
+    bool "Debug APIC"
+    depends on ARCH_X86 && DEBUG_PRINTS
+    default n
+    help
+        Turn on debug prints for the LAPIC driver
+
+config DEBUG_IOAPIC
+    bool "Debug IOAPIC"
+    depends on ARCH_X86 && DEBUG_PRINTS
+    default n
+    help 
+        Turn on debug prints for the IOAPIC driver
+
+config XSAVE_SUPPORT
+    bool "Allow saving of FPRs with XSAVE instructions"
+    depends on X86_64_HOST
+    default y
+    help
+      Adds xsave instruction support to Nautilus. Processor
+      must have xsave support or this feature will be ignored.
+
+config XSAVE_SSE_SUPPORT
+    bool "Enable saving of SSE registers with XSAVE"
+    default y
+    depends on XSAVE_SUPPORT
+    help
+      Will save SSE state with XSAVE when enabled. Required
+      in order to save AVX and AVX512f state. This will
+      be ignored if processor does not have SSE registers.
+
+config XSAVE_AVX_SUPPORT
+    bool "Enable saving of AVX registers with XSAVE"
+    default y
+    depends on XSAVE_SUPPORT
+    help
+      Will save AVX state with XSAVE when enabled. Required
+      in order to save AVX512f state. This opt. will
+      be ignored if processor does not have AVX registers.
+
+config XSAVE_AVX512F_SUPPORT
+    bool "Enable saving of AVX512f registers with XSAVE"
+    default y
+    depends on XSAVE_SUPPORT
+    help
+      Will save AVX512f state with XSAVE when enabled. This
+      opt will be ignored if processor does not 
+      have avx512f registers.
+

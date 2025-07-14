@@ -375,6 +375,7 @@ leaq 8(%rsp), %rsp ;                            // This instruction must not aff
 
 */	
 
+#ifdef NAUT_CONFIG_THREAD_FORK
 ENTRY(nk_thread_fork)
 	REG_SAVE()                  // RBP and RSP will be handled in _thread_fork
 
@@ -396,9 +397,11 @@ ENTRY(_fork_return)
 
 	foo(struct nk_regs *r)
 
-	nk_interrupt_like_trampoline(foo)
-	
+	nk_interrupt_like_trampoline(foo)	
 */
+
+#endif /* NAUT_CONFIG_THREAD_FORK */
+
 ENTRY(nk_interrupt_like_trampoline)
 	// we need to create a whole interrupt stack frame
 	mov  %ss, %rax

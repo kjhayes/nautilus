@@ -1,0 +1,8 @@
+
+config ARM64_HAS_SECURE_MONITOR
+    bool "ARM Has Secure Monitor"
+    default n
+    depends on ARCH_ARM64
+    help
+      Is there trusted firmware present at EL3? (e.g. should we use HVC or SMC calls?)
+

@@ -476,8 +476,8 @@ kbd_handler (struct nk_irq_action * action, struct nk_regs *regs, void *state)
     DEBUG("Keyboard: status=0x%x, scancode=0x%x\n", status, scan);
     io_delay();
     
-    
-#if NAUT_CONFIG_THREAD_EXIT_KEYCODE == 0xc4
+   
+#if NAUT_CONFIG_PS2_THREAD_EXIT_KEYCODE == 0xc4
     // Vestigal debug handling to force thread exit
     if (scan == 0xc4) {
       void * ret = NULL;

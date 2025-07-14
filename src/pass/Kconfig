@@ -1,5 +1,3 @@
-menu "Compiler Passes"
-  depends on USE_WLLVM
 
 config BEANDIP
   bool "BEANDIP"
@@ -27,4 +25,3 @@ config EXAMPLE_PASS
   help
     Enables the Example LLVM Pass (does nothing)
 
-endmenu

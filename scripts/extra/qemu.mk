@@ -1,7 +1,7 @@
 
 ifdef QEMU
 
-QEMU_FLAGS += -smp cpus=4
+QEMU_FLAGS += -smp cpus=1
 QEMU_FLAGS += -serial stdio
 #QEMU_FLAGS += -display none
 QEMU_FLAGS += -m 2G

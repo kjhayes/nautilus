@@ -1,4 +1,3 @@
-menu "Networking"
 
 config NET_ETHERNET
 	bool "Low-level Ethernet Support"
@@ -108,7 +107,3 @@ config NET_LWIP_APP_LWIP_IPVCD
 		Adds the ability to telnet to a virtual console in NK
 endmenu
 
-
-	
-
-endmenu

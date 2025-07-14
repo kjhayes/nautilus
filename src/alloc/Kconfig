@@ -1,0 +1,65 @@
+config ALLOCS
+  bool "Enable Allocators"
+  default n
+  depends on X86_64_HOST
+  depends on ALLOW_UNINTEGRATED
+  select ALLOC_BASE
+  help
+     Enable allocator abstractions
+     
+config DEBUG_ALLOCS
+  bool "Debug allocators core"
+  depends on ALLOCS
+  default n
+  help
+     Turn on debugging prints for the allocator core
+
+config ALLOC_BASE
+  bool "Base allocator"
+  depends on ALLOCS
+  default y
+  help
+     This is the base allocator, just a wrapper on the system allocator
+
+config DEBUG_ALLOC_BASE
+  bool "Debug the base allocator"
+  depends on ALLOC_BASE
+  default n
+  help
+     Turn on debugging prints for the base allocator
+
+config ALLOC_BUMP
+  bool "Bump allocator"
+  depends on ALLOCS
+  default n
+  help
+     This allocator never deallocates, but allocates in constant time
+
+config DEBUG_ALLOC_BUMP
+  bool "Debug the bump allocator"
+  depends on ALLOC_BUMP
+  default n
+  help
+     Turn on debugging prints for the dumb allocator
+
+config ALLOC_IMPLICIT
+  bool "Implicit free list allocator"
+  depends on ALLOCS
+  default n
+  help
+     Implicit Free list implementation
+
+config DEBUG_ALLOC_IMPLICIT
+  bool "Debug the implicit free list allocator"
+  depends on ALLOC_IMPLICIT
+  default n
+  help
+     Turn on debugging prints for the cs213 allocator
+
+config DEBUG_ALLOC_TEST
+  bool "Debug allocator test"
+  depends on ALLOC_TEST
+  default n
+  help
+     Turn on debugging prints for the allocator test
+

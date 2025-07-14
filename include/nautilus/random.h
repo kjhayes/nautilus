@@ -43,6 +43,8 @@ void nk_rand_set_xi(uint64_t xi);
 void nk_rand_seed(uint64_t seed);
 void nk_get_rand_bytes(uint8_t *buf, unsigned len);
 
+unsigned long nk_get_rand_ulong(void);
+
 #ifdef __cplusplus
 }
 #endif

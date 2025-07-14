@@ -24,6 +24,7 @@ extern void thread_cleanup (void);
 extern void thread_push (nk_thread_t * t, uint64_t x);
 extern void thread_setup_init_stack (nk_thread_t * t, nk_thread_fun_t fun, void * arg);
 
+#ifdef NAUT_CONFIG_THREAD_FORK
 nk_thread_id_t
 __thread_fork (void)
 {
@@ -181,4 +182,5 @@ __thread_fork (void)
    // return child's tid to parent
    return tid;
 }
+#endif
 

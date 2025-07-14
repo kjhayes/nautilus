@@ -108,6 +108,7 @@ nk_thread_start (nk_thread_fun_t fun,
                  nk_thread_id_t * tid,
                  cpu_id_t bound_cpu); // NK_NULL_CPU_ID => not bound
 
+#ifdef NAUT_CONFIG_THREAD_FORK
 // fork the current thread 
 //   - parent is returned the tid of child
 //   - child is returned zero
@@ -117,6 +118,7 @@ nk_thread_start (nk_thread_fun_t fun,
 //     the caller
 // on error, parents gets NK_BAD_THREAD_ID
 extern nk_thread_id_t nk_thread_fork(void);
+#endif
 
 // Allow a child thread to set output explicitly
 // This is not overwritten by an nk_thread_exit()
@@ -291,7 +293,9 @@ struct nk_thread {
 // internal thread representations
 typedef struct nk_thread nk_thread_t;
 
+#ifdef NAUT_CONFIG_THREAD_FORK
 nk_thread_id_t __thread_fork(void);
+#endif
 
 int
 _nk_thread_init (nk_thread_t * t, 

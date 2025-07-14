@@ -129,6 +129,7 @@ static int test_create_join(int nump, int numt)
     return 0;
 }
 
+#ifdef NAUT_CONFIG_THREAD_FORK
 static int __noinline
 #ifndef __clang__
 __attribute__((noclone))
@@ -138,9 +139,6 @@ test_fork_join(int nump, int numt)
     int i,j;
 
     PRINT("Starting on threads fork/join stress test (%d passes, %d threads)\n",nump,numt);
-#ifdef NAUT_CONFIG_ARCH_RISCV
-    return -1;
-#else
 
     nk_thread_id_t t;
     
@@ -179,10 +177,10 @@ test_fork_join(int nump, int numt)
 	PRINT("Joined %d forked threads in pass %d\n", j, i);
 	nk_sched_reap(1); // clean up unconditionally
     }
-#endif
     PRINT("Done with thread fork/join stress test (SUCCESS)\n");
     return 0;
 }
+#endif
 
 static void _test_recursive_create_join(void *in, void **out)
 {
@@ -247,6 +245,7 @@ static int test_recursive_create_join()
 
 volatile static uint64_t hack;
 
+#ifdef NAUT_CONFIG_THREAD_FORK
 static void __noinline
 #ifndef __clang__
 __attribute__((noclone))
@@ -316,13 +315,14 @@ static int test_recursive_fork_join()
     }
     return hack;
 }
+#endif
 
 int test_threads()
 {
-    int create_join;
-    int fork_join;
-    int recursive_create_join;
-    int recursive_fork_join;
+    int create_join = 0;
+    int fork_join = 0;
+    int recursive_create_join = 0;
+    int recursive_fork_join = 0;
 
     printk("Starting thread tests...\n");
 
@@ -333,15 +333,17 @@ int test_threads()
 
     printk("Create-join test of %lu passes with %lu threads each: %s\n", 
 		 NUM_PASSES,NUM_THREADS, create_join ? "FAIL" : "PASS");
-   
+
+#ifdef NAUT_CONFIG_THREAD_FORK
     printk("Starting Fork-join test of %lu passes with %lu threads each...\n", 
 		 NUM_PASSES,NUM_THREADS);
  
     fork_join = test_fork_join(NUM_PASSES,NUM_THREADS);
     
     printk("Fork-join test of %lu passes with %lu threads each: %s\n", 
-		 NUM_PASSES,NUM_THREADS, fork_join ? "FAIL" : "PASS");
- 
+		 NUM_PASSES,NUM_THREADS, fork_join ? "FAIL" : "PASS"); 
+#endif
+
     printk("Starting Recursive create-join test of %lu passes with depth %lu (%lu threads)...\n", 
 		 NUM_PASSES,DEPTH, 1ULL<<(DEPTH+1));
   
@@ -350,6 +352,7 @@ int test_threads()
     printk("Recursive create-join test of %lu passes with depth %lu (%lu threads): %s\n", 
 		 NUM_PASSES,DEPTH, 1ULL<<(DEPTH+1),recursive_create_join ? "FAIL" : "PASS");
 
+#ifdef NAUT_CONFIG_THREAD_FORK
     printk("Starting Recursive fork-join test of %lu passes with depth %lu (%lu threads)...\n", 
 		 NUM_PASSES,DEPTH, 1ULL<<(DEPTH+1));
 
@@ -357,6 +360,7 @@ int test_threads()
 
     printk("Recursive fork-join test of %lu passes with depth %lu (%lu threads): %s\n", 
 		 NUM_PASSES,DEPTH, 1ULL<<(DEPTH+1),recursive_fork_join ? "FAIL" : "PASS");
+#endif
 
     return create_join | fork_join | recursive_create_join | recursive_fork_join;
 }

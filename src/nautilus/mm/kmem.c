@@ -534,7 +534,15 @@ _kmem_sys_malloc (size_t size, int cpu, int zero, addr_t lb, addr_t ub)
 	my_id = cpu;
     }
 
-    struct kmem_data * my_kmem = &(nk_get_nautilus_info()->sys.cpus[my_id]->kmem);
+    ASSERT(my_id >= 0 && my_id < nk_get_num_cpus());
+
+    struct naut_info *naut_info = nk_get_nautilus_info();
+    ASSERT(naut_info != NULL);
+
+    struct cpu *cpu_ptr = naut_info->sys.cpus[my_id];
+    ASSERT(cpu_ptr != NULL);
+
+    struct kmem_data * my_kmem = &(cpu_ptr->kmem);
 
     KMEM_DEBUG("malloc of %lu bytes (zero=%d) from:\n",size,zero);
     KMEM_DEBUG_BACKTRACE();

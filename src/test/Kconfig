@@ -1,4 +1,3 @@
-menu "Tests"
 
 config TEST_ALLOC_IMPLICIT
 	  bool "Test the implicit free list allocator"
@@ -59,7 +58,7 @@ config TEST_CACHEPART
 
 config NPB_NAS_TEST
     bool "NPB NAS Tests"
-    depends on !BASE_LIBM_COMPAT
+    depends on THREAD_FORK && !BASE_LIBM_COMPAT
     default n
     help
         Include the NAS Parallel Benchmark Test Suite
@@ -136,4 +135,8 @@ config NPB_NAS_SP
     help
         Include the SP Benchmark from the NPB NAS benchmark suite.
 
-endmenu
+config FP_TEST
+    bool "Floating Point Tests"
+    depends on BASE_LIBM_COMPAT
+    default n
+

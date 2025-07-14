@@ -112,7 +112,6 @@ get_rand_byte (void)
 #endif
 }
 
-
 void
 nk_get_rand_bytes (uint8_t * buf, unsigned len)
 {
@@ -125,6 +124,12 @@ nk_get_rand_bytes (uint8_t * buf, unsigned len)
     }
 }
 
+unsigned long nk_get_rand_ulong(void)
+{
+    unsigned long val;
+    nk_get_rand_bytes((void*)&val, sizeof(val));
+    return val;
+}
 
 int
 nk_rand_init (struct cpu * cpu) 

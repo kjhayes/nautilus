@@ -1,10 +1,11 @@
-menu "Devices"
 
 menu "Serial Options"
+    depends on ALLOW_UNINTEGRATED
 
 config SERIAL_REDIRECT
     bool "Serial Redirect"
     depends on !HVM_HRT && ARCH_X86 && !PC_8250_UART
+    depends on ALLOW_UNINTEGRATED
     default n
     help
         Redirect printing to serial device
@@ -16,6 +17,7 @@ config SERIAL_REDIRECT
 
 config SERIAL_REDIRECT_PORT
     depends on SERIAL_REDIRECT
+    depends on ALLOW_UNINTEGRATED
     int "Serial COM Port for redirection"
     range 1 4
     default "1"
@@ -25,6 +27,7 @@ config SERIAL_REDIRECT_PORT
 
 config SERIAL_DEBUGGER
     bool "Serial Debugger"
+    depends on ALLOW_UNINTEGRATED
     depends on ENABLE_REMOTE_DEBUGGING && ARCH_X86 && !PC_8250_UART
     default n
     help
@@ -32,6 +35,7 @@ config SERIAL_DEBUGGER
 
 config SERIAL_DEBUGGER_PORT
     depends on SERIAL_DEBUGGER
+    depends on ALLOW_UNINTEGRATED
     int "Serial COM Port for remote debugger interface"
     range 1 4
     default "2"
@@ -45,7 +49,7 @@ endmenu
 config SIFIVE_GPIO
     bool "SiFive GPIO"
     depends on ARCH_RISCV
-    default y
+    default n
     help
        Enable driver for SiFive GPIO
 
@@ -93,6 +97,8 @@ config DEBUG_GIC
     help
       Debug the Generic Interrupt Controller for the ARM64 Architecture
 
+menu "Serial/UART Devices"
+
 config GENERIC_8250_UART
     bool
     default n
@@ -129,7 +135,7 @@ config OF_8250_UART_EARLY_OUTPUT
       Try to use the Generic 8250 UART found in the device tree for early output before the Virtual Console
 
 config PC_8250_UART
-    bool "PC 8250 UART"
+    bool "Serial Port UART"
     depends on ARCH_X86 && !STANDALONE_SERIAL_DRIVER
     select GENERIC_8250_UART
     default n
@@ -138,19 +144,19 @@ config PC_8250_UART
       Selecting this disables the original serial port driver.
 
 config DEBUG_PC_8250_UART
-    bool "Debug PC 8250 UART"
+    bool "Debug Serial Port UART"
     depends on DEBUG_PRINTS && PC_8250_UART
     select DEBUG_GENERIC_8250_UART
 
 config PC_8250_UART_EARLY_OUTPUT
-    bool "PC 8250 UART Early Output"
+    bool "Serial Port UART Early Output"
     depends on PC_8250_UART
     default n
     help
       Use one of the PC COM Ports for Early Output
 
 config PC_8250_UART_EARLY_COM_PORT
-    int "PC 8250 UART Early COM Port"
+    int "Serial Port UART Early COM Port"
     depends on PC_8250_UART_EARLY_OUTPUT
     default 1
     help
@@ -221,54 +227,44 @@ config SIFIVE_SERIAL_DEBUG
     help
       Debug the driver for the SiFive serial port
 
-config APIC_FORCE_XAPIC_MODE
-    bool "Force APIC to use XAPIC mode"
+endmenu
+
+menu "PCI Options"
+    depends on HAS_PCI
+
+    config OF_PCI
+        bool "Device Tree PCI"
+        depends on USE_FDT && HAS_PCI
+        default y
+        help
+            Allow parsing PCI information from the device tree if available.
+    
+    config DEBUG_PCI
+        bool "Debug PCI"
+        depends on HAS_PCI && DEBUG_PRINTS
+        default n
+        help 
+            Turn on debug prints for PCI devices
+
+endmenu
+
+config PS2
+    bool "PS2 Keyboard/Mouse Driver"
     depends on ARCH_X86
-    default n
-    help
-       Force the use of XAPIC mode even if X2APIC mode is available
-
-config APIC_TIMER_CALIBRATE_INDEPENDENTLY
-    bool "Calibrate APIC timer independently on each core"
-    depends on ARCH_X86
-    default n
-    help
-      If set, each core's APIC timer is independently calibrated
-      If not set, only the BSP core's timer is calibrated and
-      other cores clone its calibration
-
-
-config DEBUG_APIC
-    bool "Debug APIC"
-    depends on ARCH_X86 && DEBUG_PRINTS
-    default n
-    help
-        Turn on debug prints for the LAPIC driver
-
-config DEBUG_IOAPIC
-    bool "Debug IOAPIC"
-    depends on ARCH_X86 && DEBUG_PRINTS
-    default n
-    help 
-        Turn on debug prints for the IOAPIC driver
-
-config OF_PCI
-    bool "OpenFirmware PCI Bus"
-    depends on USE_FDT && HAS_PCI
     default y
-    help
-        Allow parsing PCI information from the device tree if available.
 
-config DEBUG_PCI
-    bool "Debug PCI"
-    depends on HAS_PCI && DEBUG_PRINTS
-    default n
-    help 
-        Turn on debug prints for PCI devices
+config PS2_THREAD_EXIT_KEYCODE
+    int "PS2 Thread Exit Keycode"
+    range 1 255
+    default "196"
+    depends on PS2
+    help
+        uses a special thread exit keycode
 
 config DISABLE_PS2_MOUSE
     bool "Disable PS2 Mouse"
     default n
+    depends on PS2
     help
         Unconditionally disable PS2 mouse support
         This is useful on bizarro platforms that have broken or
@@ -276,7 +272,7 @@ config DISABLE_PS2_MOUSE
 
 config DEBUG_PS2
     bool "Debug PS2 interface (Keyboard/Mouse)"
-    depends on ARCH_X86 && DEBUG_PRINTS
+    depends on PS2 && DEBUG_PRINTS
     default n
     help
         Turn on debug prints for the keyboard/mouse on the PS/2 interface
@@ -326,47 +322,51 @@ config DEBUG_HPET
     help
       Turn on debug prints for the HPET
 
-config VIRTIO_PCI
-    bool "Core Virtio PCI Driver"
-    depends on HAS_PCI && HAS_MSI
-    default n
-    help
-      Adds the basic Virtio PCI interface
+menu "Virtio Devices"
 
-config DEBUG_VIRTIO_PCI
-    bool "Debug Virtio PCI"
-    depends on DEBUG_PRINTS && VIRTIO_PCI
-    default n
-    help
-      Turn on debug prints for the Virtio PCI interface
+    config VIRTIO_PCI
+        bool "Core Virtio PCI Driver"
+        depends on HAS_PCI && HAS_MSI
+        default n
+        help
+          Adds the basic Virtio PCI interface
+    
+    config DEBUG_VIRTIO_PCI
+        bool "Debug Virtio PCI"
+        depends on DEBUG_PRINTS && VIRTIO_PCI
+        default n
+        help
+          Turn on debug prints for the Virtio PCI interface
+    
+    config VIRTIO_NET
+        bool "Virtio Net"
+        depends on VIRTIO_PCI
+        default n
+        help
+          Adds the Virtio Network Driver
+    
+    config DEBUG_VIRTIO_NET
+        bool "Debug Virtio Net"
+        depends on DEBUG_PRINTS && VIRTIO_NET
+        default n
+        help
+          Turn on debug prints for the Virtio Network Driver
+          
+    config VIRTIO_BLK
+        bool "Virtio Block"
+        depends on VIRTIO_PCI
+        default n
+        help
+          Adds the Virtio Block Driver
+    
+    config DEBUG_VIRTIO_BLK
+        bool "Debug Virtio Block"
+        depends on DEBUG_PRINTS && VIRTIO_BLK
+        default n
+        help
+          Turn on debug prints for the Virtio Block Driver
 
-config VIRTIO_NET
-    bool "Virtio Net"
-    depends on VIRTIO_PCI
-    default n
-    help
-      Adds the Virtio Network Driver
-
-config DEBUG_VIRTIO_NET
-    bool "Debug Virtio Net"
-    depends on DEBUG_PRINTS && VIRTIO_NET
-    default n
-    help
-      Turn on debug prints for the Virtio Network Driver
-      
-config VIRTIO_BLK
-    bool "Virtio Block"
-    depends on VIRTIO_PCI
-    default n
-    help
-      Adds the Virtio Block Driver
-
-config DEBUG_VIRTIO_BLK
-    bool "Debug Virtio Block"
-    depends on DEBUG_PRINTS && VIRTIO_BLK
-    default n
-    help
-      Turn on debug prints for the Virtio Block Driver
+endmenu
 
 config E1000_PCI
     bool "E1000 PCI NIC Driver"
@@ -409,7 +409,6 @@ config DEBUG_MLX3_PCI
     default n
     help
       Turn on debug prints for the Mellanox ConnectX-3 HCA Driver
-
 
 config RAMDISK
     bool "RAM Disk Support"
@@ -462,6 +461,3 @@ config DEBUG_VESA
     help
        Add debugging output from VESA driver
 
-endmenu
-
-    

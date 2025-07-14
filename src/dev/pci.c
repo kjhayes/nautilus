@@ -1316,7 +1316,7 @@ int pci_dev_enable_msi(struct pci_dev *dev, nk_irq_t base_irq, int num_irq)
 
   if (num_irq<1 || num_irq>32 || 
       num_irq>dev->msi.num_vectors_needed || 
-      __builtin_popcount(num_irq)!=1 || 
+      (num_irq & (num_irq-1))!=0 || // Not a power of two
       base_irq& (num_irq- 1)) {
     PCI_ERROR("Invalid MSI enable request\n");
   }

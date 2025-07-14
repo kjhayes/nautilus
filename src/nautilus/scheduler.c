@@ -63,7 +63,9 @@
 #include <nautilus/backtrace.h>
 #include <nautilus/shell.h>
 #include <nautilus/topo.h>
+#ifdef NAUT_CONFIG_LIBC_COMPAT
 #include <nautilus/libccompat.h>
+#endif
 #include <nautilus/atomic.h>
 #include <dev/port_gpio.h>
 
@@ -5299,7 +5301,7 @@ static struct shell_cmd_impl burn_impl = {
 };
 nk_register_shell_cmd(burn_impl);
 
-#ifdef NAUT_CONFIG_ARCH_X86
+#ifdef NAUT_CONFIG_LIBC_COMPAT
   static int 
 test_timed_stop (char * buf, void * priv)
 {

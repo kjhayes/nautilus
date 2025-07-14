@@ -1,0 +1,154 @@
+config ASPACES
+  bool "Enable Address Spaces"
+  default n
+  depends on X86_64_HOST
+  depends on ALLOW_UNINTEGRATED
+  select ASPACE_BASE
+  help
+     Enable address space abstractions plus address space
+     switching on thread context switches
+     
+config DEBUG_ASPACES
+  bool "Debug address space core"
+  depends on ASPACES
+  default n
+  help
+     Turn on debugging prints for the address space core
+     
+config ASPACE_BASE
+  bool "Base abstraction"
+  depends on ASPACES
+  default y
+  help
+     This is the base address space abstraction
+     which is the single, identity-mapped address space
+     but now it has a name.   This must always be available
+
+config DEBUG_ASPACE_BASE
+  bool "Debug the base address space abstraction"
+  depends on ASPACE_BASE
+  default n
+  help
+     Turn on debugging prints for the paging address space abstraction
+
+config ASPACE_PAGING
+  bool "Paging abstraction"
+  depends on ASPACES
+  default y
+  help
+     This is the paging address space abstraction.
+     It does lazy build of identity-mapped page tables, plus
+     it allows creation of non-identity-mapped addresses
+
+	  choice
+      	  	depends on ASPACE_PAGING
+          	prompt "Paging region data structure"
+          	default ASPACE_PAGING_REGION_RB_TREE
+
+          	config ASPACE_PAGING_REGION_RB_TREE
+           	  bool "Red Black Tree"
+
+          	config ASPACE_PAGING_REGION_SPLAY_TREE
+              	  bool "Splay Tree"
+
+          	config ASPACE_PAGING_REGION_LINKED_LIST
+              	  bool "Linked List"
+
+                config ASPACE_PAGING_REGION_SKIP_LIST
+                  bool "Skip List"
+          endchoice
+
+
+config ASPACE_PAGING_1GB
+     bool "Huge Page 1GB"
+     depends on ASPACE_PAGING
+     default y
+     help
+       Enable 1GB Huge Page for region aligned with 1GB and length as multiple of 1GB
+
+config ASPACE_PAGING_2MB
+  bool "Large Page 2MB"
+  depends on ASPACE_PAGING
+  default y
+  help
+    Enable 2MB Large Page for region aligned with 2MB and length as multiple of 2MB
+
+config ASPACE_PAGING_REGION_STRUCT_TEST
+  bool "Test region tracking data structures"
+  depends on ASPACE_PAGING
+  default n
+  help
+   Test red black tree, splay tree, and linked list against each other
+
+config ASPACE_PAGING_PCID
+ bool "PCID for Paging"
+ depends on ASPACE_PAGING
+ default y
+ help
+ Enable PCID support for paging address aspace
+
+choice
+  depends on ASPACE_PAGING_PCID
+    prompt "PCID implementation"
+    default ASPACE_PAGING_PCID_QUEUE
+
+    config ASPACE_PAGING_PCID_QUEUE
+        bool "Queue"
+    config ASPACE_PAGING_PCID_BITMAP
+        bool "Bitmap"
+endchoice
+
+
+config DEBUG_ASPACE_PAGING
+  bool "Debug the paging address space abstraction"
+  depends on ASPACE_PAGING
+  default n
+  help
+     Turn on debugging prints for the paging address space abstraction
+
+config ASPACE_CARAT
+  bool "CARAT  abstraction"
+  depends on ASPACES
+  default y
+  help
+     This is the CARAT address space abstraction.
+     
+config DEBUG_ASPACE_CARAT
+  bool "Debug the CARAT address space abstraction"
+  depends on ASPACE_CARAT
+  default n
+  help
+     Turn on debugging prints for the CARAT address space abstraction
+
+choice
+  depends on ASPACE_CARAT
+  prompt "CARAT Region data structure"
+  default ASPACE_CARAT_REGION_RB_TREE
+  
+  config ASPACE_CARAT_REGION_RB_TREE
+     bool "Red Black Tree"
+  
+  config ASPACE_CARAT_REGION_SPLAY_TREE
+     bool "Splay Tree"
+  
+  config ASPACE_CARAT_REGION_LINKED_LIST
+     bool "Linked List"
+  
+  config ASPACE_CARAT_REGION_SKIP_LIST
+     bool "Skip List"
+endchoice
+
+config CARAT_PROFILE
+  bool "Enable profiling for CARAT aspace"
+  depends on ASPACE_CARAT
+  default n
+  help
+    Turns on profiling for CARAT Aspace
+
+config DEBUG_ASPACE_REGION_TRACKING
+  bool "Debug the selected region tracking data structure (RBTree/SplayTree/..)"
+    depends on ASPACES
+    default y
+    help
+       Turn on debugging prints for selected region tracking data structure
+
